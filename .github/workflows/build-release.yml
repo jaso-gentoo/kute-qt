@@ -31,7 +31,7 @@ jobs:
             libtag1-dev libgl1-mesa-dev \
             libwayland-dev libxkbcommon-dev \
             cmake ninja-build patchelf desktop-file-utils \
-            libfuse2 wget file
+            libfuse2 wget curl file
 
       - name: Configure
         run: |
@@ -48,9 +48,21 @@ jobs:
 
       - name: Download linuxdeploy
         run: |
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          set -e
+          for i in 1 2 3; do
+            curl -fL --retry 5 --retry-delay 3 --retry-connrefused \
+              -o linuxdeploy-x86_64.AppImage \
+              "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage" && break || sleep 5
+          done
+          for i in 1 2 3; do
+            curl -fL --retry 5 --retry-delay 3 --retry-connrefused \
+              -o linuxdeploy-plugin-qt-x86_64.AppImage \
+              "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage" && break || sleep 5
+          done
+          test -s linuxdeploy-x86_64.AppImage
+          test -s linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy*.AppImage
+          ls -la linuxdeploy*.AppImage
 
       - name: Bundle Qt Wayland plugins and libs
         run: |
@@ -102,7 +114,9 @@ jobs:
 
       - name: Build AppImage
         run: |
-          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          curl -fL --retry 5 --retry-delay 3 -o appimagetool \
+            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          test -s appimagetool
           chmod +x appimagetool
           ARCH=x86_64 ./appimagetool AppDir kute-x86_64.AppImage
           ls -la kute-x86_64.AppImage
@@ -204,7 +218,7 @@ jobs:
           Unicode true
           SilentInstall silent
           RequestExecutionLevel user
-          OutFile "kute-windows-x64.exe"
+          OutFile "kute-windows-x86_64.exe"
           InstallDir "$TEMP\kute"
 
           Section
@@ -221,17 +235,17 @@ jobs:
 
           "$NSIS" kute.nsi
 
-          if [ ! -f "kute-windows-x64.exe" ]; then
-            echo "ERROR: kute-windows-x64.exe was NOT created"
+          if [ ! -f "kute-windows-x86_64.exe" ]; then
+            echo "ERROR: kute-windows-x86_64.exe was NOT created"
             exit 1
           fi
-          ls -la kute-windows-x64.exe
+          ls -la kute-windows-x86_64.exe
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-portable
-          path: kute-windows-x64.exe
+          path: kute-windows-x86_64.exe
 
   release:
     needs: [linux, windows]
