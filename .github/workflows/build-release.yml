@@ -147,6 +147,341 @@ jobs:
           mkdir -p dist
           cp build/kute.exe dist/
           windeployqt --release --no-translations --qmldir qml dist/kute.exe || true
+
+          # Копируем ВСЁ из /ucrt64/bin — гарантирует, что ни одна
+          # зависимость MinGW-рантайма не потеряется.
+          cp /ucrt64/bin/*.dll dist/
+
+          # Удаляем лишнее: LLM-хлам, Python, tcl/tk, hwy
+          rm -f dist/ggml*.dll
+          rm -f dist/libllama*.dll
+          rm -f dist/libmtmd*.dll
+          rm -f dist/libwhisper*.dll
+          rm -f dist/libparakeet*.dll
+          rm -f dist/libpython*.dll
+          rm -f dist/libPyImath*.dll
+          rm -f dist/libopenblas*.dll
+          rm -f dist/libgfortran*.dll
+          rm -f dist/libquadmath*.dll
+          rm -f dist/libgomp*.dll
+          rm -f dist/tcl86.dll
+          rm -f dist/tk86.dll
+          rm -f dist/libhwy*.dll
+          rm -f dist/libcaca*.dll
+          rm -f dist/libImath*.dll
+          rm -f dist/libIex*.dll
+          rm -f dist/libIlmThread*.dll
+          rm -f dist/libOpenEXR*.dll
+          rm -f dist/libjxl*.dll
+          rm -f dist/libmenuw6.dll
+          rm -f dist/libformw6.dll
+          rm -f dist/libpanelw6.dll
+          rm -f dist/libncurses*.dll
+
+          # КРИТИЧНО: MinGW-стаб vulkan-1.dll ломает инициализацию GPU.
+          rm -f dist/vulkan-1.dll
+          rm -f dist/OpenCL.dll
+
+          echo "--- dist ---"
+          ls dist/ | wc -l
+          du -sh dist/
+
+      - name: Pack dist to zip
+        run: |
+          cd dist
+          7z a -mx=9 ../dist.zip .
+          cd ..
+          ls -la dist.zip
+
+      - name: Build launcher.exe
+        run: |
+          cat > launcher.c <<'EOF'
+          #include <windows.h>
+          #include <shellapi.h>
+          #include <stdio.h>
+
+          int WINAPI wWinMain(HINSTANCE hI, HINSTANCE hP, PWSTR cmd, int nShow) {
+              wchar_t exePath[MAX_PATH];
+              GetModuleFileNameW(NULL, exePath, MAX_PATH);
+              wchar_t *slash = wcsrchr(exePath, L'\\');
+              if (slash) *slash = 0;
+
+              wchar_t tempPath[MAX_PATH];
+              GetTempPathW(MAX_PATH, tempPath);
+
+              wchar_t targetDir[MAX_PATH];
+              swprintf(targetDir, MAX_PATH, L"%skute_%u", tempPath, GetTickCount());
+              CreateDirectoryW(targetDir, NULL);
+
+              wchar_t psCmd[2048];
+              swprintf(psCmd, 2048,
+                  L"powershell -NoProfile -WindowStyle Hidden -Command "
+                  L"\"Expand-Archive -Path '%s\\dist.zip' -DestinationPath '%s' -Force\"",
+                  exePath, targetDir);
+
+              STARTUPINFOW si = { sizeof(si) };
+              PROCESS_INFORMATION pi = { 0 };
+              si.dwFlags = STARTF_USESHOWWINDOW;
+              si.wShowWindow = SW_HIDE;
+              if (!CreateProcessW(NULL, psCmd, NULL, NULL, FALSE,
+                                  CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+                  MessageBoxW(NULL, L"Cannot run unpacker", L"kute", MB_ICONERROR);
+                  return 1;
+              }
+              WaitForSingleObject(pi.hProcess, 60000);
+              CloseHandle(pi.hProcess);
+              CloseHandle(pi.hThread);
+
+              wchar_t kuteExe[MAX_PATH];
+              swprintf(kuteExe, MAX_PATH, L"%s\\kute.exe", targetDir);
+
+              if (GetFileAttributesW(kuteExe) == INVALID_FILE_ATTRIBUTES) {
+                  MessageBoxW(NULL, L"Unpack failed, kute.exe not found", L"kute", MB_ICONERROR);
+                  return 1;
+              }
+
+              ShellExecuteW(NULL, L"open", kuteExe, NULL, targetDir, SW_SHOW);
+              return 0;
+          }
+          EOF
+
+          gcc -O2 -s -mwindows launcher.c -o launcher.exe -lshell32 -luser32
+          ls -la launcher.exe
+
+      - name: Build single-file exe with IExpress
+        shell: pwsh
+        run: |
+          $dir = (Get-Location).Path.Replace('\', '\\')
+
+          if (-not (Test-Path "launcher.exe")) { Write-Error "launcher.exe not found"; exit 1 }
+          if (-not (Test-Path "dist.zip"))     { Write-Error "dist.zip not found"; exit 1 }
+
+          $sed = @"
+          [Version]
+          Class=IEXPRESS
+          SEDVersion=3
+          [Options]
+          PackagePurpose=InstallApp
+          ShowInstallProgramWindow=0
+          HideExtractAnimation=1
+          UseLongFileName=1
+          InsideCompressed=0
+          CAB_FixedSize=0
+          CAB_ResvCodeSigning=0
+          RebootMode=N
+          InstallPrompt=
+          DisplayLicense=
+          FinishMessage=
+          TargetName=$dir\kute-windows-x64.exe
+          FriendlyName=kute
+          AppLaunched=launcher.exe
+          PostInstallCmd=<None>
+          AdminQuietInstCmd=
+          UserQuietInstCmd=
+          SourceFiles=SourceFiles
+          [Strings]
+          FILE0="launcher.exe"
+          FILE1="dist.zip"
+          [SourceFiles]
+          SourceFiles0=$dir\\
+          [SourceFiles0]
+          %FILE0%=
+          %FILE1%=
+          "@
+
+          $sed = ($sed -split "`r?`n" | Where-Object { $_ -ne "" -and $_ -notmatch '^\s+$' }) -join "`r`n"
+          Set-Content -Path "kute.sed" -Value $sed -Encoding ASCII -NoNewline
+          Get-Content kute.sed
+
+          $iexpress = "$env:SystemRoot\System32\iexpress.exe"
+          $proc = Start-Process -FilePath $iexpress -ArgumentList "/N","kute.sed" -Wait -PassThru
+          Write-Host "IExpress exit code: $($proc.ExitCode)"
+          Start-Sleep -Seconds 5
+
+          if (Test-Path "kute-windows-x64.exe") {
+            Write-Host "=== SUCCESS ==="
+            Get-Item "kute-windows-x64.exe" | Format-List Name, Length
+          } else {
+            Write-Host "=== Files in dir ==="
+            Get-ChildItem | Format-Table Name, Length
+            Write-Error "kute-windows-x64.exe was NOT created"
+            exit 1
+          }
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: kute-windows-x64.exe
+
+  release:
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-appimage
+          path: artifacts/
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-portable
+          path: artifacts/
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}name: Build Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.*'
+          host: 'linux'
+          target: 'desktop'
+          arch: 'linux_gcc_64'
+          modules: 'qtmultimedia'
+          cache: true
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libtag1-dev libgl1-mesa-dev \
+            libwayland-dev libxkbcommon-dev \
+            cmake ninja-build patchelf desktop-file-utils \
+            libfuse2 wget file
+
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Install to AppDir
+        run: DESTDIR=$PWD/AppDir cmake --install build
+
+      - name: Download linuxdeploy
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+
+      - name: Bundle Qt Wayland plugins and libs
+        run: |
+          QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
+          mkdir -p AppDir/usr/plugins/platforms
+          mkdir -p AppDir/usr/plugins/wayland-shell-integration
+          mkdir -p AppDir/usr/plugins/wayland-decoration-client
+          mkdir -p AppDir/usr/plugins/wayland-graphics-integration-client
+          mkdir -p AppDir/usr/lib
+
+          cp -v "$QTDIR"/plugins/platforms/libqwayland*.so AppDir/usr/plugins/platforms/
+          cp -v "$QTDIR"/plugins/wayland-shell-integration/*.so \
+                AppDir/usr/plugins/wayland-shell-integration/ 2>/dev/null || true
+          cp -v "$QTDIR"/plugins/wayland-decoration-client/*.so \
+                AppDir/usr/plugins/wayland-decoration-client/ 2>/dev/null || true
+          cp -v "$QTDIR"/plugins/wayland-graphics-integration-client/*.so \
+                AppDir/usr/plugins/wayland-graphics-integration-client/ 2>/dev/null || true
+          cp -v "$QTDIR"/lib/libQt6Wayland*.so* AppDir/usr/lib/
+
+      - name: Fill AppDir with linuxdeploy
+        env:
+          QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
+          QML_SOURCES_PATHS: ${{ github.workspace }}/qml
+          EXTRA_QT_MODULES: "multimedia;dbus"
+        run: |
+          QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
+          export LD_LIBRARY_PATH="$QTDIR/lib:$LD_LIBRARY_PATH"
+          export PATH="$QTDIR/bin:$PATH"
+
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --plugin qt \
+            --desktop-file AppDir/usr/share/applications/kute.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+
+          rm -f AppDir/usr/lib/libwayland-client.so*  || true
+          rm -f AppDir/usr/lib/libwayland-cursor.so*  || true
+          rm -f AppDir/usr/lib/libwayland-egl.so*     || true
+          rm -f AppDir/usr/lib/libwayland-server.so*  || true
+          rm -f AppDir/usr/lib/libxkbcommon.so*       || true
+          rm -f AppDir/usr/lib/libxkbcommon-x11.so*   || true
+          rm -f AppDir/usr/lib/libEGL.so*             || true
+          rm -f AppDir/usr/lib/libGL.so*              || true
+          rm -f AppDir/usr/lib/libGLX.so*             || true
+          rm -f AppDir/usr/lib/libGLdispatch.so*      || true
+          rm -f AppDir/usr/lib/libvulkan.so*          || true
+          rm -f AppDir/usr/lib/libpulse.so*           || true
+          rm -f AppDir/usr/lib/libpulsecommon*.so     || true
+
+      - name: Build AppImage
+        run: |
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool AppDir kute-x86_64.AppImage
+          ls -la kute-x86_64.AppImage
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: kute-x86_64.AppImage
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-multimedia
+            mingw-w64-ucrt-x86_64-qt6-declarative
+            mingw-w64-ucrt-x86_64-qt6-tools
+            mingw-w64-ucrt-x86_64-taglib
+            mingw-w64-ucrt-x86_64-7zip
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Deploy Qt DLLs
+        run: |
+          mkdir -p dist
+          cp build/kute.exe dist/
+          windeployqt --release --no-translations --qmldir qml dist/kute.exe || true
           for dll in \
             libstdc++-6.dll libgcc_s_seh-1.dll libwinpthread-1.dll \
             libbrotlicommon.dll libbrotlidec.dll libbrotlienc.dll \
