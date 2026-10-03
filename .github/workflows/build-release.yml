@@ -174,57 +174,67 @@ jobs:
       - name: Build single-file exe with IExpress
         shell: pwsh
         run: |
-          $dir = (Get-Location).Path
+          $dir = (Get-Location).Path.Replace('\', '\\')
           Write-Host "Working dir: $dir"
-          
-          if (-not (Test-Path "$dir\dist.zip"))    { Write-Error "dist.zip not found"; exit 1 }
-          if (-not (Test-Path "$dir\launcher.bat")) { Write-Error "launcher.bat not found"; exit 1 }
-          
-          $sedLines = @(
-            "[Version]",
-            "Class=IEXPRESS",
-            "SEDVersion=3",
-            "[Options]",
-            "PackagePurpose=InstallApp",
-            "ShowInstallProgramWindow=0",
-            "HideExtractAnimation=1",
-            "UseLongFileName=1",
-            "InsideCompressed=1",
-            "CAB_FixedSize=0",
-            "CAB_ResvCodeSigning=0",
-            "RebootMode=N",
-            "InstallPrompt=",
-            "DisplayLicense=",
-            "FinishMessage=",
-            "TargetName=$dir\kute-windows-x64.exe",
-            "FriendlyName=kute",
-            "AppLaunched=launcher.bat",
-            "PostInstallCmd=<None>",
-            "AdminQuietInstCmd=",
-            "UserQuietInstCmd=",
-            "SourceFiles=SourceFiles",
-            "[SourceFiles]",
-            "SourceFiles0=$dir",
-            "[SourceFiles0]",
-            "%FILE0%=",
-            "%FILE1%=",
-            "[Strings]",
-            'FILE0="launcher.bat"',
-            'FILE1="dist.zip"'
-          )
-          
-          Set-Content -Path "kute.sed" -Value ($sedLines -join "`r`n") -Encoding ASCII
+
+          if (-not (Test-Path "launcher.bat")) { Write-Error "launcher.bat not found"; exit 1 }
+          if (-not (Test-Path "dist.zip"))     { Write-Error "dist.zip not found"; exit 1 }
+
+          # Правильный порядок секций: [Strings] идёт ДО [SourceFiles].
+          # [SourceFiles0] с %FILE0%= (с = в конце). SourceFiles0 путь с \ в конце.
+          $sed = @"
+          [Version]
+          Class=IEXPRESS
+          SEDVersion=3
+          [Options]
+          PackagePurpose=InstallApp
+          ShowInstallProgramWindow=0
+          HideExtractAnimation=0
+          UseLongFileName=1
+          InsideCompressed=0
+          CAB_FixedSize=0
+          CAB_ResvCodeSigning=0
+          RebootMode=N
+          InstallPrompt=
+          DisplayLicense=
+          FinishMessage=
+          TargetName=$dir\kute-windows-x64.exe
+          FriendlyName=kute
+          AppLaunched=launcher.bat
+          PostInstallCmd=<None>
+          AdminQuietInstCmd=
+          UserQuietInstCmd=
+          SourceFiles=SourceFiles
+          [Strings]
+          FILE0="launcher.bat"
+          FILE1="dist.zip"
+          [SourceFiles]
+          SourceFiles0=$dir\\
+          [SourceFiles0]
+          %FILE0%=
+          %FILE1%=
+          "@
+
+          # Убираем пустые строки, которые PS добавляет в here-string
+          $sed = ($sed -split "`r?`n" | Where-Object { $_ -ne "" -and $_ -notmatch '^\s+$' }) -join "`r`n"
+          Set-Content -Path "kute.sed" -Value $sed -Encoding ASCII -NoNewline
           Write-Host "=== Generated SED ==="
           Get-Content kute.sed
-          
-          & "$env:SystemRoot\System32\iexpress.exe" /N /Q "kute.sed"
-          Start-Sleep -Seconds 10
-          
-          if (Test-Path "$dir\kute-windows-x64.exe") {
-            Write-Host "=== Success ==="
-            Get-Item "$dir\kute-windows-x64.exe" | Format-List
+
+          $iexpress = "$env:SystemRoot\System32\iexpress.exe"
+          Write-Host "Running: $iexpress /N kute.sed"
+          $proc = Start-Process -FilePath $iexpress -ArgumentList "/N","kute.sed" -Wait -PassThru
+          Write-Host "IExpress exit code: $($proc.ExitCode)"
+
+          Start-Sleep -Seconds 5
+
+          if (Test-Path "kute-windows-x64.exe") {
+            Write-Host "=== SUCCESS ==="
+            Get-Item "kute-windows-x64.exe" | Format-List Name, Length, LastWriteTime
           } else {
-            Write-Error "Wrapper kute-windows-x64.exe was not created"
+            Write-Host "=== Files in dir after IExpress ==="
+            Get-ChildItem | Format-Table Name, Length
+            Write-Error "kute-windows-x64.exe was NOT created"
             exit 1
           }
 
