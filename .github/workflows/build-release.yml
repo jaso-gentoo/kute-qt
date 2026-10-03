@@ -147,10 +147,36 @@ jobs:
           mkdir -p dist
           cp build/kute.exe dist/
           windeployqt --release --no-translations --qmldir qml dist/kute.exe || true
-          cp /ucrt64/bin/*.dll dist/
+          for dll in \
+            libstdc++-6.dll libgcc_s_seh-1.dll libwinpthread-1.dll \
+            libbrotlicommon.dll libbrotlidec.dll libbrotlienc.dll \
+            libbz2-1.dll libzstd.dll liblzma-5.dll libdouble-conversion.dll \
+            libpcre2-8-0.dll libpcre2-16-0.dll libpcre2-32-0.dll \
+            libpng16-16.dll zlib1.dll libfreetype-6.dll libharfbuzz-0.dll \
+            libmd4c.dll libmd4c-html.dll libssl-3-x64.dll libcrypto-3-x64.dll \
+            libtag-2.dll libtag_c-2.dll \
+            avcodec-63.dll avformat-63.dll avutil-61.dll swresample-7.dll swscale-10.dll \
+            libiconv-2.dll libintl-8.dll libglib-2.0-0.dll libgobject-2.0-0.dll \
+            libgraphite2.dll libffi-8.dll libexpat-1.dll libb2-1.dll \
+            libsqlite3-0.dll libnghttp2-14.dll libssh2-1.dll libpsl-5.dll \
+            libidn2-0.dll libunistring-5.dll libtasn1-6.dll libhogweed-7.dll \
+            libnettle-9.dll libgmp-10.dll libgnutls-30.dll libp11-kit-0.dll \
+            libjpeg-8.dll libwebp-7.dll libtiff-6.dll liblcms2-2.dll \
+            libx264-165.dll libx265-217.dll libvpx-1.dll libmp3lame-0.dll \
+            libopus-0.dll libvorbis-0.dll libvorbisenc-2.dll libogg-0.dll \
+            libtheora-1.dll libtheoraenc-2.dll libtheoradec-2.dll \
+          ; do
+            cp "/ucrt64/bin/$dll" dist/ 2>/dev/null || true
+          done
+
+          # КРИТИЧНО: убрать стаб vulkan-1.dll, если windeployqt его затащил.
+          rm -f dist/vulkan-1.dll || true
+
           echo "--- dist ---"
           ls dist/ | wc -l
           du -sh dist/
+          echo "--- vulkan check (должно быть пусто) ---"
+          ls dist/ | grep -i vulkan || echo "ok"
 
       - name: Pack dist to zip
         run: |
