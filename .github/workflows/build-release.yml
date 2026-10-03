@@ -69,21 +69,19 @@ jobs:
           mkdir -p AppDir/usr/plugins/platforms
           mkdir -p AppDir/usr/lib
 
-          # 1) Qt wayland плагины
+          # Только Qt wayland плагины
           cp -v "$QTDIR"/plugins/platforms/libqwayland*.so AppDir/usr/plugins/platforms/
 
-          # 2) Qt6Wayland* библиотеки — ГЛАВНОЕ, чего не хватало
+          # Только Qt6Wayland* библиотеки (их в системе нет, они Qt-специфичные)
           cp -v "$QTDIR"/lib/libQt6Wayland*.so* AppDir/usr/lib/
 
-          # 3) Системные wayland client-библиотеки
-          cp -v /usr/lib/x86_64-linux-gnu/libwayland-client.so* AppDir/usr/lib/
-          cp -v /usr/lib/x86_64-linux-gnu/libwayland-cursor.so* AppDir/usr/lib/
-          cp -v /usr/lib/x86_64-linux-gnu/libwayland-egl.so* AppDir/usr/lib/
+          # libwayland-* / libxkbcommon НЕ копируем — пусть AppImage
+          # использует системные, чтобы не было конфликта с Mesa EGL.
 
           echo "--- platforms ---"
           ls -la AppDir/usr/plugins/platforms/
-          echo "--- AppDir/usr/lib (wayland) ---"
-          ls AppDir/usr/lib/ | grep -i wayland || true
+          echo "--- lib ---"
+          ls AppDir/usr/lib/ | grep -iE "wayland|xkb" || true
 
       - name: Build AppImage
         env:
