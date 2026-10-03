@@ -53,7 +53,7 @@ jobs:
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy*.AppImage
 
-      - name: Bundle Wayland plugin + libs
+      - name: Bundle Wayland plugin + Qt wayland libs
         run: |
           QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
           mkdir -p AppDir/usr/plugins/platforms
@@ -67,13 +67,11 @@ jobs:
           echo "--- lib ---"
           ls AppDir/usr/lib/ | grep -iE "wayland|xkb" || true
 
-      - name: Build AppImage
+      - name: Fill AppDir with linuxdeploy
         env:
           QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
           QML_SOURCES_PATHS: ${{ github.workspace }}/qml
           EXTRA_QT_MODULES: "multimedia;dbus"
-          OUTPUT: kute-x86_64.AppImage
-          LINUXDEPLOY_EXCLUDE_LIBRARIES: "libwayland-client.so.0;libwayland-cursor.so.0;libwayland-egl.so.1;libwayland-server.so.0;libxkbcommon.so.0;libxkbcommon-x11.so.0;libEGL.so.1;libGL.so.1;libGLX.so.0;libGLdispatch.so.0;libgbm.so.1;libdrm.so.2"
         run: |
           QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
           export LD_LIBRARY_PATH="$QTDIR/lib:$LD_LIBRARY_PATH"
@@ -83,20 +81,34 @@ jobs:
             --appdir AppDir \
             --plugin qt \
             --desktop-file AppDir/usr/share/applications/kute.desktop \
-            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png \
-            --output appimage
+            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
 
-          ls -la *.AppImage
-          NEW_APPIMAGE=$(find . -maxdepth 1 -name "*.AppImage" \
-                         ! -name "linuxdeploy*" -print -quit)
-          if [ -z "$NEW_APPIMAGE" ]; then
-            echo "AppImage не создан"
-            exit 1
-          fi
-          echo "Найден: $NEW_APPIMAGE"
-          if [ "$NEW_APPIMAGE" != "./kute-x86_64.AppImage" ]; then
-            mv "$NEW_APPIMAGE" kute-x86_64.AppImage
-          fi
+          echo "=== before cleanup ==="
+          ls AppDir/usr/lib/ | grep -iE "wayland|xkb|EGL|GL" || true
+
+          # Убираем системные библиотеки — они должны браться с хоста,
+          # иначе конфликт версий с Mesa/EGL ломает wayland-плагин.
+          rm -f AppDir/usr/lib/libwayland-client.so* || true
+          rm -f AppDir/usr/lib/libwayland-cursor.so* || true
+          rm -f AppDir/usr/lib/libwayland-egl.so*    || true
+          rm -f AppDir/usr/lib/libwayland-server.so* || true
+          rm -f AppDir/usr/lib/libxkbcommon.so*      || true
+          rm -f AppDir/usr/lib/libxkbcommon-x11.so*  || true
+          rm -f AppDir/usr/lib/libEGL.so*            || true
+          rm -f AppDir/usr/lib/libGL.so*             || true
+          rm -f AppDir/usr/lib/libGLX.so*            || true
+          rm -f AppDir/usr/lib/libGLdispatch.so*     || true
+
+          echo "=== after cleanup ==="
+          ls AppDir/usr/lib/ | grep -iE "wayland|xkb|EGL|GL" || echo "none (ok)"
+
+      - name: Build AppImage with appimagetool
+        run: |
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+
+          ARCH=x86_64 ./appimagetool AppDir kute-x86_64.AppImage
+
           ls -la kute-x86_64.AppImage
 
       - name: Upload Linux artifact
