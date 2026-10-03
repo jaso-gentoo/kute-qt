@@ -1,6 +1,5 @@
 #ifdef Q_OS_LINUX
 
-#include "MprisController.h"
 #include "Library.h"
 
 #include <QDBusConnection>

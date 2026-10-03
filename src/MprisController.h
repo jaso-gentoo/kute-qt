@@ -1,4 +1,3 @@
-#pragma once
 #ifdef Q_OS_LINUX
 
 #include <QObject>
