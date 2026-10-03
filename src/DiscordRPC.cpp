@@ -79,6 +79,24 @@ void DiscordRPC::tryConnect() {
     if (!m_enabled) return;
     if (m_socket->state() != QLocalSocket::UnconnectedState) return;
 
+#ifdef Q_OS_WIN
+    // Windows: \\.\pipe\discord-ipc-N
+    if (m_attemptIndex >= 10) {
+        m_attemptIndex = 0;
+        m_reconnectTimer->start();
+        return;
+    }
+
+    const QString path = QString("\\\\.\\pipe\\discord-ipc-%1").arg(m_attemptIndex);
+    m_socket->connectToServer(path);
+
+    QTimer::singleShot(100, this, [this]() {
+        if (m_socket->state() == QLocalSocket::UnconnectedState) {
+            m_attemptIndex++;
+            tryConnect();
+        }
+    });
+#else
     const QString runtimeDir = qEnvironmentVariable("XDG_RUNTIME_DIR");
 
     QStringList dirs;
@@ -107,6 +125,7 @@ void DiscordRPC::tryConnect() {
 
     m_attemptIndex++;
     QTimer::singleShot(20, this, &DiscordRPC::tryConnect);
+#endif
 }
 
 void DiscordRPC::onConnected() {

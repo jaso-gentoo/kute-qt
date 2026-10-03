@@ -4,13 +4,19 @@
 #include <QKeyEvent>
 #include <QQuickWindow>
 #include <QQuickItem>
+
+#include "ThemeManager.h"
+#include "Library.h"
+
+#ifdef Q_OS_LINUX
+#include "MprisController.h"
+#endif
+
+#ifdef Q_OS_UNIX
 #include <QFile>
 #include <QByteArray>
 #include <cstdlib>
 #include <unistd.h>
-#include "ThemeManager.h"
-#include "Library.h"
-#include "MprisController.h"
 
 static QByteArray selfPath() {
     return QFile::symLinkTarget("/proc/self/exe").toUtf8();
@@ -28,6 +34,9 @@ static void reexecWithEnv(char *argv[]) {
     if (path.isEmpty()) return;
     execv(path.constData(), argv);
 }
+#else
+static void reexecWithEnv(char *argv[]) { Q_UNUSED(argv) }
+#endif
 
 static bool focusIsTextInput() {
     QObject *focus = QGuiApplication::focusObject();
@@ -110,7 +119,10 @@ int main(int argc, char *argv[]) {
 
     ThemeManager theme;
     Library library;
+
+#ifdef Q_OS_LINUX
     MprisController mpris(&library);
+#endif
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("theme", &theme);

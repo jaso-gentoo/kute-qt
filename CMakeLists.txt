@@ -9,20 +9,35 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Quick QuickControls2 Multimedia Network DBus)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(TAGLIB REQUIRED IMPORTED_TARGET taglib)
+set(QT_COMPONENTS Core Gui Quick QuickControls2 Multimedia Network)
+if(UNIX AND NOT APPLE)
+    list(APPEND QT_COMPONENTS DBus)
+endif()
+find_package(Qt6 6.5 REQUIRED COMPONENTS ${QT_COMPONENTS})
+
+if(WIN32)
+    find_package(TagLib REQUIRED)
+    set(TAGLIB_LINK TagLib::TagLib)
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(TAGLIB REQUIRED IMPORTED_TARGET taglib)
+    set(TAGLIB_LINK PkgConfig::TAGLIB)
+endif()
 
 qt_standard_project_setup()
 
-qt_add_executable(kute
+set(SOURCES
     src/main.cpp
     src/ThemeManager.cpp
     src/TrackModel.cpp
     src/Library.cpp
     src/DiscordRPC.cpp
-    src/MprisController.cpp
 )
+if(UNIX AND NOT APPLE)
+    list(APPEND SOURCES src/MprisController.cpp)
+endif()
+
+qt_add_executable(kute ${SOURCES})
 
 qt_add_qml_module(kute
     URI Kute
@@ -51,6 +66,26 @@ target_link_libraries(kute PRIVATE
     Qt6::QuickControls2
     Qt6::Multimedia
     Qt6::Network
-    Qt6::DBus
-    PkgConfig::TAGLIB
+    ${TAGLIB_LINK}
 )
+
+if(UNIX AND NOT APPLE)
+    target_link_libraries(kute PRIVATE Qt6::DBus)
+endif()
+
+if(WIN32)
+    set_target_properties(kute PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()
+
+if(UNIX AND NOT APPLE)
+    include(GNUInstallDirs)
+    install(TARGETS kute RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    if(EXISTS "${CMAKE_SOURCE_DIR}/packaging/kute.desktop")
+        install(FILES packaging/kute.desktop
+                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
+    endif()
+    if(EXISTS "${CMAKE_SOURCE_DIR}/packaging/kute.png")
+        install(FILES packaging/kute.png
+                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps)
+    endif()
+endif()

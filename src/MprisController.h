@@ -1,4 +1,5 @@
 #pragma once
+#ifdef Q_OS_LINUX
 
 #include <QObject>
 #include <QDBusAbstractAdaptor>
@@ -56,8 +57,6 @@ class MprisPlayerAdaptor : public QDBusAbstractAdaptor {
     Q_PROPERTY(bool CanControl READ canControl CONSTANT)
 
 public:
-    // NOTE: parent передаётся сразу, без setParent после создания —
-    // иначе QDBusAbstractAdaptor теряет привязку к MprisController.
     explicit MprisPlayerAdaptor(Library *lib, QObject *parent);
 
     QString playbackStatus() const;
@@ -113,3 +112,5 @@ private:
     MprisRootAdaptor   *m_root = nullptr;
     MprisPlayerAdaptor *m_player = nullptr;
 };
+
+#endif // Q_OS_LINUX

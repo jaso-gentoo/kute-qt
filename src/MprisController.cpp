@@ -1,12 +1,14 @@
+#ifdef Q_OS_LINUX
+
 #include "MprisController.h"
 #include "Library.h"
 
 #include <QDBusConnection>
 #include <QDBusError>
+#include <QDBusConnectionInterface>
 #include <QCoreApplication>
 #include <QUrl>
 #include <QDebug>
-#include <QDBusConnectionInterface>
 
 static const char *kObjectPath = "/org/mpris/MediaPlayer2";
 static const char *kService    = "org.mpris.MediaPlayer2.kute";
@@ -132,7 +134,6 @@ void MprisPlayerAdaptor::SetPosition(const QDBusObjectPath &, qlonglong position
 MprisController::MprisController(Library *lib, QObject *parent)
     : QObject(parent), m_lib(lib) {
 
-    // ВАЖНО: оба адаптера — прямые дети MprisController, без setParent после создания.
     m_root   = new MprisRootAdaptor(this);
     m_player = new MprisPlayerAdaptor(lib, this);
 
@@ -151,7 +152,6 @@ MprisController::MprisController(Library *lib, QObject *parent)
         qWarning() << "MPRIS: registerObject failed:" << bus.lastError().message();
     }
 
-    // Если имя уже занято (например, упавший прошлый процесс), попробуем его освободить.
     if (bus.interface()) {
         const auto owners = bus.interface()->registeredServiceNames().value();
         if (owners.contains(kService)) {
@@ -173,3 +173,5 @@ MprisController::~MprisController() {
     bus.unregisterService(kService);
     bus.unregisterObject(kObjectPath);
 }
+
+#endif // Q_OS_LINUX
