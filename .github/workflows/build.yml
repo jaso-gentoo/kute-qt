@@ -108,8 +108,11 @@ jobs:
 
       - name: Download 7-Zip SFX module
         run: |
-          wget -q https://www.7-zip.org/a/7z2301-extra.7z
-          7z x 7z2301-extra.7z -o7z-extra 7zSD.sfx
+          set -e
+          curl -fL -o 7z-extra.7z https://github.com/ip7z/7zip/releases/download/24.09/7z2409-extra.7z
+          ls -la 7z-extra.7z
+          7z x 7z-extra.7z -o7z-extra 7zSD.sfx
+          ls -la 7z-extra/
 
       - name: Create SFX config
         run: |
