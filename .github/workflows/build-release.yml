@@ -53,30 +53,14 @@ jobs:
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy*.AppImage
 
-      - name: Verify Qt paths
-        run: |
-          QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
-          echo "QT_ROOT_DIR=$QT_ROOT_DIR"
-          echo "QTDIR=$QTDIR"
-          echo "--- platforms in Qt ---"
-          ls -la "$QTDIR/plugins/platforms/"
-          echo "--- libQt6Wayland* in Qt ---"
-          ls "$QTDIR"/lib/libQt6Wayland* || true
-
       - name: Bundle Wayland plugin + libs
         run: |
           QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
           mkdir -p AppDir/usr/plugins/platforms
           mkdir -p AppDir/usr/lib
 
-          # Только Qt wayland плагины
           cp -v "$QTDIR"/plugins/platforms/libqwayland*.so AppDir/usr/plugins/platforms/
-
-          # Только Qt6Wayland* библиотеки (их в системе нет, они Qt-специфичные)
           cp -v "$QTDIR"/lib/libQt6Wayland*.so* AppDir/usr/lib/
-
-          # libwayland-* / libxkbcommon НЕ копируем — пусть AppImage
-          # использует системные, чтобы не было конфликта с Mesa EGL.
 
           echo "--- platforms ---"
           ls -la AppDir/usr/plugins/platforms/
@@ -89,6 +73,7 @@ jobs:
           QML_SOURCES_PATHS: ${{ github.workspace }}/qml
           EXTRA_QT_MODULES: "multimedia;dbus"
           OUTPUT: kute-x86_64.AppImage
+          LINUXDEPLOY_EXCLUDE_LIBRARIES: "libwayland-client.so.0;libwayland-cursor.so.0;libwayland-egl.so.1;libwayland-server.so.0;libxkbcommon.so.0;libxkbcommon-x11.so.0;libEGL.so.1;libGL.so.1;libGLX.so.0;libGLdispatch.so.0;libgbm.so.1;libdrm.so.2"
         run: |
           QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
           export LD_LIBRARY_PATH="$QTDIR/lib:$LD_LIBRARY_PATH"
