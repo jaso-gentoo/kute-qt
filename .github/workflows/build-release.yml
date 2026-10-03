@@ -132,7 +132,7 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-declarative
             mingw-w64-ucrt-x86_64-qt6-tools
             mingw-w64-ucrt-x86_64-taglib
-            mingw-w64-ucrt-x86_64-nsis
+            mingw-w64-ucrt-x86_64-7zip
 
       - name: Configure
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -150,53 +150,89 @@ jobs:
           ls dist/ | wc -l
           du -sh dist/
 
-      - name: Build NSIS installer
+      - name: Pack dist to zip
         run: |
-          cat > installer.nsi <<'NSIS_EOF'
-          !include "MUI2.nsh"
+          cd dist
+          7z a -mx=9 ../dist.zip .
+          cd ..
+          ls -la dist.zip
+
+      - name: Create launcher batch
+        shell: cmd
+        run: |
+          (
+            echo @echo off
+            echo setlocal
+            echo set "TMPDIR=%%TEMP%%\kute_%%RANDOM%%%%RANDOM%%"
+            echo mkdir "%%TMPDIR%%" 2^>nul
+            echo powershell -NoProfile -Command "Expand-Archive -Path '%%~dp0dist.zip' -DestinationPath '%%TMPDIR%%' -Force"
+            echo start "" "%%TMPDIR%%\kute.exe"
+            echo exit /b 0
+          ) > launcher.bat
+          type launcher.bat
+
+      - name: Build single-file exe with IExpress
+        shell: pwsh
+        run: |
+          $dir = (Get-Location).Path
+          Write-Host "Working dir: $dir"
           
-          Name "kute"
-          OutFile "kute-installer.exe"
-          InstallDir "$LOCALAPPDATA\Programs\kute"
-          RequestExecutionLevel user
-          Unicode True
+          if (-not (Test-Path "$dir\dist.zip"))    { Write-Error "dist.zip not found"; exit 1 }
+          if (-not (Test-Path "$dir\launcher.bat")) { Write-Error "launcher.bat not found"; exit 1 }
           
-          !insertmacro MUI_PAGE_DIRECTORY
-          !insertmacro MUI_PAGE_INSTFILES
-          !insertmacro MUI_UNPAGE_CONFIRM
-          !insertmacro MUI_UNPAGE_INSTFILES
-          !insertmacro MUI_LANGUAGE "English"
-          !insertmacro MUI_LANGUAGE "Russian"
+          $sedLines = @(
+            "[Version]",
+            "Class=IEXPRESS",
+            "SEDVersion=3",
+            "[Options]",
+            "PackagePurpose=InstallApp",
+            "ShowInstallProgramWindow=0",
+            "HideExtractAnimation=1",
+            "UseLongFileName=1",
+            "InsideCompressed=1",
+            "CAB_FixedSize=0",
+            "CAB_ResvCodeSigning=0",
+            "RebootMode=N",
+            "InstallPrompt=",
+            "DisplayLicense=",
+            "FinishMessage=",
+            "TargetName=$dir\kute-windows-x64.exe",
+            "FriendlyName=kute",
+            "AppLaunched=launcher.bat",
+            "PostInstallCmd=<None>",
+            "AdminQuietInstCmd=",
+            "UserQuietInstCmd=",
+            "SourceFiles=SourceFiles",
+            "[SourceFiles]",
+            "SourceFiles0=$dir",
+            "[SourceFiles0]",
+            "%FILE0%=",
+            "%FILE1%=",
+            "[Strings]",
+            'FILE0="launcher.bat"',
+            'FILE1="dist.zip"'
+          )
           
-          Section "Install"
-            SetOutPath "$INSTDIR"
-            File /r "dist\*"
-            CreateDirectory "$SMPROGRAMS\kute"
-            CreateShortcut "$SMPROGRAMS\kute\kute.lnk" "$INSTDIR\kute.exe"
-            CreateShortcut "$DESKTOP\kute.lnk" "$INSTDIR\kute.exe"
-            WriteUninstaller "$INSTDIR\uninstall.exe"
-            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\kute" "DisplayName" "kute"
-            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\kute" "UninstallString" "$INSTDIR\uninstall.exe"
-            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\kute" "DisplayIcon" "$INSTDIR\kute.exe"
-          SectionEnd
+          Set-Content -Path "kute.sed" -Value ($sedLines -join "`r`n") -Encoding ASCII
+          Write-Host "=== Generated SED ==="
+          Get-Content kute.sed
           
-          Section "Uninstall"
-            RMDir /r "$INSTDIR"
-            Delete "$SMPROGRAMS\kute\kute.lnk"
-            RMDir "$SMPROGRAMS\kute"
-            Delete "$DESKTOP\kute.lnk"
-            DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\kute"
-          SectionEnd
-          NSIS_EOF
+          & "$env:SystemRoot\System32\iexpress.exe" /N /Q "kute.sed"
+          Start-Sleep -Seconds 10
           
-          makensis installer.nsi
-          ls -la kute-installer.exe
+          if (Test-Path "$dir\kute-windows-x64.exe") {
+            Write-Host "=== Success ==="
+            Get-Item "$dir\kute-windows-x64.exe" | Format-List
+          } else {
+            Write-Error "Wrapper kute-windows-x64.exe was not created"
+            exit 1
+          }
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-installer
-          path: kute-installer.exe
+          name: windows-portable
+          path: kute-windows-x64.exe
 
   release:
     needs: [linux, windows]
@@ -209,7 +245,7 @@ jobs:
           path: artifacts/
       - uses: actions/download-artifact@v4
         with:
-          name: windows-installer
+          name: windows-portable
           path: artifacts/
       - uses: softprops/action-gh-release@v2
         with:
