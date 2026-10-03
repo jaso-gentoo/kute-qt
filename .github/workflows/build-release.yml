@@ -31,98 +31,7 @@ jobs:
             libtag1-dev libgl1-mesa-dev \
             libwayland-dev libxkbcommon-dev \
             cmake ninja-build patchelf desktop-file-utils \
-            libfuse2 wget file \
-            libpipewire-0.3-dev libpulse-dev libasound2-dev
-
-      - name: Patch and build Qt Multimedia
-        run: |
-          set -e
-
-          QT_VER=$(grep -oP 'set\(Qt6Multimedia_VERSION \K[0-9.]+' \
-                   "$QT_ROOT_DIR"/lib/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake 2>/dev/null || echo "6.11.0")
-          QT_MAJOR_MINOR=$(echo "$QT_VER" | cut -d. -f1-2)
-          QT_MAJOR_MINOR_PATCH=$(echo "$QT_VER" | cut -d. -f1-3)
-
-          echo "Detected Qt Multimedia version: $QT_VER"
-
-          SRC_DIR="$RUNNER_TEMP/qtmultimedia-src"
-          BUILD_DIR="$RUNNER_TEMP/qtmultimedia-build"
-
-          mkdir -p "$SRC_DIR"
-          cd "$SRC_DIR"
-
-          ARCHIVE_URL="https://download.qt.io/archive/qt/${QT_MAJOR_MINOR}/${QT_MAJOR_MINOR_PATCH}/submodules/qtmultimedia-everywhere-src-${QT_MAJOR_MINOR_PATCH}.tar.xz"
-
-          if ! wget -q --spider "$ARCHIVE_URL"; then
-            ARCHIVE_URL="https://download.qt.io/archive/qt/${QT_MAJOR_MINOR}/${QT_MAJOR_MINOR_PATCH}/submodules/qtmultimedia-everywhere-src-${QT_MAJOR_MINOR_PATCH}.zip"
-          fi
-
-          echo "Downloading: $ARCHIVE_URL"
-          wget -q "$ARCHIVE_URL" -O qtmultimedia-archive
-
-          if file qtmultimedia-archive | grep -q Zip; then
-            unzip -q qtmultimedia-archive
-          else
-            tar -xf qtmultimedia-archive
-          fi
-
-          SRC_EXTRACTED=$(find . -maxdepth 1 -type d -name 'qtmultimedia-*' | head -n1)
-          cd "$SRC_EXTRACTED"
-
-          TARGET_FILE="src/multimedia/pipewire/qpipewire_audiosink.cpp"
-          if [ ! -f "$TARGET_FILE" ]; then
-            echo "ERROR: $TARGET_FILE not found. Qt source layout changed?"
-            find src/multimedia/pipewire -maxdepth 1 -type f | sort
-            exit 1
-          fi
-
-          echo "--- before patch ---"
-          grep -n 'MEDIA_ROLE' "$TARGET_FILE" || true
-
-          sed -i 's/\(PW_KEY_MEDIA_ROLE[[:space:]]*,[[:space:]]*\)"Music"/\1"Application"/' "$TARGET_FILE"
-
-          echo "--- after patch ---"
-          grep -n 'MEDIA_ROLE' "$TARGET_FILE" || true
-
-          if grep -q 'PW_KEY_MEDIA_ROLE[[:space:]]*,[[:space:]]*"Music"' "$TARGET_FILE"; then
-            echo "ERROR: patch did not apply"
-            exit 1
-          fi
-
-          mkdir -p "$BUILD_DIR"
-          cd "$BUILD_DIR"
-
-          cmake "$SRC_EXTRACTED" \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR" \
-            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
-            -DQT_BUILD_TESTS=OFF \
-            -DQT_BUILD_EXAMPLES=OFF
-
-          cmake --build . --parallel "$(nproc)"
-          cmake --install .
-
-          echo "--- libQt6Multimedia after install ---"
-          ls -la "$QT_ROOT_DIR"/lib/libQt6Multimedia.so*
-
-      - name: Verify patched library is in place
-        run: |
-          QMLIB="$QT_ROOT_DIR/lib/libQt6Multimedia.so.6"
-          if [ ! -e "$QMLIB" ]; then
-            echo "ERROR: $QMLIB not found"
-            ls -la "$QT_ROOT_DIR"/lib/libQt6Multimedia*
-            exit 1
-          fi
-
-          echo "Checking: $QMLIB"
-          ldd "$QMLIB" | head -20
-
-          if strings "$QMLIB" | grep -q 'Application'; then
-            echo "OK: patched library contains 'Application' role string"
-          else
-            echo "WARN: 'Application' string not found, patch may not have propagated"
-          fi
+            libfuse2 wget file
 
       - name: Configure
         run: |
@@ -188,23 +97,8 @@ jobs:
           rm -f AppDir/usr/lib/libGLX.so*             || true
           rm -f AppDir/usr/lib/libGLdispatch.so*      || true
           rm -f AppDir/usr/lib/libvulkan.so*          || true
-
-      - name: Verify AppImage contains patched Multimedia
-        run: |
-          APPDIR_LIB=$(find AppDir -name 'libQt6Multimedia.so*' | head -n1)
-          echo "Checking: $APPDIR_LIB"
-          if [ -z "$APPDIR_LIB" ]; then
-            echo "ERROR: libQt6Multimedia not found in AppDir"
-            find AppDir -name 'libQt6*' | sort
-            exit 1
-          fi
-
-          if strings "$APPDIR_LIB" | grep -q 'Application'; then
-            echo "OK: AppImage has patched Qt Multimedia"
-          else
-            echo "ERROR: AppImage still has original Qt Multimedia (no 'Application' string)"
-            exit 1
-          fi
+          rm -f AppDir/usr/lib/libpulse.so*           || true
+          rm -f AppDir/usr/lib/libpulsecommon*.so     || true
 
       - name: Build AppImage
         run: |
