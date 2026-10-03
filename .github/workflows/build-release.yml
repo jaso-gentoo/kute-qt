@@ -165,6 +165,8 @@ jobs:
             libx264-165.dll libx265-217.dll libvpx-1.dll libmp3lame-0.dll \
             libopus-0.dll libvorbis-0.dll libvorbisenc-2.dll libogg-0.dll \
             libtheora-1.dll libtheoraenc-2.dll libtheoradec-2.dll \
+            libicudt78.dll libicuin78.dll libicuuc78.dll \
+            libicutu78.dll libicuio78.dll \
           ; do
             cp "/ucrt64/bin/$dll" dist/ 2>/dev/null || true
           done
