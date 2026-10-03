@@ -1,0 +1,154 @@
+name: Build Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            qt6-base-dev qt6-multimedia-dev qt6-declarative-dev \
+            libtag1-dev libgl1-mesa-dev \
+            cmake ninja-build patchelf desktop-file-utils \
+            libfuse2 wget file
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Install to AppDir
+        run: DESTDIR=$PWD/AppDir cmake --install build
+
+      - name: Download linuxdeploy
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+
+      - name: Build AppImage
+        run: |
+          export QML_SOURCES_PATHS=$PWD/qml
+          export EXTRA_QT_MODULES=multimedia\;dbus
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --plugin qt \
+            --desktop-file AppDir/usr/share/applications/kute.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png \
+            --output appimage
+          mv kute-*.AppImage kute-x86_64.AppImage
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: kute-x86_64.AppImage
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-multimedia
+            mingw-w64-ucrt-x86_64-qt6-declarative
+            mingw-w64-ucrt-x86_64-qt6-tools
+            mingw-w64-ucrt-x86_64-taglib
+            mingw-w64-ucrt-x86_64-7zip
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Deploy Qt DLLs
+        run: |
+          mkdir -p dist
+          cp build/kute.exe dist/
+          windeployqt --release --no-translations --qmldir qml dist/kute.exe || true
+          cp /ucrt64/bin/libtag*.dll dist/ 2>/dev/null || true
+          cp /ucrt64/bin/libstdc++-6.dll dist/ 2>/dev/null || true
+          cp /ucrt64/bin/libgcc_s_seh-1.dll dist/ 2>/dev/null || true
+          cp /ucrt64/bin/libwinpthread-1.dll dist/ 2>/dev/null || true
+          cp /ucrt64/bin/zlib1.dll dist/ 2>/dev/null || true
+          cp /ucrt64/bin/libbz2-1.dll dist/ 2>/dev/null || true
+
+      - name: Download 7-Zip SFX module
+        run: |
+          wget -q https://www.7-zip.org/a/7z2301-extra.7z
+          7z x 7z2301-extra.7z -o7z-extra 7zSD.sfx 7zSD_All.sfx
+          ls -la 7z-extra/
+
+      - name: Create SFX config
+        run: |
+          cat > sfx-config.txt <<'EOF'
+          ;!@Install@!UTF-8!
+          Title="kute"
+          Progress="no"
+          RunProgram="kute.exe"
+          ;!@InstallEnd@!
+          EOF
+
+      - name: Build single-file kute-portable.exe
+        run: |
+          # Пакуем содержимое dist/ в архив
+          cd dist && 7z a -mx=9 ../payload.7z . && cd ..
+
+          # Склеиваем: SFX модуль + конфиг + архив = один exe
+          cat 7z-extra/7zSD.sfx sfx-config.txt payload.7z > kute-portable.exe
+
+          ls -la kute-portable.exe
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: kute-portable.exe
+
+  release:
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-appimage
+          path: artifacts/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-portable
+          path: artifacts/
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
