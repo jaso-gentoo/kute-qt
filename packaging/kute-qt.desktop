@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Kute
+Comment=Music player
+Exec=kute
+Icon=kute.png
+Categories=AudioVideo;
+StartupNotify=true
+Terminal=false
+StartupWMClass=Kute
