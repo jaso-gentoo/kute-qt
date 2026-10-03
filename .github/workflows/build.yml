@@ -37,6 +37,7 @@ jobs:
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
 
       - name: Build
         run: cmake --build build
@@ -66,10 +67,10 @@ jobs:
           NEW_APPIMAGE=$(find . -maxdepth 1 -name "*.AppImage" \
                          ! -name "linuxdeploy*" -print -quit)
           if [ -z "$NEW_APPIMAGE" ]; then
-            echo "AppImage was not created"
+            echo "AppImage не создан"
             exit 1
           fi
-          echo "Found: $NEW_APPIMAGE"
+          echo "Найден: $NEW_APPIMAGE"
           if [ "$NEW_APPIMAGE" != "./kute-x86_64.AppImage" ]; then
             mv "$NEW_APPIMAGE" kute-x86_64.AppImage
           fi
@@ -107,8 +108,7 @@ jobs:
       - name: Configure
         run: |
           cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
+            -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build
@@ -117,18 +117,11 @@ jobs:
         run: |
           mkdir -p dist
           cp build/kute.exe dist/
-
-          # Qt-плагины и Qt6*.dll
           windeployqt --release --no-translations --qmldir qml dist/kute.exe || true
-
-          # Все runtime DLL из /ucrt64/bin: brotli, zstd, bz2, png,
-          # freetype, double-conversion, libstdc++ и прочее
           cp /ucrt64/bin/*.dll dist/
-
           echo "--- dist ---"
           ls dist/ | wc -l
           du -sh dist/
-          ls -la dist/ | head -40
 
       - name: Download 7-Zip SFX module
         run: |
