@@ -281,4 +281,287 @@ jobs:
           draft: false
           prerelease: false
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}name: Build Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.*'
+          host: 'linux'
+          target: 'desktop'
+          arch: 'linux_gcc_64'
+          modules: 'qtmultimedia'
+          cache: true
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libtag1-dev libgl1-mesa-dev \
+            libwayland-dev libxkbcommon-dev \
+            cmake ninja-build patchelf desktop-file-utils \
+            libfuse2 wget curl file
+
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Install to AppDir
+        run: DESTDIR=$PWD/AppDir cmake --install build
+
+      - name: Download linuxdeploy
+        run: |
+          set -e
+          for i in 1 2 3; do
+            curl -fL --retry 5 --retry-delay 3 --retry-connrefused \
+              -o linuxdeploy-x86_64.AppImage \
+              "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage" && break || sleep 5
+          done
+          for i in 1 2 3; do
+            curl -fL --retry 5 --retry-delay 3 --retry-connrefused \
+              -o linuxdeploy-plugin-qt-x86_64.AppImage \
+              "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage" && break || sleep 5
+          done
+          test -s linuxdeploy-x86_64.AppImage
+          test -s linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+          ls -la linuxdeploy*.AppImage
+
+      - name: Bundle Qt Wayland plugins and libs
+        run: |
+          QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
+          mkdir -p AppDir/usr/plugins/platforms
+          mkdir -p AppDir/usr/plugins/wayland-shell-integration
+          mkdir -p AppDir/usr/plugins/wayland-decoration-client
+          mkdir -p AppDir/usr/plugins/wayland-graphics-integration-client
+          mkdir -p AppDir/usr/lib
+
+          cp -v "$QTDIR"/plugins/platforms/libqwayland*.so AppDir/usr/plugins/platforms/
+          cp -v "$QTDIR"/plugins/wayland-shell-integration/*.so \
+                AppDir/usr/plugins/wayland-shell-integration/ 2>/dev/null || true
+          cp -v "$QTDIR"/plugins/wayland-decoration-client/*.so \
+                AppDir/usr/plugins/wayland-decoration-client/ 2>/dev/null || true
+          cp -v "$QTDIR"/plugins/wayland-graphics-integration-client/*.so \
+                AppDir/usr/plugins/wayland-graphics-integration-client/ 2>/dev/null || true
+          cp -v "$QTDIR"/lib/libQt6Wayland*.so* AppDir/usr/lib/
+
+      - name: Fill AppDir with linuxdeploy
+        env:
+          QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
+          QML_SOURCES_PATHS: ${{ github.workspace }}/qml
+          EXTRA_QT_MODULES: "multimedia;dbus"
+        run: |
+          QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
+          export LD_LIBRARY_PATH="$QTDIR/lib:$LD_LIBRARY_PATH"
+          export PATH="$QTDIR/bin:$PATH"
+
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --plugin qt \
+            --desktop-file AppDir/usr/share/applications/kute.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+
+          rm -f AppDir/usr/lib/libwayland-client.so*  || true
+          rm -f AppDir/usr/lib/libwayland-cursor.so*  || true
+          rm -f AppDir/usr/lib/libwayland-egl.so*     || true
+          rm -f AppDir/usr/lib/libwayland-server.so*  || true
+          rm -f AppDir/usr/lib/libxkbcommon.so*       || true
+          rm -f AppDir/usr/lib/libxkbcommon-x11.so*   || true
+          rm -f AppDir/usr/lib/libEGL.so*             || true
+          rm -f AppDir/usr/lib/libGL.so*              || true
+          rm -f AppDir/usr/lib/libGLX.so*             || true
+          rm -f AppDir/usr/lib/libGLdispatch.so*      || true
+          rm -f AppDir/usr/lib/libvulkan.so*          || true
+          rm -f AppDir/usr/lib/libpulse.so*           || true
+          rm -f AppDir/usr/lib/libpulsecommon*.so     || true
+
+      - name: Build AppImage
+        run: |
+          curl -fL --retry 5 --retry-delay 3 -o appimagetool \
+            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          test -s appimagetool
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool AppDir kute-x86_64.AppImage
+          ls -la kute-x86_64.AppImage
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: kute-x86_64.AppImage
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (-not (Test-Path $nsis)) {
+            Write-Error "NSIS install failed"
+            exit 1
+          }
+          Write-Host "NSIS installed: $nsis"
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-multimedia
+            mingw-w64-ucrt-x86_64-qt6-declarative
+            mingw-w64-ucrt-x86_64-qt6-tools
+            mingw-w64-ucrt-x86_64-taglib
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Deploy Qt DLLs
+        run: |
+          mkdir -p dist
+          cp build/kute.exe dist/
+          windeployqt --release --no-translations --qmldir qml dist/kute.exe || true
+          cp /ucrt64/bin/*.dll dist/
+
+          rm -f dist/ggml*.dll
+          rm -f dist/libllama*.dll
+          rm -f dist/libmtmd*.dll
+          rm -f dist/libwhisper*.dll
+          rm -f dist/libparakeet*.dll
+          rm -f dist/libpython*.dll
+          rm -f dist/libPyImath*.dll
+          rm -f dist/libopenblas*.dll
+          rm -f dist/libgfortran*.dll
+          rm -f dist/libquadmath*.dll
+          rm -f dist/libgomp*.dll
+          rm -f dist/tcl86.dll
+          rm -f dist/tk86.dll
+          rm -f dist/libhwy*.dll
+          rm -f dist/libcaca*.dll
+          rm -f dist/libImath*.dll
+          rm -f dist/libIex*.dll
+          rm -f dist/libIlmThread*.dll
+          rm -f dist/libOpenEXR*.dll
+          rm -f dist/libjxl*.dll
+          rm -f dist/libmenuw6.dll
+          rm -f dist/libformw6.dll
+          rm -f dist/libpanelw6.dll
+          rm -f dist/libncurses*.dll
+          rm -f dist/vulkan-1.dll
+          rm -f dist/OpenCL.dll
+
+          echo "--- dist ---"
+          ls dist/ | wc -l
+          du -sh dist/
+
+      - name: Copy FFmpeg and dependencies
+        run: |
+          echo "--- Copying missing FFmpeg and dependency DLLs ---"
+          cp /ucrt64/bin/avcodec-*.dll dist/
+          cp /ucrt64/bin/avformat-*.dll dist/
+          cp /ucrt64/bin/avutil-*.dll dist/
+          cp /ucrt64/bin/swresample-*.dll dist/
+          cp /ucrt64/bin/swscale-*.dll dist/
+          cp /ucrt64/bin/libjxl.dll dist/ 2>/dev/null || true
+          cp /ucrt64/bin/libjxl_threads.dll dist/ 2>/dev/null || true
+          cp /ucrt64/bin/libsoxr.dll dist/ 2>/dev/null || true
+          cp /ucrt64/bin/libgomp-1.dll dist/ 2>/dev/null || true
+          echo "--- dist after copying FFmpeg libs ---"
+          ls dist/ | grep -E 'avcodec|avformat|avutil|swresample|swscale|libjxl|libsoxr|libgomp' || echo "Some DLLs still missing, but continuing."
+
+      - name: Build single exe with NSIS
+        shell: bash
+        run: |
+          NSIS="/c/Program Files (x86)/NSIS/makensis.exe"
+          if [ ! -f "$NSIS" ]; then
+            echo "ERROR: NSIS not found at $NSIS"
+            exit 1
+          fi
+          echo "Using NSIS: $NSIS"
+
+          cat > kute.nsi.raw <<'EOF'
+          Unicode true
+          SilentInstall silent
+          RequestExecutionLevel user
+          OutFile "kute-windows-x86_64.exe"
+          InstallDir "$TEMP\kute"
+
+          Section
+          InitPluginsDir
+          SetOutPath $PLUGINSDIR
+          File /r "dist\*"
+          ExecWait '"$PLUGINSDIR\kute.exe"'
+          SectionEnd
+          EOF
+
+          sed 's/^ *//' kute.nsi.raw > kute.nsi
+          rm kute.nsi.raw
+          cat kute.nsi
+
+          "$NSIS" kute.nsi
+
+          if [ ! -f "kute-windows-x86_64.exe" ]; then
+            echo "ERROR: kute-windows-x86_64.exe was NOT created"
+            exit 1
+          fi
+          ls -la kute-windows-x86_64.exe
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: kute-windows-x86_64.exe
+
+  release:
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-appimage
+          path: artifacts/
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-portable
+          path: artifacts/
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          draft: false
+          prerelease: false
+        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
