@@ -1,0 +1,46 @@
+name: Build Windows
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-multimedia
+            mingw-w64-ucrt-x86_64-qt6-declarative
+            mingw-w64-ucrt-x86_64-taglib
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Deploy
+        run: |
+          mkdir -p dist
+          cp build/kute.exe dist/
+          windeployqt --release --qmldir qml dist/kute.exe
+          # Копируем TagLib и его зависимости
+          cp /ucrt64/bin/libtag*.dll dist/ || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kute-windows-x64
+          path: dist/
