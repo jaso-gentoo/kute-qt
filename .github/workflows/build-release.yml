@@ -204,6 +204,21 @@ jobs:
           ls dist/ | wc -l
           du -sh dist/
 
+      - name: Copy FFmpeg and dependencies
+        run: |
+          echo "--- Copying missing FFmpeg and dependency DLLs ---"
+          cp /ucrt64/bin/avcodec-*.dll dist/
+          cp /ucrt64/bin/avformat-*.dll dist/
+          cp /ucrt64/bin/avutil-*.dll dist/
+          cp /ucrt64/bin/swresample-*.dll dist/
+          cp /ucrt64/bin/swscale-*.dll dist/
+          cp /ucrt64/bin/libjxl.dll dist/ 2>/dev/null || true
+          cp /ucrt64/bin/libjxl_threads.dll dist/ 2>/dev/null || true
+          cp /ucrt64/bin/libsoxr.dll dist/ 2>/dev/null || true
+          cp /ucrt64/bin/libgomp-1.dll dist/ 2>/dev/null || true
+          echo "--- dist after copying FFmpeg libs ---"
+          ls dist/ | grep -E 'avcodec|avformat|avutil|swresample|swscale|libjxl|libsoxr|libgomp' || echo "Some DLLs still missing, but continuing."
+
       - name: Build single exe with NSIS
         shell: bash
         run: |
