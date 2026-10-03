@@ -111,13 +111,18 @@ jobs:
         run: |
           mkdir -p dist
           cp build/kute.exe dist/
+
+          # Qt-плагины и Qt6*.dll
           windeployqt --release --no-translations --qmldir qml dist/kute.exe || true
-          cp /ucrt64/bin/libtag*.dll dist/ 2>/dev/null || true
-          cp /ucrt64/bin/libstdc++-6.dll dist/ 2>/dev/null || true
-          cp /ucrt64/bin/libgcc_s_seh-1.dll dist/ 2>/dev/null || true
-          cp /ucrt64/bin/libwinpthread-1.dll dist/ 2>/dev/null || true
-          cp /ucrt64/bin/zlib1.dll dist/ 2>/dev/null || true
-          cp /ucrt64/bin/libbz2-1.dll dist/ 2>/dev/null || true
+
+          # Все runtime DLL из /ucrt64/bin: brotli, zstd, bz2, png,
+          # freetype, double-conversion, libstdc++ и прочее
+          cp /ucrt64/bin/*.dll dist/
+
+          echo "--- dist ---"
+          ls dist/ | wc -l
+          du -sh dist/
+          ls -la dist/ | head -40
 
       - name: Download 7-Zip SFX module
         run: |
