@@ -53,16 +53,33 @@ jobs:
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy*.AppImage
 
+      - name: Verify Qt paths
+        run: |
+          QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
+          echo "QT_ROOT_DIR=$QT_ROOT_DIR"
+          echo "Qt6_DIR=$Qt6_DIR"
+          echo "QTDIR=$QTDIR"
+          echo "--- platforms in Qt ---"
+          ls -la "$QTDIR/plugins/platforms/" || true
+
+      - name: Bundle Wayland platform plugin
+        run: |
+          QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
+          mkdir -p AppDir/usr/plugins/platforms
+          cp -v "$QTDIR"/plugins/platforms/libqwayland*.so AppDir/usr/plugins/platforms/ 2>&1 || true
+          echo "--- platforms in AppDir ---"
+          ls -la AppDir/usr/plugins/platforms/
+
       - name: Build AppImage
         env:
+          QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
           QML_SOURCES_PATHS: ${{ github.workspace }}/qml
           EXTRA_QT_MODULES: "multimedia;dbus"
-          EXTRA_QT_PLUGINS: "wayland;wayland-egl;wayland-decoration-client;wayland-graphics-integration-client;wayland-shell-integration"
           OUTPUT: kute-x86_64.AppImage
         run: |
-          mkdir -p AppDir/usr/plugins/platforms
-          find "$Qt6_DIR" -name "libqwayland*.so" \
-               -exec cp {} AppDir/usr/plugins/platforms/ \; 2>/dev/null || true
+          QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
+          export LD_LIBRARY_PATH="$QTDIR/lib:$LD_LIBRARY_PATH"
+          export PATH="$QTDIR/bin:$PATH"
 
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
@@ -70,14 +87,15 @@ jobs:
             --desktop-file AppDir/usr/share/applications/kute.desktop \
             --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png \
             --output appimage
+
           ls -la *.AppImage
           NEW_APPIMAGE=$(find . -maxdepth 1 -name "*.AppImage" \
                          ! -name "linuxdeploy*" -print -quit)
           if [ -z "$NEW_APPIMAGE" ]; then
-            echo "AppImage was not created"
+            echo "AppImage не создан"
             exit 1
           fi
-          echo "found: $NEW_APPIMAGE"
+          echo "Найден: $NEW_APPIMAGE"
           if [ "$NEW_APPIMAGE" != "./kute-x86_64.AppImage" ]; then
             mv "$NEW_APPIMAGE" kute-x86_64.AppImage
           fi
