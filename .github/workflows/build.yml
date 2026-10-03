@@ -29,6 +29,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libtag1-dev libgl1-mesa-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
             cmake ninja-build patchelf desktop-file-utils \
             libfuse2 wget file
 
@@ -55,8 +57,13 @@ jobs:
         env:
           QML_SOURCES_PATHS: ${{ github.workspace }}/qml
           EXTRA_QT_MODULES: "multimedia;dbus"
+          EXTRA_QT_PLUGINS: "wayland;wayland-egl;wayland-decoration-client;wayland-graphics-integration-client;wayland-shell-integration"
           OUTPUT: kute-x86_64.AppImage
         run: |
+          mkdir -p AppDir/usr/plugins/platforms
+          find "$Qt6_DIR" -name "libqwayland*.so" \
+               -exec cp {} AppDir/usr/plugins/platforms/ \; 2>/dev/null || true
+
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
             --plugin qt \
@@ -67,10 +74,10 @@ jobs:
           NEW_APPIMAGE=$(find . -maxdepth 1 -name "*.AppImage" \
                          ! -name "linuxdeploy*" -print -quit)
           if [ -z "$NEW_APPIMAGE" ]; then
-            echo "AppImage не создан"
+            echo "AppImage was not created"
             exit 1
           fi
-          echo "Найден: $NEW_APPIMAGE"
+          echo "found: $NEW_APPIMAGE"
           if [ "$NEW_APPIMAGE" != "./kute-x86_64.AppImage" ]; then
             mv "$NEW_APPIMAGE" kute-x86_64.AppImage
           fi
