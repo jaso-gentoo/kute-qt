@@ -57,18 +57,33 @@ jobs:
         run: |
           QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
           echo "QT_ROOT_DIR=$QT_ROOT_DIR"
-          echo "Qt6_DIR=$Qt6_DIR"
           echo "QTDIR=$QTDIR"
           echo "--- platforms in Qt ---"
-          ls -la "$QTDIR/plugins/platforms/" || true
+          ls -la "$QTDIR/plugins/platforms/"
+          echo "--- libQt6Wayland* in Qt ---"
+          ls "$QTDIR"/lib/libQt6Wayland* || true
 
-      - name: Bundle Wayland platform plugin
+      - name: Bundle Wayland plugin + libs
         run: |
           QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
           mkdir -p AppDir/usr/plugins/platforms
-          cp -v "$QTDIR"/plugins/platforms/libqwayland*.so AppDir/usr/plugins/platforms/ 2>&1 || true
-          echo "--- platforms in AppDir ---"
+          mkdir -p AppDir/usr/lib
+
+          # 1) Qt wayland плагины
+          cp -v "$QTDIR"/plugins/platforms/libqwayland*.so AppDir/usr/plugins/platforms/
+
+          # 2) Qt6Wayland* библиотеки — ГЛАВНОЕ, чего не хватало
+          cp -v "$QTDIR"/lib/libQt6Wayland*.so* AppDir/usr/lib/
+
+          # 3) Системные wayland client-библиотеки
+          cp -v /usr/lib/x86_64-linux-gnu/libwayland-client.so* AppDir/usr/lib/
+          cp -v /usr/lib/x86_64-linux-gnu/libwayland-cursor.so* AppDir/usr/lib/
+          cp -v /usr/lib/x86_64-linux-gnu/libwayland-egl.so* AppDir/usr/lib/
+
+          echo "--- platforms ---"
           ls -la AppDir/usr/plugins/platforms/
+          echo "--- AppDir/usr/lib (wayland) ---"
+          ls AppDir/usr/lib/ | grep -i wayland || true
 
       - name: Build AppImage
         env:
