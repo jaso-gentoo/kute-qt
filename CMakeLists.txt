@@ -9,6 +9,26 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
+if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT IPO_OK OUTPUT IPO_ERR)
+    if(IPO_OK)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    endif()
+
+    if(MSVC)
+        add_compile_options(/O2)
+        add_link_options(/OPT:REF /OPT:ICF)
+    else()
+        add_compile_options(-ffunction-sections -fdata-sections)
+        if(WIN32)
+            add_link_options(-Wl,--gc-sections -Wl,-O1 -Wl,-s)
+        else()
+            add_link_options(-Wl,--gc-sections -Wl,-O1 -Wl,--as-needed)
+        endif()
+    endif()
+endif()
+
 set(QT_COMPONENTS Core Gui Quick QuickControls2 Multimedia Network)
 if(UNIX AND NOT APPLE)
     list(APPEND QT_COMPONENTS DBus)
@@ -75,6 +95,12 @@ endif()
 
 if(WIN32)
     set_target_properties(kute PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()
+
+if(UNIX AND NOT APPLE)
+    add_custom_command(TARGET kute POST_BUILD
+        COMMAND ${CMAKE_STRIP} --strip-all $<TARGET_FILE:kute>
+        COMMENT "Stripping kute")
 endif()
 
 if(UNIX AND NOT APPLE)

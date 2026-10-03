@@ -327,7 +327,7 @@ Item {
                 target: list
                 property: "contentY"
                 duration: 260
-                easing.type: Easing.OutQuint
+                easing.type: Easing.OutCubic
             }
 
             WheelHandler {

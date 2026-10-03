@@ -24,12 +24,18 @@ static QByteArray selfPath() {
 
 static void reexecWithEnv(char *argv[]) {
     if (qEnvironmentVariableIsSet("KUTE_ENV_READY")) return;
+
     setenv("MALLOC_ARENA_MAX", "2", 1);
     setenv("QSG_USE_IMAGE_CACHE", "0", 1);
     setenv("QSG_RENDER_LOOP", "threaded", 1);
     setenv("QSG_RHI_BACKEND", "vulkan", 1);
     setenv("QT_QUICK_BACKEND", "vulkan", 1);
+    if (!qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) {
+        setenv("QT_QPA_PLATFORM", "wayland", 1);
+    }
+
     setenv("KUTE_ENV_READY", "1", 1);
+
     const QByteArray path = selfPath();
     if (path.isEmpty()) return;
     execv(path.constData(), argv);
