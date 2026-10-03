@@ -64,10 +64,17 @@ jobs:
             --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png \
             --output appimage
           ls -la *.AppImage
-          for f in *.AppImage; do
-            mv "$f" kute-x86_64.AppImage
-            break
-          done
+          NEW_APPIMAGE=$(find . -maxdepth 1 -name "*.AppImage" \
+                         ! -name "linuxdeploy*" -print -quit)
+          if [ -z "$NEW_APPIMAGE" ]; then
+            echo "AppImage was not created"
+            exit 1
+          fi
+          echo "Found: $NEW_APPIMAGE"
+          if [ "$NEW_APPIMAGE" != "./kute-x86_64.AppImage" ]; then
+            mv "$NEW_APPIMAGE" kute-x86_64.AppImage
+          fi
+          ls -la kute-x86_64.AppImage
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
