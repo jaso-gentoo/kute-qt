@@ -111,8 +111,16 @@ jobs:
           set -e
           curl -fL -o 7z-extra.7z https://github.com/ip7z/7zip/releases/download/24.09/7z2409-extra.7z
           ls -la 7z-extra.7z
-          7z x 7z-extra.7z -o7z-extra 7zSD.sfx
-          ls -la 7z-extra/
+          7z x -y 7z-extra.7z -o7z-extra
+          echo "--- содержимое 7z-extra ---"
+          ls -laR 7z-extra/ | head -60
+          SFX=$(find 7z-extra -name "7zSD.sfx" -print -quit)
+          if [ -z "$SFX" ]; then
+            echo "SFX 7zSD.sfx не найден в архиве"
+            exit 1
+          fi
+          cp "$SFX" sfx-module.sfx
+          ls -la sfx-module.sfx
 
       - name: Create SFX config
         run: |
@@ -121,7 +129,7 @@ jobs:
       - name: Build single-file kute-portable.exe
         run: |
           cd dist && 7z a -mx=9 ../payload.7z . && cd ..
-          cat 7z-extra/7zSD.sfx sfx-config.txt payload.7z > kute-portable.exe
+          cat sfx-module.sfx sfx-config.txt payload.7z > kute-portable.exe
           ls -la kute-portable.exe
 
       - name: Upload Windows artifact
