@@ -68,6 +68,17 @@ jobs:
                 AppDir/usr/plugins/wayland-decoration-client/ 2>/dev/null || true
           cp -v "$QTDIR"/plugins/wayland-graphics-integration-client/*.so \
                 AppDir/usr/plugins/wayland-graphics-integration-client/ 2>/dev/null || true
+
+          mkdir -p AppDir/usr/plugins/multimedia/audio
+          cp -v "$QTDIR"/plugins/multimedia/libffmpegmediaplugin.so \
+                AppDir/usr/plugins/multimedia/ 2>/dev/null || true
+          cp -v "$QTDIR"/plugins/multimedia/audio/libqtaudio_*.so \
+                AppDir/usr/plugins/multimedia/audio/ 2>/dev/null || true
+
+          echo "--- multimedia plugins ---"
+          ls -la AppDir/usr/plugins/multimedia/ || true
+          echo "--- audio backends ---"
+          ls -la AppDir/usr/plugins/multimedia/audio/ || true
           cp -v "$QTDIR"/lib/libQt6Wayland*.so* AppDir/usr/lib/
 
       - name: Fill AppDir with linuxdeploy
