@@ -31,7 +31,7 @@ static void reexecWithEnv(char *argv[]) {
     setenv("QSG_RHI_BACKEND", "vulkan", 1);
     setenv("QT_QUICK_BACKEND", "vulkan", 1);
     if (!qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) {
-        setenv("QT_QPA_PLATFORM", "wayland", 1);
+        setenv("QT_QPA_PLATFORM", "wayland;xcb", 1);
     }
 
     setenv("KUTE_ENV_READY", "1", 1);
