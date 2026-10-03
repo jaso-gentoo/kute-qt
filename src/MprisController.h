@@ -1,4 +1,4 @@
-#ifdef Q_OS_LINUX
+#pragma once
 
 #include <QObject>
 #include <QDBusAbstractAdaptor>
@@ -111,5 +111,3 @@ private:
     MprisRootAdaptor   *m_root = nullptr;
     MprisPlayerAdaptor *m_player = nullptr;
 };
-
-#endif // Q_OS_LINUX
