@@ -1,122 +1,4 @@
-  windows:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install NSIS
-        shell: pwsh
-        run: |
-          choco install nsis -y --no-progress
-          $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
-          if (-not (Test-Path $nsis)) {
-            Write-Error "NSIS install failed"
-            exit 1
-          }
-          Write-Host "NSIS installed: $nsis"
-
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: true
-          install: >-
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-qt6-base
-            mingw-w64-ucrt-x86_64-qt6-multimedia
-            mingw-w64-ucrt-x86_64-qt6-declarative
-            mingw-w64-ucrt-x86_64-qt6-tools
-            mingw-w64-ucrt-x86_64-taglib
-
-      - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build
-
-      - name: Deploy Qt DLLs
-        run: |
-          mkdir -p dist
-          cp build/kute.exe dist/
-          windeployqt --release --no-translations --qmldir qml dist/kute.exe || true
-          cp /ucrt64/bin/*.dll dist/
-
-          rm -f dist/ggml*.dll
-          rm -f dist/libllama*.dll
-          rm -f dist/libmtmd*.dll
-          rm -f dist/libwhisper*.dll
-          rm -f dist/libparakeet*.dll
-          rm -f dist/libpython*.dll
-          rm -f dist/libPyImath*.dll
-          rm -f dist/libopenblas*.dll
-          rm -f dist/libgfortran*.dll
-          rm -f dist/libquadmath*.dll
-          rm -f dist/libgomp*.dll
-          rm -f dist/tcl86.dll
-          rm -f dist/tk86.dll
-          rm -f dist/libhwy*.dll
-          rm -f dist/libcaca*.dll
-          rm -f dist/libImath*.dll
-          rm -f dist/libIex*.dll
-          rm -f dist/libIlmThread*.dll
-          rm -f dist/libOpenEXR*.dll
-          rm -f dist/libjxl*.dll
-          rm -f dist/libmenuw6.dll
-          rm -f dist/libformw6.dll
-          rm -f dist/libpanelw6.dll
-          rm -f dist/libncurses*.dll
-          rm -f dist/vulkan-1.dll
-          rm -f dist/OpenCL.dll
-
-          echo "--- dist ---"
-          ls dist/ | wc -l
-          du -sh dist/
-
-      - name: Build single exe with NSIS
-        shell: bash
-        run: |
-          NSIS="/c/Program Files (x86)/NSIS/makensis.exe"
-          if [ ! -f "$NSIS" ]; then
-            echo "ERROR: NSIS not found at $NSIS"
-            exit 1
-          fi
-          echo "Using NSIS: $NSIS"
-
-          cat > kute.nsi.raw <<'EOF'
-          Unicode true
-          SilentInstall silent
-          RequestExecutionLevel user
-          OutFile "kute-windows-x64.exe"
-          InstallDir "$TEMP\kute"
-
-          Section
-          InitPluginsDir
-          SetOutPath $PLUGINSDIR
-          File /r "dist\*"
-          ExecWait '"$PLUGINSDIR\kute.exe"'
-          SectionEnd
-          EOF
-
-          sed 's/^ *//' kute.nsi.raw > kute.nsi
-          rm kute.nsi.raw
-          cat kute.nsi
-
-          "$NSIS" kute.nsi
-
-          if [ ! -f "kute-windows-x64.exe" ]; then
-            echo "ERROR: kute-windows-x64.exe was NOT created"
-            exit 1
-          fi
-          ls -la kute-windows-x64.exe
-
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-portable
-          path: kute-windows-x64.exename: Build Release
+name: Build Release
 
 on:
   push:
@@ -239,6 +121,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (-not (Test-Path $nsis)) {
+            Write-Error "NSIS install failed"
+            exit 1
+          }
+          Write-Host "NSIS installed: $nsis"
+
       - uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
@@ -302,10 +195,7 @@ jobs:
         run: |
           NSIS="/c/Program Files (x86)/NSIS/makensis.exe"
           if [ ! -f "$NSIS" ]; then
-            NSIS="/c/Program Files/NSIS/makensis.exe"
-          fi
-          if [ ! -f "$NSIS" ]; then
-            echo "ERROR: NSIS not found"
+            echo "ERROR: NSIS not found at $NSIS"
             exit 1
           fi
           echo "Using NSIS: $NSIS"
