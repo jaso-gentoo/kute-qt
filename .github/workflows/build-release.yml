@@ -147,9 +147,6 @@ jobs:
           mkdir -p dist
           cp build/kute.exe dist/
           windeployqt --release --no-translations --qmldir qml dist/kute.exe || true
-
-          # Копируем ВСЁ из /ucrt64/bin — гарантирует, что ни одна
-          # зависимость MinGW-рантайма не потеряется.
           cp /ucrt64/bin/*.dll dist/
 
           # Удаляем лишнее: LLM-хлам, Python, tcl/tk, hwy
