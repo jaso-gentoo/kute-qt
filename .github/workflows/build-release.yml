@@ -86,6 +86,8 @@ jobs:
             --desktop-file AppDir/usr/share/applications/kute.desktop \
             --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
 
+          # Системные библиотеки — не тащим, пусть берутся с хоста.
+          # Конфликт версий ломает wayland/GL/звук.
           rm -f AppDir/usr/lib/libwayland-client.so*  || true
           rm -f AppDir/usr/lib/libwayland-cursor.so*  || true
           rm -f AppDir/usr/lib/libwayland-egl.so*     || true
@@ -97,6 +99,9 @@ jobs:
           rm -f AppDir/usr/lib/libGLX.so*             || true
           rm -f AppDir/usr/lib/libGLdispatch.so*      || true
           rm -f AppDir/usr/lib/libvulkan.so*          || true
+          rm -f AppDir/usr/lib/libpulse.so*           || true
+          rm -f AppDir/usr/lib/libpulsecommon*.so     || true
+          rm -f AppDir/usr/lib/libpulse-simple.so*    || true
 
       - name: Build AppImage
         run: |
