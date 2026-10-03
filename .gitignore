@@ -1,0 +1,46 @@
+# Build
+build/
+build-*/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+*.o
+*.obj
+*.so
+*.dll
+*.dylib
+*.a
+*.lib
+
+# Qt
+moc_*.cpp
+*.moc
+qrc_*.cpp
+ui_*.h
+*.qmlc
+*.jsc
+
+# Packaging
+AppDir/
+squashfs-root/
+*.AppImage
+*.AppImage.zsync
+*.deb
+*.rpm
+*.flatpak
+.flatpak-builder/
+
+# IDE
+.vscode/
+.idea/
+*.user
+*.kdev4
+compile_commands.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python (для appimage-builder)
+__pycache__/
+*.pyc
