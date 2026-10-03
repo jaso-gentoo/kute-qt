@@ -109,11 +109,11 @@ jobs:
       - name: Download 7-Zip SFX module
         run: |
           set -e
-          curl -fL -o 7z-extra.7z https://github.com/ip7z/7zip/releases/download/24.09/7z2409-extra.7z
+          curl -fL -o 7z-extra.7z https://www.7-zip.org/a/7z1900-extra.7z
           ls -la 7z-extra.7z
           7z x -y 7z-extra.7z -o7z-extra
           echo "--- содержимое 7z-extra ---"
-          ls -laR 7z-extra/ | head -60
+          ls -la 7z-extra/ | head -40
           SFX=$(find 7z-extra -name "7zSD.sfx" -print -quit)
           if [ -z "$SFX" ]; then
             echo "SFX 7zSD.sfx не найден в архиве"
