@@ -32,17 +32,14 @@ jobs:
             libwayland-dev libxkbcommon-dev \
             cmake ninja-build patchelf desktop-file-utils \
             libfuse2 wget file \
-            libpipewire-0.3-dev libpulse-dev libasound2-dev \
-            libavcodec-dev libavformat-dev libavutil-dev \
-            libswresample-dev libswscale-dev \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+            libpipewire-0.3-dev libpulse-dev libasound2-dev
 
       - name: Patch and build Qt Multimedia
         run: |
           set -e
 
-          QT_VER=$(ls -d "$QT_ROOT_DIR"/lib/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake 2>/dev/null \
-                   && grep -oP 'set\(Qt6Multimedia_VERSION \K[0-9.]+' "$QT_ROOT_DIR"/lib/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake || echo "6.11.0")
+          QT_VER=$(grep -oP 'set\(Qt6Multimedia_VERSION \K[0-9.]+' \
+                   "$QT_ROOT_DIR"/lib/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake 2>/dev/null || echo "6.11.0")
           QT_MAJOR_MINOR=$(echo "$QT_VER" | cut -d. -f1-2)
           QT_MAJOR_MINOR_PATCH=$(echo "$QT_VER" | cut -d. -f1-3)
 
@@ -101,12 +98,9 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR" \
             -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
             -DQT_BUILD_TESTS=OFF \
-            -DQT_BUILD_EXAMPLES=OFF \
-            -DQT_FEATURE_pulseaudio=ON \
-            -DQT_FEATURE_pipewire=ON
+            -DQT_BUILD_EXAMPLES=OFF
 
           cmake --build . --parallel "$(nproc)"
-
           cmake --install .
 
           echo "--- libQt6Multimedia after install ---"
@@ -121,11 +115,8 @@ jobs:
             exit 1
           fi
 
-          echo "Checking that patched library is loaded from $QT_ROOT_DIR"
+          echo "Checking: $QMLIB"
           ldd "$QMLIB" | head -20
-
-          STRINGS_OUT=$(strings "$QMLIB" | grep -c 'media.role' || true)
-          echo "media.role occurrences in library: $STRINGS_OUT"
 
           if strings "$QMLIB" | grep -q 'Application'; then
             echo "OK: patched library contains 'Application' role string"
@@ -200,11 +191,7 @@ jobs:
 
       - name: Verify AppImage contains patched Multimedia
         run: |
-          APPDIR_LIB="AppDir/usr/lib/libQt6Multimedia.so.6"
-          if [ ! -e "$APPDIR_LIB" ] && [ ! -e "$APPDIR_LIB"* ]; then
-            APPDIR_LIB=$(find AppDir -name 'libQt6Multimedia.so*' | head -n1)
-          fi
-
+          APPDIR_LIB=$(find AppDir -name 'libQt6Multimedia.so*' | head -n1)
           echo "Checking: $APPDIR_LIB"
           if [ -z "$APPDIR_LIB" ]; then
             echo "ERROR: libQt6Multimedia not found in AppDir"
