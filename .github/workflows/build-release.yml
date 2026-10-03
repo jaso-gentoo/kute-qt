@@ -68,17 +68,6 @@ jobs:
                 AppDir/usr/plugins/wayland-decoration-client/ 2>/dev/null || true
           cp -v "$QTDIR"/plugins/wayland-graphics-integration-client/*.so \
                 AppDir/usr/plugins/wayland-graphics-integration-client/ 2>/dev/null || true
-
-          mkdir -p AppDir/usr/plugins/multimedia/audio
-          cp -v "$QTDIR"/plugins/multimedia/libffmpegmediaplugin.so \
-                AppDir/usr/plugins/multimedia/ 2>/dev/null || true
-          cp -v "$QTDIR"/plugins/multimedia/audio/libqtaudio_*.so \
-                AppDir/usr/plugins/multimedia/audio/ 2>/dev/null || true
-
-          echo "--- multimedia plugins ---"
-          ls -la AppDir/usr/plugins/multimedia/ || true
-          echo "--- audio backends ---"
-          ls -la AppDir/usr/plugins/multimedia/audio/ || true
           cp -v "$QTDIR"/lib/libQt6Wayland*.so* AppDir/usr/lib/
 
       - name: Fill AppDir with linuxdeploy
@@ -97,8 +86,6 @@ jobs:
             --desktop-file AppDir/usr/share/applications/kute.desktop \
             --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
 
-          # Системные библиотеки — не тащим, пусть берутся с хоста.
-          # Конфликт версий ломает wayland/GL/звук.
           rm -f AppDir/usr/lib/libwayland-client.so*  || true
           rm -f AppDir/usr/lib/libwayland-cursor.so*  || true
           rm -f AppDir/usr/lib/libwayland-egl.so*     || true
@@ -112,7 +99,6 @@ jobs:
           rm -f AppDir/usr/lib/libvulkan.so*          || true
           rm -f AppDir/usr/lib/libpulse.so*           || true
           rm -f AppDir/usr/lib/libpulsecommon*.so     || true
-          rm -f AppDir/usr/lib/libpulse-simple.so*    || true
 
       - name: Build AppImage
         run: |
@@ -173,7 +159,7 @@ jobs:
           cd ..
           ls -la dist.zip
 
-      - name: Create launcher batch
+      - name: Create launcher command
         shell: cmd
         run: |
           (
@@ -184,8 +170,8 @@ jobs:
             echo powershell -NoProfile -Command "Expand-Archive -Path '%%~dp0dist.zip' -DestinationPath '%%TMPDIR%%' -Force"
             echo start "" "%%TMPDIR%%\kute.exe"
             echo exit /b 0
-          ) > launcher.bat
-          type launcher.bat
+          ) > launcher.cmd
+          type launcher.cmd
 
       - name: Build single-file exe with IExpress
         shell: pwsh
@@ -193,11 +179,9 @@ jobs:
           $dir = (Get-Location).Path.Replace('\', '\\')
           Write-Host "Working dir: $dir"
 
-          if (-not (Test-Path "launcher.bat")) { Write-Error "launcher.bat not found"; exit 1 }
+          if (-not (Test-Path "launcher.cmd")) { Write-Error "launcher.cmd not found"; exit 1 }
           if (-not (Test-Path "dist.zip"))     { Write-Error "dist.zip not found"; exit 1 }
 
-          # Правильный порядок секций: [Strings] идёт ДО [SourceFiles].
-          # [SourceFiles0] с %FILE0%= (с = в конце). SourceFiles0 путь с \ в конце.
           $sed = @"
           [Version]
           Class=IEXPRESS
@@ -216,13 +200,13 @@ jobs:
           FinishMessage=
           TargetName=$dir\kute-windows-x64.exe
           FriendlyName=kute
-          AppLaunched=launcher.bat
+          AppLaunched=launcher.cmd
           PostInstallCmd=<None>
           AdminQuietInstCmd=
           UserQuietInstCmd=
           SourceFiles=SourceFiles
           [Strings]
-          FILE0="launcher.bat"
+          FILE0="launcher.cmd"
           FILE1="dist.zip"
           [SourceFiles]
           SourceFiles0=$dir\\
@@ -231,24 +215,20 @@ jobs:
           %FILE1%=
           "@
 
-          # Убираем пустые строки, которые PS добавляет в here-string
           $sed = ($sed -split "`r?`n" | Where-Object { $_ -ne "" -and $_ -notmatch '^\s+$' }) -join "`r`n"
           Set-Content -Path "kute.sed" -Value $sed -Encoding ASCII -NoNewline
-          Write-Host "=== Generated SED ==="
           Get-Content kute.sed
 
           $iexpress = "$env:SystemRoot\System32\iexpress.exe"
-          Write-Host "Running: $iexpress /N kute.sed"
           $proc = Start-Process -FilePath $iexpress -ArgumentList "/N","kute.sed" -Wait -PassThru
           Write-Host "IExpress exit code: $($proc.ExitCode)"
-
           Start-Sleep -Seconds 5
 
           if (Test-Path "kute-windows-x64.exe") {
             Write-Host "=== SUCCESS ==="
-            Get-Item "kute-windows-x64.exe" | Format-List Name, Length, LastWriteTime
+            Get-Item "kute-windows-x64.exe" | Format-List Name, Length
           } else {
-            Write-Host "=== Files in dir after IExpress ==="
+            Write-Host "=== Files in dir ==="
             Get-ChildItem | Format-Table Name, Length
             Write-Error "kute-windows-x64.exe was NOT created"
             exit 1
