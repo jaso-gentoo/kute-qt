@@ -80,12 +80,24 @@ endif()
 if(UNIX AND NOT APPLE)
     include(GNUInstallDirs)
     install(TARGETS kute RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
     if(EXISTS "${CMAKE_SOURCE_DIR}/packaging/kute.desktop")
-        install(FILES packaging/kute.desktop
-                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
+        install(FILES "${CMAKE_SOURCE_DIR}/packaging/kute.desktop"
+                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
+                RENAME kute.desktop)
+    elseif(EXISTS "${CMAKE_SOURCE_DIR}/packaging/kute-qt.desktop")
+        install(FILES "${CMAKE_SOURCE_DIR}/packaging/kute-qt.desktop"
+                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
+                RENAME kute.desktop)
     endif()
+
     if(EXISTS "${CMAKE_SOURCE_DIR}/packaging/kute.png")
-        install(FILES packaging/kute.png
-                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps)
+        install(FILES "${CMAKE_SOURCE_DIR}/packaging/kute.png"
+                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps
+                RENAME kute.png)
+    elseif(EXISTS "${CMAKE_SOURCE_DIR}/packaging/kute-qt.png")
+        install(FILES "${CMAKE_SOURCE_DIR}/packaging/kute-qt.png"
+                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps
+                RENAME kute.png)
     endif()
 endif()
