@@ -17,7 +17,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.11.1'
+          version: '6.11.*'
           host: 'linux'
           target: 'desktop'
           arch: 'linux_gcc_64'
@@ -61,28 +61,14 @@ jobs:
           mkdir -p AppDir/usr/plugins/wayland-graphics-integration-client
           mkdir -p AppDir/usr/lib
 
-          # Основные платформенные плагины
           cp -v "$QTDIR"/plugins/platforms/libqwayland*.so AppDir/usr/plugins/platforms/
-
-          # Shell integration — ГЛАВНОЕ, чего не хватало
           cp -v "$QTDIR"/plugins/wayland-shell-integration/*.so \
                 AppDir/usr/plugins/wayland-shell-integration/ 2>/dev/null || true
-
-          # Decoration client
           cp -v "$QTDIR"/plugins/wayland-decoration-client/*.so \
                 AppDir/usr/plugins/wayland-decoration-client/ 2>/dev/null || true
-
-          # Graphics integration (в т.ч. libvulkan-server.so — для vulkan+wayland)
           cp -v "$QTDIR"/plugins/wayland-graphics-integration-client/*.so \
                 AppDir/usr/plugins/wayland-graphics-integration-client/ 2>/dev/null || true
-
-          # Qt wayland библиотеки
           cp -v "$QTDIR"/lib/libQt6Wayland*.so* AppDir/usr/lib/
-
-          echo "--- platforms ---"
-          ls -la AppDir/usr/plugins/platforms/
-          echo "--- shell integration ---"
-          ls -la AppDir/usr/plugins/wayland-shell-integration/ 2>/dev/null || echo "нет"
 
       - name: Fill AppDir with linuxdeploy
         env:
@@ -100,11 +86,6 @@ jobs:
             --desktop-file AppDir/usr/share/applications/kute.desktop \
             --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
 
-          echo "=== before cleanup ==="
-          ls AppDir/usr/lib/ | grep -iE "wayland|xkb|EGL|GL|vulkan" || true
-
-          # Системные библиотеки НЕ тащим в AppImage — они должны быть с хоста,
-          # иначе конфликт версий с Mesa / vulkan-драйверами ломает всё.
           rm -f AppDir/usr/lib/libwayland-client.so*  || true
           rm -f AppDir/usr/lib/libwayland-cursor.so*  || true
           rm -f AppDir/usr/lib/libwayland-egl.so*     || true
@@ -116,9 +97,6 @@ jobs:
           rm -f AppDir/usr/lib/libGLX.so*             || true
           rm -f AppDir/usr/lib/libGLdispatch.so*      || true
           rm -f AppDir/usr/lib/libvulkan.so*          || true
-
-          echo "=== after cleanup ==="
-          ls AppDir/usr/lib/ | grep -iE "wayland|xkb|EGL|GL|vulkan" || echo "none (ok)"
 
       - name: Build AppImage
         run: |
@@ -154,11 +132,10 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-declarative
             mingw-w64-ucrt-x86_64-qt6-tools
             mingw-w64-ucrt-x86_64-taglib
-            mingw-w64-ucrt-x86_64-7zip
+            mingw-w64-ucrt-x86_64-nsis
 
       - name: Configure
-        run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build
@@ -173,34 +150,53 @@ jobs:
           ls dist/ | wc -l
           du -sh dist/
 
-      - name: Download 7-Zip SFX module
+      - name: Build NSIS installer
         run: |
-          set -e
-          curl -fL -o 7z-extra.7z "https://master.dl.sourceforge.net/project/sevenzip/7-Zip/9.20/7z920_extra.7z?viasf=1"
-          7z x -y 7z-extra.7z -o7z-extra
-          SFX=$(find 7z-extra -iname "7zSD.sfx" -print -quit)
-          if [ -z "$SFX" ]; then
-            echo "SFX 7zSD.sfx не найден"
-            exit 1
-          fi
-          cp "$SFX" sfx-module.sfx
-          ls -la sfx-module.sfx
-
-      - name: Create SFX config
-        run: |
-          printf ';!@Install@!UTF-8!\nTitle="kute"\nProgress="no"\nRunProgram="kute.exe"\n;!@InstallEnd@!\n' > sfx-config.txt
-
-      - name: Build kute-portable.exe
-        run: |
-          cd dist && 7z a -mx=9 ../payload.7z . && cd ..
-          cat sfx-module.sfx sfx-config.txt payload.7z > kute-portable.exe
-          ls -la kute-portable.exe
+          cat > installer.nsi <<'NSIS_EOF'
+          !include "MUI2.nsh"
+          
+          Name "kute"
+          OutFile "kute-installer.exe"
+          InstallDir "$LOCALAPPDATA\Programs\kute"
+          RequestExecutionLevel user
+          Unicode True
+          
+          !insertmacro MUI_PAGE_DIRECTORY
+          !insertmacro MUI_PAGE_INSTFILES
+          !insertmacro MUI_UNPAGE_CONFIRM
+          !insertmacro MUI_UNPAGE_INSTFILES
+          !insertmacro MUI_LANGUAGE "English"
+          !insertmacro MUI_LANGUAGE "Russian"
+          
+          Section "Install"
+            SetOutPath "$INSTDIR"
+            File /r "dist\*"
+            CreateDirectory "$SMPROGRAMS\kute"
+            CreateShortcut "$SMPROGRAMS\kute\kute.lnk" "$INSTDIR\kute.exe"
+            CreateShortcut "$DESKTOP\kute.lnk" "$INSTDIR\kute.exe"
+            WriteUninstaller "$INSTDIR\uninstall.exe"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\kute" "DisplayName" "kute"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\kute" "UninstallString" "$INSTDIR\uninstall.exe"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\kute" "DisplayIcon" "$INSTDIR\kute.exe"
+          SectionEnd
+          
+          Section "Uninstall"
+            RMDir /r "$INSTDIR"
+            Delete "$SMPROGRAMS\kute\kute.lnk"
+            RMDir "$SMPROGRAMS\kute"
+            Delete "$DESKTOP\kute.lnk"
+            DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\kute"
+          SectionEnd
+          NSIS_EOF
+          
+          makensis installer.nsi
+          ls -la kute-installer.exe
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-portable
-          path: kute-portable.exe
+          name: windows-installer
+          path: kute-installer.exe
 
   release:
     needs: [linux, windows]
@@ -213,7 +209,7 @@ jobs:
           path: artifacts/
       - uses: actions/download-artifact@v4
         with:
-          name: windows-portable
+          name: windows-installer
           path: artifacts/
       - uses: softprops/action-gh-release@v2
         with:
