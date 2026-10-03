@@ -57,7 +57,12 @@ jobs:
             --desktop-file AppDir/usr/share/applications/kute.desktop \
             --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png \
             --output appimage
-          mv kute-*.AppImage kute-x86_64.AppImage
+          ls -la *.AppImage
+          for f in *.AppImage; do
+            mv "$f" kute-x86_64.AppImage
+            break
+          done
+          ls -la kute-x86_64.AppImage
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
