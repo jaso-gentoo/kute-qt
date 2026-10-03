@@ -14,11 +14,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.3'
+          host: 'linux'
+          target: 'desktop'
+          arch: 'linux_gcc_64'
+          modules: 'qtmultimedia'
+          cache: true
+
+      - name: Install system deps
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            qt6-base-dev qt6-multimedia-dev qt6-declarative-dev \
             libtag1-dev libgl1-mesa-dev \
             cmake ninja-build patchelf desktop-file-utils \
             libfuse2 wget file
@@ -100,27 +109,16 @@ jobs:
       - name: Download 7-Zip SFX module
         run: |
           wget -q https://www.7-zip.org/a/7z2301-extra.7z
-          7z x 7z2301-extra.7z -o7z-extra 7zSD.sfx 7zSD_All.sfx
-          ls -la 7z-extra/
+          7z x 7z2301-extra.7z -o7z-extra 7zSD.sfx
 
       - name: Create SFX config
         run: |
-          cat > sfx-config.txt <<'EOF'
-          ;!@Install@!UTF-8!
-          Title="kute"
-          Progress="no"
-          RunProgram="kute.exe"
-          ;!@InstallEnd@!
-          EOF
+          printf ';!@Install@!UTF-8!\nTitle="kute"\nProgress="no"\nRunProgram="kute.exe"\n;!@InstallEnd@!\n' > sfx-config.txt
 
       - name: Build single-file kute-portable.exe
         run: |
-          # Пакуем содержимое dist/ в архив
           cd dist && 7z a -mx=9 ../payload.7z . && cd ..
-
-          # Склеиваем: SFX модуль + конфиг + архив = один exe
           cat 7z-extra/7zSD.sfx sfx-config.txt payload.7z > kute-portable.exe
-
           ls -la kute-portable.exe
 
       - name: Upload Windows artifact
