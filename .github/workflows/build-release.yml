@@ -151,6 +151,7 @@ jobs:
             mingw-w64-ucrt-x86_64-ninja
             mingw-w64-ucrt-x86_64-qt6-base
             mingw-w64-ucrt-x86_64-qt6-multimedia
+            mingw-w64-ucrt-x86_64-qt6-multimedia-wmf
             mingw-w64-ucrt-x86_64-qt6-declarative
             mingw-w64-ucrt-x86_64-qt6-tools
             mingw-w64-ucrt-x86_64-taglib
@@ -158,6 +159,7 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-svg
             mingw-w64-ucrt-x86_64-qt6-imageformats
             mingw-w64-ucrt-x86_64-ffmpeg
+            mingw-w64-ucrt-x86_64-ntldd
 
       - name: Configure
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -165,122 +167,75 @@ jobs:
       - name: Build
         run: cmake --build build
 
-      - name: Prepare dist with Qt DLLs
+      - name: Prepare dist
         run: |
           mkdir -p dist
           cp build/kute.exe dist/
-
-          echo "=== copying all ucrt64 DLLs (following symlinks) ==="
           cp -L /ucrt64/bin/*.dll dist/
 
-          rm -f dist/ggml*.dll
-          rm -f dist/libllama*.dll
-          rm -f dist/libmtmd*.dll
-          rm -f dist/libwhisper*.dll
-          rm -f dist/libparakeet*.dll
-          rm -f dist/libpython*.dll
-          rm -f dist/libPyImath*.dll
-          rm -f dist/libopenblas*.dll
-          rm -f dist/libgfortran*.dll
-          rm -f dist/libquadmath*.dll
-          rm -f dist/libgomp*.dll
-          rm -f dist/tcl86.dll
-          rm -f dist/tk86.dll
-          rm -f dist/libhwy*.dll
-          rm -f dist/libcaca*.dll
-          rm -f dist/libImath*.dll
-          rm -f dist/libIex*.dll
-          rm -f dist/libIlmThread*.dll
-          rm -f dist/libOpenEXR*.dll
-          rm -f dist/libjxl*.dll
-          rm -f dist/libmenuw6.dll
-          rm -f dist/libformw6.dll
-          rm -f dist/libpanelw6.dll
-          rm -f dist/libncurses*.dll
-          rm -f dist/vulkan-1.dll
-          rm -f dist/OpenCL.dll
+          rm -f dist/ggml*.dll dist/libllama*.dll dist/libmtmd*.dll
+          rm -f dist/libwhisper*.dll dist/libparakeet*.dll dist/libpython*.dll
+          rm -f dist/libPyImath*.dll dist/libopenblas*.dll dist/libgfortran*.dll
+          rm -f dist/libquadmath*.dll dist/libgomp*.dll dist/tcl86.dll dist/tk86.dll
+          rm -f dist/libhwy*.dll dist/libcaca*.dll dist/libImath*.dll dist/libIex*.dll
+          rm -f dist/libIlmThread*.dll dist/libOpenEXR*.dll dist/libmenuw6.dll
+          rm -f dist/libformw6.dll dist/libpanelw6.dll dist/libncurses*.dll
+          rm -f dist/vulkan-1.dll dist/OpenCL.dll
 
           echo "=== dll count ==="
           ls dist/*.dll | wc -l
 
-      - name: Copy QML modules with symlink dereferencing
+      - name: Copy QML modules
         run: |
           QML_SRC=""
           for cand in /ucrt64/share/qt6/qml /ucrt64/lib/qt6/qml; do
-            if [ -d "$cand" ]; then
-              QML_SRC="$cand"
-              break
-            fi
+            if [ -d "$cand" ]; then QML_SRC="$cand"; break; fi
           done
-
-          if [ -z "$QML_SRC" ]; then
-            echo "ERROR: QML source not found"
-            exit 1
-          fi
+          if [ -z "$QML_SRC" ]; then echo "ERROR: QML not found"; exit 1; fi
 
           echo "Using: $QML_SRC"
           rm -rf dist/qml
           mkdir -p dist/qml
-          cp -rL "$QML_SRC"/* dist/qml/ 2>&1 | head -20 || true
+          cp -rL "$QML_SRC"/* dist/qml/ 2>&1 | head -5 || true
 
-          echo "=== critical modules ==="
           for m in QtQuick QtQuick/Layouts QtQuick/Controls QtQuick/Dialogs QtQuick/Window QtQml; do
-            if [ -d "dist/qml/$m" ]; then
-              echo "OK: $m"
-            else
-              echo "MISSING: $m"
-            fi
+            [ -d "dist/qml/$m" ] && echo "OK: $m" || echo "MISSING: $m"
           done
 
-          echo "=== qml total size ==="
-          du -sh dist/qml/
-
-      - name: Copy Qt plugins
+      - name: Copy plugins and multimedia
         run: |
           PLUG_SRC=""
           for cand in /ucrt64/share/qt6/plugins /ucrt64/lib/qt6/plugins; do
-            if [ -d "$cand" ]; then
-              PLUG_SRC="$cand"
-              break
-            fi
+            if [ -d "$cand" ]; then PLUG_SRC="$cand"; break; fi
           done
+          if [ -z "$PLUG_SRC" ]; then echo "ERROR: plugins not found"; exit 1; fi
 
-          if [ -z "$PLUG_SRC" ]; then
-            echo "ERROR: plugin source not found"
-            exit 1
-          fi
-
-          echo "Using: $PLUG_SRC"
+          echo "=== available plugin folders ==="
           ls "$PLUG_SRC"
 
           for sub in platforms imageformats iconengines multimedia styles generic networkinformation tls; do
             if [ -d "$PLUG_SRC/$sub" ]; then
-              echo "Copying plugin: $sub"
               mkdir -p "dist/$sub"
-              cp -rL "$PLUG_SRC/$sub"/* "dist/$sub/" 2>&1 | head -5 || true
+              cp -rL "$PLUG_SRC/$sub"/* "dist/$sub/" 2>&1 | head -3 || true
             fi
           done
 
-          echo "=== dist/platforms ==="
-          ls -la dist/platforms/ 2>/dev/null || echo "NO platforms"
-          echo "=== dist/multimedia ==="
-          ls -la dist/multimedia/ 2>/dev/null || echo "NO multimedia"
-
-      - name: Copy multimedia plugin with all dependencies
-        run: |
-          mkdir -p dist/multimedia
-
-          for cand in /ucrt64/share/qt6/plugins/multimedia /ucrt64/lib/qt6/plugins/multimedia; do
-            if [ -d "$cand" ]; then
-              cp -rL "$cand"/* dist/multimedia/
-              break
-            fi
-          done
-
-          echo "=== multimedia plugin files ==="
+          echo "=== multimedia plugin folder ==="
           ls -la dist/multimedia/
 
-          echo "=== copying ffmpeg deps next to plugin ==="
+          echo "=== checking ffmpeg plugin deps ==="
+          if [ -f dist/multimedia/ffmpegmediaplugin.dll ]; then
+            ntldd -R dist/multimedia/ffmpegmediaplugin.dll 2>&1 | grep -i "not found" || echo "ALL DEPS OK"
+          fi
+
+          echo "=== checking wmf plugin deps ==="
+          if [ -f dist/multimedia/windowsmediaplugin.dll ]; then
+            ntldd -R dist/multimedia/windowsmediaplugin.dll 2>&1 | grep -i "not found" || echo "ALL DEPS OK"
+          fi
+
+      - name: Copy multimedia deps next to plugin
+        run: |
+          mkdir -p dist/multimedia
           for lib in avcodec avformat avutil swresample swscale; do
             cp -L /ucrt64/bin/${lib}-*.dll dist/multimedia/ 2>/dev/null || true
           done
@@ -301,41 +256,29 @@ jobs:
             'Plugins=./' \
             'Qml2Imports=./qml' \
             > dist/qt.conf
-
-          echo "=== dist/qt.conf ==="
           cat dist/qt.conf
 
-      - name: Copy OpenSSL legacy provider
+      - name: Copy OpenSSL legacy
         run: |
           mkdir -p dist/lib/ossl-modules
           cp /ucrt64/lib/ossl-modules/legacy.dll dist/lib/ossl-modules/ 2>/dev/null || true
           cp -L /ucrt64/bin/libcrypto-3-x64.dll dist/ 2>/dev/null || true
           cp -L /ucrt64/bin/libssl-3-x64.dll dist/ 2>/dev/null || true
 
-      - name: Final check before NSIS
+      - name: Final check
         run: |
-          echo "=== dist size ==="
           du -sh dist/
-
-          echo ""
-          echo "=== key files ==="
           ls -la dist/kute.exe
-          ls -la dist/Qt6Core.dll 2>/dev/null || echo "MISSING Qt6Core.dll"
-          ls -la dist/libtag.dll 2>/dev/null || echo "MISSING libtag.dll"
-          ls -la dist/qt.conf
-          ls -la dist/platforms/qwindows.dll 2>/dev/null || echo "MISSING qwindows.dll"
-          ls dist/multimedia/ 2>/dev/null | head -20
-          ls dist/qml/QtQuick/Layouts/qmldir 2>/dev/null || echo "MISSING Layouts qmldir"
-
-          echo ""
-          echo "=== check for broken symlinks (should be empty) ==="
-          find dist/ -xtype l 2>/dev/null || true
+          ls -la dist/Qt6Core.dll 2>/dev/null || echo "MISSING Qt6Core"
+          ls -la dist/libtag.dll 2>/dev/null || echo "MISSING libtag"
+          ls dist/multimedia/
+          ls dist/qml/QtQuick/Layouts/qmldir 2>/dev/null || echo "MISSING Layouts"
 
       - name: Build single exe with NSIS
         shell: bash
         run: |
           NSIS="/c/Program Files (x86)/NSIS/makensis.exe"
-          if [ ! -f "$NSIS" ]; then exit 1; fi
+          [ -f "$NSIS" ] || exit 1
 
           printf '%s\n' \
             'Unicode true' \
@@ -352,11 +295,8 @@ jobs:
             'SectionEnd' \
             > kute.nsi
 
-          cat kute.nsi
           "$NSIS" kute.nsi
-
-          if [ ! -f "kute-windows-x86_64.exe" ]; then exit 1; fi
-          echo "=== final exe size ==="
+          [ -f "kute-windows-x86_64.exe" ] || exit 1
           ls -la kute-windows-x86_64.exe
 
       - name: Upload Windows artifact
@@ -371,12 +311,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v6
         with:
           path: downloads/
 
-      - name: Delete existing v0.99 release if present
+      - name: Delete existing v0.99
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -387,9 +326,7 @@ jobs:
         with:
           tag_name: v0.99
           name: "v0.99 (pre-release)"
-          body: |
-            Auto-generated build from commit ${{ github.sha }}.
-            Updated on every workflow run.
+          body: "Auto-generated build from commit ${{ github.sha }}."
           draft: false
           prerelease: true
           make_latest: false
