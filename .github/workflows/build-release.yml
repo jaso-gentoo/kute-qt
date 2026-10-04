@@ -251,38 +251,33 @@ jobs:
   publish:
     needs: [linux, windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v6
         with:
           path: downloads/
 
-      - name: Prepare files
+      - name: Delete existing v0.99 release if present
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p site
-          cp downloads/linux-appimage/kute-x86_64.AppImage site/
-          cp downloads/windows-portable/kute-windows-x86_64.exe site/
+          gh release delete v0.99 --repo ${{ github.repository }} --yes --cleanup-tag 2>/dev/null || true
 
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            VERSION="${GITHUB_REF#refs/tags/}"
-            cp site/kute-x86_64.AppImage "site/kute-${VERSION}-x86_64.AppImage"
-            cp site/kute-windows-x86_64.exe "site/kute-${VERSION}-windows-x86_64.exe"
-          fi
-
-          printf '%s' '<!DOCTYPE html><html><head><meta charset="utf-8"><title>kute downloads</title><style>body{font-family:sans-serif;padding:40px;max-width:700px;margin:auto;color:#222}a{color:#0b6bcb}li{margin:8px 0}code{background:#eee;padding:2px 6px;border-radius:4px}</style></head><body><h1>kute downloads</h1><p>Latest builds:</p><ul><li><a href="kute-x86_64.AppImage">kute-x86_64.AppImage</a> &mdash; Linux</li><li><a href="kute-windows-x86_64.exe">kute-windows-x86_64.exe</a> &mdash; Windows</li></ul><p style="color:#888;font-size:12px">Build: <code>'"${GITHUB_SHA:0:8}"'</code></p></body></html>' > site/index.html
-
-          echo "=== site contents ==="
-          ls -la site/
-          echo "=== site size ==="
-          du -sh site/
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Create pre-release v0.99
+        uses: softprops/action-gh-release@v2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          publish_branch: dev
-          keep_files: true
-          commit_message: "Build ${{ github.sha }}"
-          user_name: "github-actions[bot]"
-          user_email: "github-actions[bot]@users.noreply.github.com"
+          tag_name: v0.99
+          name: "v0.99 (pre-release)"
+          body: |
+            Auto-generated build from commit ${{ github.sha }}.
+            Updated on every workflow run.
+          draft: false
+          prerelease: true
+          make_latest: false
+          files: |
+            downloads/linux-appimage/kute-x86_64.AppImage
+            downloads/windows-portable/kute-windows-x86_64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
