@@ -157,39 +157,13 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-shadertools
             mingw-w64-ucrt-x86_64-qt6-svg
             mingw-w64-ucrt-x86_64-qt6-imageformats
+            mingw-w64-ucrt-x86_64-ffmpeg
 
       - name: Configure
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build
-
-      - name: Locate Qt directories
-        run: |
-          echo "=== QML source dir candidates ==="
-          for d in /ucrt64/share/qt6/qml /ucrt64/lib/qt6/qml; do
-            if [ -d "$d" ]; then
-              echo "EXISTS: $d"
-              ls -la "$d" | head -5
-            else
-              echo "MISSING: $d"
-            fi
-          done
-
-          echo ""
-          echo "=== plugin source dir candidates ==="
-          for d in /ucrt64/share/qt6/plugins /ucrt64/lib/qt6/plugins; do
-            if [ -d "$d" ]; then
-              echo "EXISTS: $d"
-              ls "$d"
-            else
-              echo "MISSING: $d"
-            fi
-          done
-
-          echo ""
-          echo "=== check if qml files are symlinks ==="
-          find /ucrt64 -name 'qmldir' -path '*QtQuick/Layouts*' -exec ls -la {} \; 2>/dev/null | head -3
 
       - name: Prepare dist with Qt DLLs
         run: |
@@ -247,31 +221,21 @@ jobs:
           echo "Using: $QML_SRC"
           rm -rf dist/qml
           mkdir -p dist/qml
-
-          echo "=== copying with -rL (dereference symlinks) ==="
           cp -rL "$QML_SRC"/* dist/qml/ 2>&1 | head -20 || true
 
-          echo ""
-          echo "=== check critical modules exist as real files ==="
+          echo "=== critical modules ==="
           for m in QtQuick QtQuick/Layouts QtQuick/Controls QtQuick/Dialogs QtQuick/Window QtQml; do
             if [ -d "dist/qml/$m" ]; then
-              echo "OK dir: $m"
-              ls "dist/qml/$m" | head -3
+              echo "OK: $m"
             else
               echo "MISSING: $m"
             fi
           done
 
-          echo ""
-          echo "=== verify qmldir is a real file ==="
-          ls -la dist/qml/QtQuick/Layouts/qmldir 2>&1 || echo "qmldir missing!"
-          ls -la dist/qml/QtQuick/Layouts/*.dll 2>&1 | head -3 || echo "no dll in Layouts!"
-
-          echo ""
-          echo "=== total qml size ==="
+          echo "=== qml total size ==="
           du -sh dist/qml/
 
-      - name: Copy Qt plugins with symlink dereferencing
+      - name: Copy Qt plugins
         run: |
           PLUG_SRC=""
           for cand in /ucrt64/share/qt6/plugins /ucrt64/lib/qt6/plugins; do
@@ -291,21 +255,42 @@ jobs:
 
           for sub in platforms imageformats iconengines multimedia styles generic networkinformation tls; do
             if [ -d "$PLUG_SRC/$sub" ]; then
-              echo "Copying: $sub"
+              echo "Copying plugin: $sub"
               mkdir -p "dist/$sub"
               cp -rL "$PLUG_SRC/$sub"/* "dist/$sub/" 2>&1 | head -5 || true
             fi
           done
 
-          echo ""
           echo "=== dist/platforms ==="
           ls -la dist/platforms/ 2>/dev/null || echo "NO platforms"
-
           echo "=== dist/multimedia ==="
           ls -la dist/multimedia/ 2>/dev/null || echo "NO multimedia"
 
-          echo "=== dist/imageformats ==="
-          ls dist/imageformats/ 2>/dev/null || echo "NO imageformats"
+      - name: Copy multimedia plugin with all dependencies
+        run: |
+          mkdir -p dist/multimedia
+
+          for cand in /ucrt64/share/qt6/plugins/multimedia /ucrt64/lib/qt6/plugins/multimedia; do
+            if [ -d "$cand" ]; then
+              cp -rL "$cand"/* dist/multimedia/
+              break
+            fi
+          done
+
+          echo "=== multimedia plugin files ==="
+          ls -la dist/multimedia/
+
+          echo "=== copying ffmpeg deps next to plugin ==="
+          for lib in avcodec avformat avutil swresample swscale; do
+            cp -L /ucrt64/bin/${lib}-*.dll dist/multimedia/ 2>/dev/null || true
+          done
+          cp -L /ucrt64/bin/libjxl*.dll dist/multimedia/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libsoxr.dll dist/multimedia/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libgomp-1.dll dist/multimedia/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libssp-0.dll dist/multimedia/ 2>/dev/null || true
+
+          echo "=== dist/multimedia after deps ==="
+          ls -la dist/multimedia/
 
       - name: Create qt.conf
         shell: bash
@@ -320,21 +305,12 @@ jobs:
           echo "=== dist/qt.conf ==="
           cat dist/qt.conf
 
-      - name: Copy extra deps for multimedia
+      - name: Copy OpenSSL legacy provider
         run: |
-          # av* DLLs next to exe AND in multimedia/ folder
-          for dll in avcodec avformat avutil swresample swscale; do
-            cp /ucrt64/bin/${dll}-*.dll dist/ 2>/dev/null || true
-            cp /ucrt64/bin/${dll}-*.dll dist/multimedia/ 2>/dev/null || true
-          done
-          cp /ucrt64/bin/libjxl*.dll dist/ 2>/dev/null || true
-          cp /ucrt64/bin/libsoxr.dll dist/ 2>/dev/null || true
-          cp /ucrt64/bin/libgomp-1.dll dist/ 2>/dev/null || true
-
           mkdir -p dist/lib/ossl-modules
           cp /ucrt64/lib/ossl-modules/legacy.dll dist/lib/ossl-modules/ 2>/dev/null || true
-          cp /ucrt64/bin/libcrypto-3-x64.dll dist/ 2>/dev/null || true
-          cp /ucrt64/bin/libssl-3-x64.dll dist/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libcrypto-3-x64.dll dist/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libssl-3-x64.dll dist/ 2>/dev/null || true
 
       - name: Final check before NSIS
         run: |
@@ -345,10 +321,11 @@ jobs:
           echo "=== key files ==="
           ls -la dist/kute.exe
           ls -la dist/Qt6Core.dll 2>/dev/null || echo "MISSING Qt6Core.dll"
+          ls -la dist/libtag.dll 2>/dev/null || echo "MISSING libtag.dll"
           ls -la dist/qt.conf
           ls -la dist/platforms/qwindows.dll 2>/dev/null || echo "MISSING qwindows.dll"
-          ls -la dist/multimedia/ 2>/dev/null | head -5
-          ls -la dist/qml/QtQuick/Layouts/qmldir 2>/dev/null || echo "MISSING Layouts qmldir"
+          ls dist/multimedia/ 2>/dev/null | head -20
+          ls dist/qml/QtQuick/Layouts/qmldir 2>/dev/null || echo "MISSING Layouts qmldir"
 
           echo ""
           echo "=== check for broken symlinks (should be empty) ==="
