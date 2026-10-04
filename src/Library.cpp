@@ -79,6 +79,16 @@ static TagLib::FileRef makeFileRef(const QString &path) {
 #endif
 }
 
+static QString normalizeLocalPath(QString p) {
+    if (p.startsWith("file://")) p = QUrl(p).toLocalFile();
+#ifdef Q_OS_WIN
+    if (p.length() >= 3 && p[0] == '/' && p[2] == ':') {
+        p = p.mid(1);
+    }
+#endif
+    return p;
+}
+
 QString Library::toFileUrl(const QString &localPath) const {
     if (localPath.isEmpty()) return {};
     return QUrl::fromLocalFile(localPath).toString();
@@ -529,9 +539,7 @@ void Library::extractImages(const QString &filePath,
         }
     }
 
-    if (data.isEmpty()) {
-        return;
-    }
+    if (data.isEmpty()) return;
 
     QImage src;
     if (!src.loadFromData(data)) return;
@@ -1080,7 +1088,10 @@ bool Library::saveMetadata(int index,
         QThread::msleep(200);
     }
 
-    const bool wantCover = !coverSourcePath.isEmpty();
+    const QString normalizedCover = normalizeLocalPath(coverSourcePath);
+    const bool wantCover = !normalizedCover.isEmpty();
+    qWarning() << "saveMetadata: normalizedCover=" << normalizedCover
+               << "wantCover=" << wantCover;
 
     bool ok = false;
     {
@@ -1110,15 +1121,15 @@ bool Library::saveMetadata(int index,
             tag->setAlbum(toTaglib(finalAlbum));
 
             if (wantCover) {
-                QFile img(coverSourcePath);
+                QFile img(normalizedCover);
                 if (!img.open(QIODevice::ReadOnly)) {
-                    qWarning() << "saveMetadata: can't open source cover" << coverSourcePath;
+                    qWarning() << "saveMetadata: can't open source cover" << normalizedCover;
                 } else {
                     const QByteArray data = img.readAll();
                     qWarning() << "saveMetadata: source cover size =" << data.size();
                     QString mime = "image/jpeg";
-                    if (coverSourcePath.endsWith(".png", Qt::CaseInsensitive)) mime = "image/png";
-                    else if (coverSourcePath.endsWith(".webp", Qt::CaseInsensitive)) mime = "image/webp";
+                    if (normalizedCover.endsWith(".png", Qt::CaseInsensitive)) mime = "image/png";
+                    else if (normalizedCover.endsWith(".webp", Qt::CaseInsensitive)) mime = "image/webp";
 
                     tag->removeFrames("APIC");
                     auto *frame = new TagLib::ID3v2::AttachedPictureFrame;
@@ -1141,11 +1152,11 @@ bool Library::saveMetadata(int index,
             }
 
             if (wantCover) {
-                QFile img(coverSourcePath);
+                QFile img(normalizedCover);
                 if (img.open(QIODevice::ReadOnly)) {
                     const QByteArray data = img.readAll();
                     QString mime = "image/jpeg";
-                    if (coverSourcePath.endsWith(".png", Qt::CaseInsensitive)) mime = "image/png";
+                    if (normalizedCover.endsWith(".png", Qt::CaseInsensitive)) mime = "image/png";
 
                     flac->removePictures();
                     auto *pic = new TagLib::FLAC::Picture;
@@ -1237,7 +1248,6 @@ bool Library::removeCurrentCover() {
     if (m_currentTrack.path.isEmpty()) return false;
     const QString path = m_currentTrack.path;
 
-    // Стоп плеер, чтобы отпустил файл
     const bool wasPlaying = isPlaying();
     const qint64 savedPos = m_player->position();
     m_player->stop();
@@ -1268,7 +1278,6 @@ bool Library::removeCurrentCover() {
         }
     }
 
-    // Возобновить плеер
     m_player->setSource(QUrl::fromLocalFile(path));
     m_player->setPosition(savedPos);
     if (wasPlaying) {
@@ -1314,11 +1323,10 @@ bool Library::removeCurrentCover() {
 bool Library::saveCoverTo(const QString &destPath) {
     if (m_currentTrack.path.isEmpty()) return false;
 
-    QString local = destPath;
-    if (local.startsWith("file://")) local = QUrl(local).toLocalFile();
+    QString local = normalizeLocalPath(destPath);
+    qWarning() << "saveCoverTo: destPath=" << destPath << "normalized=" << local;
     if (local.isEmpty()) return false;
 
-    // Стоп плеер, чтобы отпустил файл
     const bool wasPlaying = isPlaying();
     const qint64 savedPos = m_player->position();
     m_player->stop();
@@ -1351,7 +1359,6 @@ bool Library::saveCoverTo(const QString &destPath) {
         }
     }
 
-    // Возобновить плеер
     m_player->setSource(QUrl::fromLocalFile(m_currentTrack.path));
     m_player->setPosition(savedPos);
     if (wasPlaying) {
@@ -1372,6 +1379,7 @@ bool Library::saveCoverTo(const QString &destPath) {
         return false;
     }
     out.write(data);
+    qWarning() << "saveCoverTo: wrote" << data.size() << "bytes to" << local;
     return true;
 }
 
@@ -1436,7 +1444,6 @@ QString Library::readTextFromTags(const QString &path) const {
 bool Library::writeTextToTags(const QString &path, const QString &content) {
     qWarning() << "writeTextToTags: path=" << path << "len=" << content.length();
 
-    // Останавливаем плеер, если это текущий трек — иначе Windows блокирует файл
     const bool isCurrentTrack = (path == m_currentTrack.path);
     const bool wasPlaying = isCurrentTrack && isPlaying();
     const qint64 savedPos = isCurrentTrack ? m_player->position() : 0;
@@ -1511,7 +1518,6 @@ bool Library::writeTextToTags(const QString &path, const QString &content) {
         }
     }
 
-    // Возобновляем воспроизведение
     if (isCurrentTrack) {
         qWarning() << "writeTextToTags: restoring player";
         m_player->setSource(QUrl::fromLocalFile(path));

@@ -105,6 +105,9 @@ endif()
 
 if(WIN32)
     set_target_properties(kute PROPERTIES WIN32_EXECUTABLE TRUE)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/packaging/kute.rc")
+        target_sources(kute PRIVATE "${CMAKE_SOURCE_DIR}/packaging/kute.rc")
+    endif()
 endif()
 
 if(UNIX AND NOT APPLE)
