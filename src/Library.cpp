@@ -504,7 +504,10 @@ void Library::extractImages(const QString &filePath,
     {
         StderrSilencer silencer;
         TagLib::FileRef f = makeFileRef(filePath);
-        if (f.isNull() || !f.file()) return;
+        if (f.isNull() || !f.file()) {
+            qWarning() << "extractImages: can't open" << filePath;
+            return;
+        }
 
         TagLib::File *file = f.file();
 
@@ -526,7 +529,9 @@ void Library::extractImages(const QString &filePath,
         }
     }
 
-    if (data.isEmpty()) return;
+    if (data.isEmpty()) {
+        return;
+    }
 
     QImage src;
     if (!src.loadFromData(data)) return;
@@ -631,6 +636,11 @@ void Library::loadFolder(const QString &path) {
         }
 
         extractImages(filePath, t.cover, t.thumb);
+        if (totalFound <= 5) {
+            qWarning() << "  file:" << info.fileName()
+                       << "cover=" << (t.cover.isEmpty() ? "NONE" : "OK")
+                       << "thumb=" << (t.thumb.isEmpty() ? "NONE" : "OK");
+        }
         m_allTracks.append(t);
     }
 
@@ -1044,7 +1054,15 @@ bool Library::saveMetadata(int index,
                            const QString &artist,
                            const QString &album,
                            const QString &coverSourcePath) {
-    if (index < 0 || index >= m_tracks.count()) return false;
+    qWarning() << "saveMetadata: index=" << index
+               << "title=" << title
+               << "artist=" << artist
+               << "coverSourcePath=" << coverSourcePath;
+
+    if (index < 0 || index >= m_tracks.count()) {
+        qWarning() << "saveMetadata: invalid index";
+        return false;
+    }
     const Track *old = m_tracks.at(index);
     if (!old) return false;
 
@@ -1059,6 +1077,7 @@ bool Library::saveMetadata(int index,
         m_player->stop();
         m_player->setSource(QUrl());
         m_intentPlaying = false;
+        QThread::msleep(200);
     }
 
     const bool wantCover = !coverSourcePath.isEmpty();
@@ -1069,6 +1088,7 @@ bool Library::saveMetadata(int index,
 
         TagLib::FileRef fr = makeFileRef(path);
         if (fr.isNull() || !fr.file()) {
+            qWarning() << "saveMetadata: TagLib can't open file";
             if (wasCurrent) {
                 m_player->setSource(QUrl::fromLocalFile(path));
                 m_player->setPosition(savedPos);
@@ -1083,6 +1103,7 @@ bool Library::saveMetadata(int index,
         TagLib::File *file = fr.file();
 
         if (auto *mpeg = dynamic_cast<TagLib::MPEG::File*>(file)) {
+            qWarning() << "saveMetadata: MPEG file";
             TagLib::ID3v2::Tag *tag = mpeg->ID3v2Tag(true);
             if (!title.isEmpty()) tag->setTitle(toTaglib(title));
             if (!artist.isEmpty()) tag->setArtist(toTaglib(artist));
@@ -1090,8 +1111,11 @@ bool Library::saveMetadata(int index,
 
             if (wantCover) {
                 QFile img(coverSourcePath);
-                if (img.open(QIODevice::ReadOnly)) {
+                if (!img.open(QIODevice::ReadOnly)) {
+                    qWarning() << "saveMetadata: can't open source cover" << coverSourcePath;
+                } else {
                     const QByteArray data = img.readAll();
+                    qWarning() << "saveMetadata: source cover size =" << data.size();
                     QString mime = "image/jpeg";
                     if (coverSourcePath.endsWith(".png", Qt::CaseInsensitive)) mime = "image/png";
                     else if (coverSourcePath.endsWith(".webp", Qt::CaseInsensitive)) mime = "image/webp";
@@ -1102,11 +1126,14 @@ bool Library::saveMetadata(int index,
                     frame->setType(TagLib::ID3v2::AttachedPictureFrame::FrontCover);
                     frame->setPicture(TagLib::ByteVector(data.constData(), data.size()));
                     tag->addFrame(frame);
+                    qWarning() << "saveMetadata: APIC frame added";
                 }
             }
 
             ok = mpeg->save();
+            qWarning() << "saveMetadata: mpeg->save() =" << ok;
         } else if (auto *flac = dynamic_cast<TagLib::FLAC::File*>(file)) {
+            qWarning() << "saveMetadata: FLAC file";
             if (flac->tag()) {
                 if (!title.isEmpty()) flac->tag()->setTitle(toTaglib(title));
                 if (!artist.isEmpty()) flac->tag()->setArtist(toTaglib(artist));
@@ -1130,7 +1157,9 @@ bool Library::saveMetadata(int index,
             }
 
             ok = flac->save();
+            qWarning() << "saveMetadata: flac->save() =" << ok;
         } else {
+            qWarning() << "saveMetadata: unknown file type";
             TagLib::Tag *tag = file->tag();
             if (!tag) {
                 if (wasCurrent) {
@@ -1151,6 +1180,7 @@ bool Library::saveMetadata(int index,
     }
 
     if (!ok) {
+        qWarning() << "saveMetadata: save failed";
         if (wasCurrent) {
             m_player->setSource(QUrl::fromLocalFile(path));
             m_player->setPosition(savedPos);
@@ -1174,6 +1204,7 @@ bool Library::saveMetadata(int index,
 
     QString newCover, newThumb;
     extractImages(path, newCover, newThumb);
+    qWarning() << "saveMetadata: after extractImages, cover=" << (newCover.isEmpty() ? "NONE" : "OK");
     if (!newCover.isEmpty()) updated.cover = newCover;
     if (!newThumb.isEmpty()) updated.thumb = newThumb;
 
