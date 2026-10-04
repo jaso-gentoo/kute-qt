@@ -142,6 +142,7 @@ public:
     Q_INVOKABLE bool isCurrentLiked() const;
     Q_INVOKABLE void toggleLike(int index);
     Q_INVOKABLE void toggleCurrentLike();
+    Q_INVOKABLE QString toFileUrl(const QString &localPath) const;
     void setVolume(int v);
 
     Q_INVOKABLE QString formatDuration(qint64 ms) const;

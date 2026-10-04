@@ -656,7 +656,7 @@ Item {
                         Image {
                             id: thumbImg
                             anchors.fill: parent
-                            source: row.thumb ? "file://" + row.thumb + "?v=" + library.coverVersion : ""
+                            source: row.thumb ? library.toFileUrl(row.thumb) + "?v=" + library.coverVersion : ""
                             sourceSize.width: 30
                             sourceSize.height: 30
                             fillMode: Image.PreserveAspectFit

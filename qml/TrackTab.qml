@@ -313,8 +313,8 @@ FocusScope {
                                 id: coverPreview
                                 anchors.fill: parent
                                 source: {
-                                    if (tab.newCoverPath !== "") return "file://" + tab.newCoverPath
-                                    if (library.currentCover !== "") return "file://" + library.currentCover + "?v=" + library.coverVersion
+                                    if (tab.newCoverPath !== "") return library.toFileUrl(tab.newCoverPath)
+                                    if (library.currentCover !== "") return library.toFileUrl(library.currentCover) + "?v=" + library.coverVersion
                                     return ""
                                 }
                                 sourceSize.width: 280; sourceSize.height: 280

@@ -186,7 +186,7 @@ Item {
                 Image {
                     id: coverSrc
                     anchors.fill: parent
-                    source: library.currentCover ? "file://" + library.currentCover + "?v=" + library.coverVersion : ""
+                    source: library.currentCover ? library.toFileUrl(library.currentCover) + "?v=" + library.coverVersion : ""
                     sourceSize.width: 300
                     sourceSize.height: 300
                     fillMode: Image.PreserveAspectCrop

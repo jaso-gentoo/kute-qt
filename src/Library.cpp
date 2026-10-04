@@ -78,6 +78,11 @@ static TagLib::FileRef makeFileRef(const QString &path) {
 #endif
 }
 
+QString Library::toFileUrl(const QString &localPath) const {
+    if (localPath.isEmpty()) return {};
+    return QUrl::fromLocalFile(localPath).toString();
+}
+
 QString Library::lyricsDir() const {
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
                         + "/kute/txts";
@@ -581,7 +586,6 @@ void Library::loadFolder(const QString &path) {
     int totalFound = 0;
     int taglibOk = 0;
     int taglibFail = 0;
-    int firstFilesLogged = 0;
 
     while (it.hasNext()) {
         const QString filePath = it.next();
@@ -597,13 +601,6 @@ void Library::loadFolder(const QString &path) {
         {
             StderrSilencer silencer;
             TagLib::FileRef f = makeFileRef(filePath);
-
-            if (firstFilesLogged < 5) {
-                qWarning() << "  file:" << filePath
-                           << "taglib_null=" << (f.isNull() ? "yes" : "no")
-                           << "has_tag=" << ((!f.isNull() && f.tag()) ? "yes" : "no");
-                firstFilesLogged++;
-            }
 
             if (!f.isNull() && f.tag()) {
                 taglibOk++;
@@ -1305,16 +1302,21 @@ bool Library::saveCoverTo(const QString &destPath) {
 QString Library::readTextFromTags(const QString &path) const {
     StderrSilencer silencer;
     TagLib::FileRef fr = makeFileRef(path);
-    if (fr.isNull() || !fr.file()) return QString();
+    if (fr.isNull() || !fr.file()) {
+        qWarning() << "readTextFromTags: can't open" << path;
+        return QString();
+    }
 
     TagLib::File *file = fr.file();
 
     if (auto *mpeg = dynamic_cast<TagLib::MPEG::File*>(file)) {
         if (auto *tag = mpeg->ID3v2Tag()) {
             const auto usltList = tag->frameList("USLT");
+            qWarning() << "readTextFromTags: USLT frames =" << usltList.size();
             if (!usltList.isEmpty()) {
                 if (auto *frame = dynamic_cast<TagLib::ID3v2::UnsynchronizedLyricsFrame*>(usltList.front())) {
                     const QString s = QString::fromUtf8(frame->text().to8Bit(true).c_str());
+                    qWarning() << "readTextFromTags: USLT len =" << s.length();
                     if (!s.trimmed().isEmpty()) return s;
                 }
             }
@@ -1334,6 +1336,8 @@ QString Library::readTextFromTags(const QString &path) const {
                     }
                 }
             }
+        } else {
+            qWarning() << "readTextFromTags: no ID3v2 tag";
         }
     } else if (auto *flac = dynamic_cast<TagLib::FLAC::File*>(file)) {
         if (auto *xc = flac->xiphComment()) {
@@ -1356,7 +1360,10 @@ QString Library::readTextFromTags(const QString &path) const {
 bool Library::writeTextToTags(const QString &path, const QString &content) {
     StderrSilencer silencer;
     TagLib::FileRef fr = makeFileRef(path);
-    if (fr.isNull() || !fr.file()) return false;
+    if (fr.isNull() || !fr.file()) {
+        qWarning() << "writeTextToTags: can't open" << path;
+        return false;
+    }
 
     TagLib::File *file = fr.file();
 
@@ -1372,9 +1379,12 @@ bool Library::writeTextToTags(const QString &path, const QString &content) {
             frame->setDescription("");
             frame->setText(toTaglib(content));
             tag->addFrame(frame);
+            qWarning() << "writeTextToTags: added USLT frame, len =" << content.length();
         }
 
-        return mpeg->save();
+        const bool ok = mpeg->save();
+        qWarning() << "writeTextToTags: mpeg->save() =" << ok;
+        return ok;
     } else if (auto *flac = dynamic_cast<TagLib::FLAC::File*>(file)) {
         if (!flac->xiphComment()) return false;
 
@@ -1401,9 +1411,15 @@ bool Library::writeTextToTags(const QString &path, const QString &content) {
 }
 
 QString Library::loadTrackText(int index, bool preferLrc) {
-    if (index < 0 || index >= m_tracks.count()) return QString();
+    if (index < 0 || index >= m_tracks.count()) {
+        qWarning() << "loadTrackText: invalid index" << index;
+        return QString();
+    }
     const Track *t = m_tracks.at(index);
-    if (!t) return QString();
+    if (!t) {
+        qWarning() << "loadTrackText: null track";
+        return QString();
+    }
 
     if (preferLrc) {
         const QString lrc = lyricsPath(*t, true);
@@ -1421,18 +1437,31 @@ QString Library::loadTrackText(int index, bool preferLrc) {
 }
 
 bool Library::saveTrackText(int index, const QString &content, bool isLrc) {
-    if (index < 0 || index >= m_tracks.count()) return false;
+    if (index < 0 || index >= m_tracks.count()) {
+        qWarning() << "saveTrackText: invalid index" << index;
+        return false;
+    }
     const Track *t = m_tracks.at(index);
     if (!t) return false;
+
+    qWarning() << "saveTrackText: idx=" << index
+               << "lrc=" << isLrc
+               << "content_len=" << content.length();
 
     if (isLrc) {
         const QString path = lyricsPath(*t, true);
         QFile f(path);
-        if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) return false;
+        if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            qWarning() << "saveTrackText: failed to open LRC file" << path;
+            return false;
+        }
         f.write(content.toUtf8());
         f.close();
+        qWarning() << "saveTrackText: LRC saved to" << path;
         return true;
     } else {
-        return writeTextToTags(t->path, content);
+        const bool ok = writeTextToTags(t->path, content);
+        qWarning() << "saveTrackText: writeTextToTags returned" << ok;
+        return ok;
     }
 }

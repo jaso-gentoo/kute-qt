@@ -95,7 +95,7 @@ Rectangle {
                 Image {
                     id: coverImg
                     anchors.fill: parent
-                    source: bar.sCover ? "file://" + bar.sCover + "?v=" + library.coverVersion : ""
+                    source: bar.sCover ? library.toFileUrl(bar.sCover) + "?v=" + library.coverVersion : ""
                     sourceSize.width: 92
                     sourceSize.height: 92
                     fillMode: Image.PreserveAspectCrop
