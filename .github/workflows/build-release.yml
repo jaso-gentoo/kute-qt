@@ -164,13 +164,36 @@ jobs:
       - name: Build
         run: cmake --build build
 
-      - name: Deploy Qt DLLs
+      - name: Locate Qt directories
+        run: |
+          echo "=== find qml dir ==="
+          for d in /ucrt64/share/qt6/qml /ucrt64/lib/qt6/qml /ucrt64/share/qt6/plugins /ucrt64/lib/qt6/plugins; do
+            if [ -d "$d" ]; then
+              echo "EXISTS: $d"
+              ls "$d" | head -20
+            else
+              echo "MISSING: $d"
+            fi
+          done
+
+          echo ""
+          echo "=== find all qml directories ==="
+          find /ucrt64 -type d -name 'QtQuick' 2>/dev/null || true
+          find /ucrt64 -type d -name 'Layouts' 2>/dev/null || true
+
+          echo ""
+          echo "=== find multimedia plugins ==="
+          find /ucrt64 -name '*.dll' -path '*multimedia*' 2>/dev/null || true
+
+      - name: Deploy all DLLs and plugins
         run: |
           mkdir -p dist
           cp build/kute.exe dist/
-          windeployqt --release --no-translations --qmldir qml dist/kute.exe || true
+
+          # Copy all MSYS2 DLLs (Qt6Core, Qt6Gui, ffmpeg, etc.)
           cp /ucrt64/bin/*.dll dist/
 
+          # Remove junk we don't need
           rm -f dist/ggml*.dll
           rm -f dist/libllama*.dll
           rm -f dist/libmtmd*.dll
@@ -198,78 +221,73 @@ jobs:
           rm -f dist/vulkan-1.dll
           rm -f dist/OpenCL.dll
 
-      - name: Ensure QML modules present
+      - name: Copy QML modules
         run: |
-          echo "=== Checking what windeployqt copied ==="
-          if [ ! -d dist/qml ]; then
-            echo "No qml folder — copying manually"
-            mkdir -p dist/qml
-            cp -r /ucrt64/share/qt6/qml/* dist/qml/ 2>/dev/null || \
-            cp -r /ucrt64/lib/qt6/qml/* dist/qml/ 2>/dev/null || true
-          fi
-
-          echo "=== Available qml modules ==="
-          ls dist/qml/ || echo "qml folder missing"
-
-          echo "=== Ensuring critical modules exist ==="
-          for mod in QtQuick QtQuick/Layouts QtQuick/Dialogs QtQuick/Controls QtQuick/Window; do
-            src=""
-            if [ -d "/ucrt64/share/qt6/qml/$mod" ]; then
-              src="/ucrt64/share/qt6/qml/$mod"
-            elif [ -d "/ucrt64/lib/qt6/qml/$mod" ]; then
-              src="/ucrt64/lib/qt6/qml/$mod"
-            fi
-
-            if [ -n "$src" ] && [ ! -d "dist/qml/$mod" ]; then
-              echo "Copying missing: $mod from $src"
-              mkdir -p "dist/qml/$(dirname $mod)"
-              cp -r "$src" "dist/qml/$mod"
+          QML_SRC=""
+          for cand in /ucrt64/share/qt6/qml /ucrt64/lib/qt6/qml; do
+            if [ -d "$cand" ]; then
+              QML_SRC="$cand"
+              break
             fi
           done
 
-          echo "=== Final qml tree (top level) ==="
+          if [ -z "$QML_SRC" ]; then
+            echo "ERROR: QML source directory not found anywhere"
+            exit 1
+          fi
+
+          echo "Using QML source: $QML_SRC"
+          rm -rf dist/qml
+          mkdir -p dist/qml
+          cp -r "$QML_SRC"/* dist/qml/
+
+          echo "=== dist/qml top level ==="
           ls dist/qml/
 
-      - name: Ensure FFmpeg multimedia plugin present
-        run: |
-          mkdir -p dist/multimedia
+          echo "=== check critical modules ==="
+          for m in QtQuick QtQuick/Layouts QtQuick/Controls QtQuick/Dialogs QtQuick/Window; do
+            if [ -d "dist/qml/$m" ]; then
+              echo "OK: $m"
+            else
+              echo "MISSING: $m"
+            fi
+          done
 
-          PLUGIN=""
-          if [ -f /ucrt64/lib/qt6/plugins/multimedia/ffmpegmediaplugin.dll ]; then
-            PLUGIN="/ucrt64/lib/qt6/plugins/multimedia/ffmpegmediaplugin.dll"
-          elif [ -f /ucrt64/share/qt6/plugins/multimedia/ffmpegmediaplugin.dll ]; then
-            PLUGIN="/ucrt64/share/qt6/plugins/multimedia/ffmpegmediaplugin.dll"
+      - name: Copy Qt plugins
+        run: |
+          PLUG_SRC=""
+          for cand in /ucrt64/share/qt6/plugins /ucrt64/lib/qt6/plugins; do
+            if [ -d "$cand" ]; then
+              PLUG_SRC="$cand"
+              break
+            fi
+          done
+
+          if [ -z "$PLUG_SRC" ]; then
+            echo "ERROR: plugins source directory not found anywhere"
+            exit 1
           fi
 
-          if [ -n "$PLUGIN" ]; then
-            echo "Copying FFmpeg plugin from $PLUGIN"
-            cp "$PLUGIN" dist/multimedia/
-          else
-            echo "ERROR: ffmpegmediaplugin.dll not found!"
-            find /ucrt64 -name 'ffmpegmediaplugin*' 2>/dev/null || true
-          fi
+          echo "Using plugin source: $PLUG_SRC"
+          ls "$PLUG_SRC"
 
-          echo "=== Also ensure av* dlls are next to plugin ==="
-          cp /ucrt64/bin/avcodec-*.dll dist/multimedia/ 2>/dev/null || true
-          cp /ucrt64/bin/avformat-*.dll dist/multimedia/ 2>/dev/null || true
-          cp /ucrt64/bin/avutil-*.dll dist/multimedia/ 2>/dev/null || true
-          cp /ucrt64/bin/swresample-*.dll dist/multimedia/ 2>/dev/null || true
-          cp /ucrt64/bin/swscale-*.dll dist/multimedia/ 2>/dev/null || true
+          # Qt looks for plugin subfolders next to the exe, so we flatten them
+          for sub in platforms imageformats iconengines multimedia styles generic networkinformation tls; do
+            if [ -d "$PLUG_SRC/$sub" ]; then
+              echo "Copying plugin folder: $sub"
+              mkdir -p "dist/$sub"
+              cp -r "$PLUG_SRC/$sub"/* "dist/$sub/" 2>/dev/null || true
+            fi
+          done
 
-          echo "=== contents of dist/multimedia ==="
-          ls -la dist/multimedia/
+          echo "=== dist plugin folders ==="
+          ls -d dist/platforms dist/imageformats dist/multimedia dist/iconengines 2>/dev/null || true
 
-      - name: Copy FFmpeg and dependencies
-        run: |
-          cp /ucrt64/bin/avcodec-*.dll dist/
-          cp /ucrt64/bin/avformat-*.dll dist/
-          cp /ucrt64/bin/avutil-*.dll dist/
-          cp /ucrt64/bin/swresample-*.dll dist/
-          cp /ucrt64/bin/swscale-*.dll dist/
-          cp /ucrt64/bin/libjxl.dll dist/ 2>/dev/null || true
-          cp /ucrt64/bin/libjxl_threads.dll dist/ 2>/dev/null || true
-          cp /ucrt64/bin/libsoxr.dll dist/ 2>/dev/null || true
-          cp /ucrt64/bin/libgomp-1.dll dist/ 2>/dev/null || true
+          echo "=== dist/platforms ==="
+          ls dist/platforms/ 2>/dev/null || echo "no platforms"
+
+          echo "=== dist/multimedia ==="
+          ls dist/multimedia/ 2>/dev/null || echo "no multimedia"
 
       - name: Copy OpenSSL legacy provider
         run: |
@@ -278,15 +296,13 @@ jobs:
           cp /ucrt64/bin/libcrypto-3-x64.dll dist/ 2>/dev/null || true
           cp /ucrt64/bin/libssl-3-x64.dll dist/ 2>/dev/null || true
 
-      - name: Show final dist size and key contents
+      - name: Show final dist
         run: |
           echo "=== dist size ==="
           du -sh dist/
-          echo "=== key files present ==="
-          ls -la dist/kute.exe
-          ls dist/multimedia/ 2>/dev/null | head -5
-          ls dist/qml/QtQuick/ 2>/dev/null | head -20
-          echo "=== qml total size ==="
+          echo "=== dist top level ==="
+          ls dist/ | head -40
+          echo "=== dist/qml size ==="
           du -sh dist/qml/ 2>/dev/null
 
       - name: Build single exe with NSIS
