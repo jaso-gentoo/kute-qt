@@ -1,7 +1,12 @@
-name: Build
+name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag (e.g. v1.0, v1.1)'
+        required: true
+        default: 'v1.0'
 
 permissions:
   contents: write
@@ -36,6 +41,7 @@ jobs:
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
+            -DKUTE_VERSION_STRING="${{ github.event.inputs.version }}" \
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
 
       - name: Build
@@ -50,17 +56,9 @@ jobs:
           if [ -f packaging/kute.png ]; then
             cp packaging/kute.png AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
           elif [ -f packaging/kute.jpg ]; then
-            convert packaging/kute.jpg \
-              -resize 256x256^ \
-              -gravity center \
-              -extent 256x256 \
-              AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+            convert packaging/kute.jpg -resize 256x256^ -gravity center -extent 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
           elif [ -f packaging/kute.jpeg ]; then
-            convert packaging/kute.jpeg \
-              -resize 256x256^ \
-              -gravity center \
-              -extent 256x256 \
-              AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+            convert packaging/kute.jpeg -resize 256x256^ -gravity center -extent 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
           fi
           file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
 
@@ -91,12 +89,9 @@ jobs:
           mkdir -p AppDir/usr/lib
 
           cp -v "$QTDIR"/plugins/platforms/libqwayland*.so AppDir/usr/plugins/platforms/
-          cp -v "$QTDIR"/plugins/wayland-shell-integration/*.so \
-                AppDir/usr/plugins/wayland-shell-integration/ 2>/dev/null || true
-          cp -v "$QTDIR"/plugins/wayland-decoration-client/*.so \
-                AppDir/usr/plugins/wayland-decoration-client/ 2>/dev/null || true
-          cp -v "$QTDIR"/plugins/wayland-graphics-integration-client/*.so \
-                AppDir/usr/plugins/wayland-graphics-integration-client/ 2>/dev/null || true
+          cp -v "$QTDIR"/plugins/wayland-shell-integration/*.so AppDir/usr/plugins/wayland-shell-integration/ 2>/dev/null || true
+          cp -v "$QTDIR"/plugins/wayland-decoration-client/*.so AppDir/usr/plugins/wayland-decoration-client/ 2>/dev/null || true
+          cp -v "$QTDIR"/plugins/wayland-graphics-integration-client/*.so AppDir/usr/plugins/wayland-graphics-integration-client/ 2>/dev/null || true
           cp -v "$QTDIR"/lib/libQt6Wayland*.so* AppDir/usr/lib/
 
       - name: Fill AppDir with linuxdeploy
@@ -157,10 +152,7 @@ jobs:
         run: |
           choco install nsis -y --no-progress
           $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
-          if (-not (Test-Path $nsis)) {
-            Write-Error "NSIS install failed"
-            exit 1
-          }
+          if (-not (Test-Path $nsis)) { exit 1 }
 
       - uses: msys2/setup-msys2@v2
         with:
@@ -180,7 +172,6 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-svg
             mingw-w64-ucrt-x86_64-qt6-imageformats
             mingw-w64-ucrt-x86_64-ffmpeg
-            mingw-w64-ucrt-x86_64-ntldd
             mingw-w64-ucrt-x86_64-imagemagick
 
       - name: Generate .ico from logo
@@ -190,21 +181,20 @@ jobs:
           if [ -f packaging/kute.jpg ]; then IMG="packaging/kute.jpg"; fi
           if [ -f packaging/kute.jpeg ]; then IMG="packaging/kute.jpeg"; fi
           if [ -f packaging/kute.png ]; then IMG="packaging/kute.png"; fi
-
-          if [ -z "$IMG" ]; then
-            echo "no source image found"
-            exit 0
-          fi
+          if [ -z "$IMG" ]; then echo "no source image"; exit 0; fi
 
           if command -v magick &> /dev/null; then
             magick "$IMG" -resize 256x256^ -gravity center -extent 256x256 -define icon:auto-resize=256,128,64,48,32,16 packaging/kute.ico
           elif command -v convert &> /dev/null; then
             convert "$IMG" -resize 256x256^ -gravity center -extent 256x256 -define icon:auto-resize=256,128,64,48,32,16 packaging/kute.ico
           fi
-          ls -la packaging/kute.ico 2>/dev/null || echo "no ico — continuing"
+          ls -la packaging/kute.ico 2>/dev/null || true
 
       - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DKUTE_VERSION_STRING="${{ github.event.inputs.version }}"
 
       - name: Build
         run: cmake --build build
@@ -214,7 +204,6 @@ jobs:
           mkdir -p dist
           cp build/kute.exe dist/
           cp -L /ucrt64/bin/*.dll dist/
-
           rm -f dist/ggml*.dll dist/libllama*.dll dist/libmtmd*.dll
           rm -f dist/libwhisper*.dll dist/libparakeet*.dll dist/libpython*.dll
           rm -f dist/libPyImath*.dll dist/libopenblas*.dll dist/libgfortran*.dll
@@ -232,15 +221,10 @@ jobs:
           for cand in /ucrt64/share/qt6/qml /ucrt64/lib/qt6/qml; do
             if [ -d "$cand" ]; then QML_SRC="$cand"; break; fi
           done
-          if [ -z "$QML_SRC" ]; then echo "ERROR: QML not found"; exit 1; fi
-
+          if [ -z "$QML_SRC" ]; then exit 1; fi
           rm -rf dist/qml
           mkdir -p dist/qml
           cp -rL "$QML_SRC"/* dist/qml/ 2>&1 | head -5 || true
-
-          for m in QtQuick QtQuick/Layouts QtQuick/Controls QtQuick/Dialogs QtQuick/Window QtQml; do
-            [ -d "dist/qml/$m" ] && echo "OK: $m" || echo "MISSING: $m"
-          done
 
       - name: Copy plugins and multimedia
         run: |
@@ -248,8 +232,7 @@ jobs:
           for cand in /ucrt64/share/qt6/plugins /ucrt64/lib/qt6/plugins; do
             if [ -d "$cand" ]; then PLUG_SRC="$cand"; break; fi
           done
-          if [ -z "$PLUG_SRC" ]; then echo "ERROR: plugins not found"; exit 1; fi
-
+          if [ -z "$PLUG_SRC" ]; then exit 1; fi
           for sub in platforms imageformats iconengines multimedia styles generic networkinformation tls; do
             if [ -d "$PLUG_SRC/$sub" ]; then
               mkdir -p "dist/$sub"
@@ -257,7 +240,7 @@ jobs:
             fi
           done
 
-      - name: Copy multimedia deps next to plugin
+      - name: Copy multimedia deps
         run: |
           mkdir -p dist/multimedia
           for lib in avcodec avformat avutil swresample swscale; do
@@ -271,12 +254,7 @@ jobs:
       - name: Create qt.conf
         shell: bash
         run: |
-          printf '%s\n' \
-            '[Paths]' \
-            'Prefix=./' \
-            'Plugins=./' \
-            'Qml2Imports=./qml' \
-            > dist/qt.conf
+          printf '%s\n' '[Paths]' 'Prefix=./' 'Plugins=./' 'Qml2Imports=./qml' > dist/qt.conf
 
       - name: Copy OpenSSL legacy
         run: |
@@ -290,7 +268,6 @@ jobs:
         run: |
           NSIS="/c/Program Files (x86)/NSIS/makensis.exe"
           [ -f "$NSIS" ] || exit 1
-
           printf '%s\n' \
             'Unicode true' \
             'SilentInstall silent' \
@@ -306,7 +283,6 @@ jobs:
             'ExecWait '"'"'"$PLUGINSDIR\kute.exe"'"'"'' \
             'SectionEnd' \
             > kute.nsi
-
           "$NSIS" kute.nsi
           [ -f "kute-windows-x86_64.exe" ] || exit 1
           ls -la kute-windows-x86_64.exe
@@ -327,28 +303,24 @@ jobs:
         with:
           path: downloads/
 
-      - name: Delete existing v9999
+      - name: Delete existing release if present
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete v9999 --repo ${{ github.repository }} --yes --cleanup-tag 2>/dev/null || true
+          gh release delete "${{ github.event.inputs.version }}" \
+            --repo ${{ github.repository }} --yes --cleanup-tag 2>/dev/null || true
 
-      - name: Create pre-release v9999
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v9999
-          name: "latest build (auto)"
+          tag_name: ${{ github.event.inputs.version }}
+          name: "kute ${{ github.event.inputs.version }}"
           body: |
-            Automatically updated build from `dev` branch.
-
-            Commit: `${{ github.sha }}`
-            Date: ${{ github.event.head_commit.timestamp }}
-
-            **This is a rolling pre-release** — files here change on every build.
-            For stable versions, see [all releases](https://github.com/${{ github.repository }}/releases).
+            Build from commit `${{ github.sha }}`.
+            Version embedded in binary: `${{ github.event.inputs.version }}`
           draft: false
-          prerelease: true
-          make_latest: false
+          prerelease: false
+          make_latest: true
           files: |
             downloads/linux-appimage/kute-x86_64.AppImage
             downloads/windows-portable/kute-windows-x86_64.exe
