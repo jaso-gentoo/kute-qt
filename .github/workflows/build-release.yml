@@ -154,6 +154,12 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-declarative
             mingw-w64-ucrt-x86_64-qt6-tools
             mingw-w64-ucrt-x86_64-taglib
+            mingw-w64-ucrt-x86_64-qt6-quickdialogs
+            mingw-w64-ucrt-x86_64-qt6-quicklayouts
+            mingw-w64-ucrt-x86_64-qt6-quickcontrols2
+            mingw-w64-ucrt-x86_64-qt6-shadertools
+            mingw-w64-ucrt-x86_64-qt6-svg
+            mingw-w64-ucrt-x86_64-qt6-imageformats
 
       - name: Configure
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -195,6 +201,67 @@ jobs:
           rm -f dist/vulkan-1.dll
           rm -f dist/OpenCL.dll
 
+      - name: Ensure QML modules present
+        run: |
+          echo "=== Checking what windeployqt copied ==="
+          if [ ! -d dist/qml ]; then
+            echo "No qml folder — copying manually"
+            mkdir -p dist/qml
+            cp -r /ucrt64/share/qt6/qml/* dist/qml/ 2>/dev/null || \
+            cp -r /ucrt64/lib/qt6/qml/* dist/qml/ 2>/dev/null || true
+          fi
+
+          echo "=== Available qml modules ==="
+          ls dist/qml/ || echo "qml folder missing"
+
+          echo "=== Ensuring critical modules exist ==="
+          for mod in QtQuick QtQuick/Layouts QtQuick/Dialogs QtQuick/Controls QtQuick/Window; do
+            src=""
+            if [ -d "/ucrt64/share/qt6/qml/$mod" ]; then
+              src="/ucrt64/share/qt6/qml/$mod"
+            elif [ -d "/ucrt64/lib/qt6/qml/$mod" ]; then
+              src="/ucrt64/lib/qt6/qml/$mod"
+            fi
+
+            if [ -n "$src" ] && [ ! -d "dist/qml/$mod" ]; then
+              echo "Copying missing: $mod from $src"
+              mkdir -p "dist/qml/$(dirname $mod)"
+              cp -r "$src" "dist/qml/$mod"
+            fi
+          done
+
+          echo "=== Final qml tree (top level) ==="
+          ls dist/qml/
+
+      - name: Ensure FFmpeg multimedia plugin present
+        run: |
+          mkdir -p dist/multimedia
+
+          PLUGIN=""
+          if [ -f /ucrt64/lib/qt6/plugins/multimedia/ffmpegmediaplugin.dll ]; then
+            PLUGIN="/ucrt64/lib/qt6/plugins/multimedia/ffmpegmediaplugin.dll"
+          elif [ -f /ucrt64/share/qt6/plugins/multimedia/ffmpegmediaplugin.dll ]; then
+            PLUGIN="/ucrt64/share/qt6/plugins/multimedia/ffmpegmediaplugin.dll"
+          fi
+
+          if [ -n "$PLUGIN" ]; then
+            echo "Copying FFmpeg plugin from $PLUGIN"
+            cp "$PLUGIN" dist/multimedia/
+          else
+            echo "ERROR: ffmpegmediaplugin.dll not found!"
+            find /ucrt64 -name 'ffmpegmediaplugin*' 2>/dev/null || true
+          fi
+
+          echo "=== Also ensure av* dlls are next to plugin ==="
+          cp /ucrt64/bin/avcodec-*.dll dist/multimedia/ 2>/dev/null || true
+          cp /ucrt64/bin/avformat-*.dll dist/multimedia/ 2>/dev/null || true
+          cp /ucrt64/bin/avutil-*.dll dist/multimedia/ 2>/dev/null || true
+          cp /ucrt64/bin/swresample-*.dll dist/multimedia/ 2>/dev/null || true
+          cp /ucrt64/bin/swscale-*.dll dist/multimedia/ 2>/dev/null || true
+
+          echo "=== contents of dist/multimedia ==="
+          ls -la dist/multimedia/
+
       - name: Copy FFmpeg and dependencies
         run: |
           cp /ucrt64/bin/avcodec-*.dll dist/
@@ -213,6 +280,17 @@ jobs:
           cp /ucrt64/lib/ossl-modules/legacy.dll dist/lib/ossl-modules/ 2>/dev/null || true
           cp /ucrt64/bin/libcrypto-3-x64.dll dist/ 2>/dev/null || true
           cp /ucrt64/bin/libssl-3-x64.dll dist/ 2>/dev/null || true
+
+      - name: Show final dist size and key contents
+        run: |
+          echo "=== dist size ==="
+          du -sh dist/
+          echo "=== key files present ==="
+          ls -la dist/kute.exe
+          ls dist/multimedia/ 2>/dev/null | head -5
+          ls dist/qml/QtQuick/ 2>/dev/null | head -20
+          echo "=== qml total size ==="
+          du -sh dist/qml/ 2>/dev/null
 
       - name: Build single exe with NSIS
         shell: bash
