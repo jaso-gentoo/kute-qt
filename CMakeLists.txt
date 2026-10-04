@@ -82,6 +82,13 @@ qt_add_qml_module(kute
         qml/FloatingSearch.qml
 )
 
+qt_add_resources(kute "fonts"
+    PREFIX "/fonts"
+    BASE "resources/fonts"
+    FILES
+        resources/fonts/MaterialSymbolsRounded.ttf
+)
+
 target_link_libraries(kute PRIVATE
     Qt6::Core
     Qt6::Gui

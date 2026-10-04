@@ -12,7 +12,7 @@ ApplicationWindow {
     visible: true
     title: "kute"
     color: theme.background
-    flags: Qt.Window | Qt.FramelessWindowHint
+    flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowSystemMenuHint | Qt.WindowMinMaxButtonsHint
 
     property int  currentPage: 0
     property bool settingsOpen: false
@@ -328,5 +328,78 @@ ApplicationWindow {
         onCloseRequested: window.settingsOpen = false
         onSaved: window.settingsOpen = false
         onFolderRequested: window.openFolderDialog()
+    }
+
+    MouseArea {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: 6
+        cursorShape: Qt.SizeVerCursor
+        preventStealing: true
+        onPressed: window.startSystemResize(Qt.TopEdge)
+    }
+    MouseArea {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: 6
+        cursorShape: Qt.SizeVerCursor
+        preventStealing: true
+        onPressed: window.startSystemResize(Qt.BottomEdge)
+    }
+    MouseArea {
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: 6
+        cursorShape: Qt.SizeHorCursor
+        preventStealing: true
+        onPressed: window.startSystemResize(Qt.LeftEdge)
+    }
+    MouseArea {
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: 6
+        cursorShape: Qt.SizeHorCursor
+        preventStealing: true
+        onPressed: window.startSystemResize(Qt.RightEdge)
+    }
+    MouseArea {
+        anchors.left: parent.left
+        anchors.top: parent.top
+        width: 14
+        height: 14
+        cursorShape: Qt.SizeFDiagCursor
+        preventStealing: true
+        onPressed: window.startSystemResize(Qt.TopEdge | Qt.LeftEdge)
+    }
+    MouseArea {
+        anchors.right: parent.right
+        anchors.top: parent.top
+        width: 14
+        height: 14
+        cursorShape: Qt.SizeBDiagCursor
+        preventStealing: true
+        onPressed: window.startSystemResize(Qt.TopEdge | Qt.RightEdge)
+    }
+    MouseArea {
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        width: 14
+        height: 14
+        cursorShape: Qt.SizeBDiagCursor
+        preventStealing: true
+        onPressed: window.startSystemResize(Qt.BottomEdge | Qt.LeftEdge)
+    }
+    MouseArea {
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        width: 14
+        height: 14
+        cursorShape: Qt.SizeFDiagCursor
+        preventStealing: true
+        onPressed: window.startSystemResize(Qt.BottomEdge | Qt.RightEdge)
     }
 }

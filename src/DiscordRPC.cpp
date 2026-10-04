@@ -80,7 +80,6 @@ void DiscordRPC::tryConnect() {
     if (m_socket->state() != QLocalSocket::UnconnectedState) return;
 
 #ifdef Q_OS_WIN
-    // Windows: \\.\pipe\discord-ipc-N
     if (m_attemptIndex >= 10) {
         m_attemptIndex = 0;
         m_reconnectTimer->start();

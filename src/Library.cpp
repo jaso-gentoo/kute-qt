@@ -555,7 +555,12 @@ void Library::extractImages(const QString &filePath,
 void Library::loadFolder(const QString &path) {
     QString localPath = path;
     if (localPath.startsWith("file://")) localPath = QUrl(localPath).toLocalFile();
-    if (localPath.isEmpty() || !QDir(localPath).exists()) return;
+    if (localPath.isEmpty() || !QDir(localPath).exists()) {
+        qWarning() << "loadFolder: path empty or doesn't exist:" << localPath;
+        return;
+    }
+
+    qWarning() << "loadFolder: starting scan of" << localPath;
 
     const QStringList filters = {
         "*.mp3", "*.flac", "*.ogg", "*.opus",
@@ -565,8 +570,15 @@ void Library::loadFolder(const QString &path) {
     m_allTracks.clear();
     QDirIterator it(localPath, filters, QDir::Files, QDirIterator::Subdirectories);
 
+    int totalFound = 0;
+    int taglibOk = 0;
+    int taglibFail = 0;
+    int firstFilesLogged = 0;
+
     while (it.hasNext()) {
         const QString filePath = it.next();
+        totalFound++;
+
         Track t;
         t.path = filePath;
 
@@ -577,7 +589,16 @@ void Library::loadFolder(const QString &path) {
         {
             StderrSilencer silencer;
             TagLib::FileRef f(filePath.toUtf8().constData());
+
+            if (firstFilesLogged < 5) {
+                qWarning() << "  file:" << filePath
+                           << "taglib_null=" << (f.isNull() ? "yes" : "no")
+                           << "has_tag=" << ((!f.isNull() && f.tag()) ? "yes" : "no");
+                firstFilesLogged++;
+            }
+
             if (!f.isNull() && f.tag()) {
+                taglibOk++;
                 TagLib::Tag *tag = f.tag();
 
                 const QString tagTitle  = QString::fromUtf8(tag->title().to8Bit(true).c_str());
@@ -596,6 +617,7 @@ void Library::loadFolder(const QString &path) {
                     t.channels   = f.audioProperties()->channels();
                 }
             } else {
+                taglibFail++;
                 t.title  = info.completeBaseName();
                 t.artist = "Unknown Artist";
                 t.album  = "Unknown Album";
@@ -605,6 +627,11 @@ void Library::loadFolder(const QString &path) {
         extractImages(filePath, t.cover, t.thumb);
         m_allTracks.append(t);
     }
+
+    qWarning() << "loadFolder: done"
+               << "found=" << totalFound
+               << "taglib_ok=" << taglibOk
+               << "taglib_fail=" << taglibFail;
 
     m_player->stop();
     m_player->setSource(QUrl());

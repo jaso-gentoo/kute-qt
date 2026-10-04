@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QTextStream>
 #include <QDateTime>
+#include <QFontDatabase>
 #include <exception>
 #include <cstdio>
 
@@ -66,13 +67,12 @@ static QString logPath() {
     return QDir::tempPath() + "/kute_debug.log";
 }
 
-// ANSI colors
 static const char *kReset  = "\033[0m";
-static const char *kDebug  = "\033[90m";   // grey
-static const char *kInfo   = "\033[36m";   // cyan
-static const char *kWarn   = "\033[33m";   // yellow
-static const char *kCrit   = "\033[91m";   // bright red
-static const char *kFatal  = "\033[97;41m"; // white on red
+static const char *kDebug  = "\033[90m";
+static const char *kInfo   = "\033[36m";
+static const char *kWarn   = "\033[33m";
+static const char *kCrit   = "\033[91m";
+static const char *kFatal  = "\033[97;41m";
 static const char *kPlain  = "";
 
 static const char *colorFor(QtMsgType type) {
@@ -106,19 +106,15 @@ static void writeToFile(const QString &line) {
     ts.flush();
 }
 
-static void writeToConsole(const QString &line, const char *color, bool colorize) {
-    if (colorize) {
-        fprintf(stderr, "%s%s%s\n", color, line.toLocal8Bit().constData(), kReset);
-    } else {
-        fprintf(stderr, "%s\n", line.toLocal8Bit().constData());
-    }
+static void writeToConsole(const QString &line, const char *color) {
+    fprintf(stderr, "%s%s%s\n", color, line.toLocal8Bit().constData(), kReset);
     fflush(stderr);
 }
 
 static void emitLog(QtMsgType type, const QString &msg) {
     const QString line = QString("%1  %2").arg(prefixFor(type)).arg(msg);
     writeToFile(line);
-    writeToConsole(line, colorFor(type), true);
+    writeToConsole(line, colorFor(type));
 }
 
 static void msgHandler(QtMsgType type, const QMessageLogContext &, const QString &msg) {
@@ -222,6 +218,15 @@ int main(int argc, char *argv[]) {
         QGuiApplication app(argc, argv);
         emitLog(QtInfoMsg, "QGuiApplication constructed");
         emitLog(QtInfoMsg, QString("platform=%1").arg(app.platformName()));
+
+        const int fontId = QFontDatabase::addApplicationFont(":/fonts/MaterialSymbolsRounded.ttf");
+        emitLog(QtInfoMsg, QString("addApplicationFont returned fontId=%1").arg(fontId));
+        if (fontId >= 0) {
+            const QStringList families = QFontDatabase::applicationFontFamilies(fontId);
+            emitLog(QtInfoMsg, QString("Material font loaded: %1").arg(families.join(", ")));
+        } else {
+            emitLog(QtWarningMsg, "Material Symbols Rounded font not loaded");
+        }
 
         app.setApplicationName("kute");
         app.setApplicationVersion("1.0.0");
