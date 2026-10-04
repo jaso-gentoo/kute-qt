@@ -62,7 +62,6 @@ jobs:
               -extent 256x256 \
               AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
           fi
-          ls -la AppDir/usr/share/icons/hicolor/256x256/apps/
           file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
 
       - name: Download linuxdeploy
@@ -137,6 +136,7 @@ jobs:
           test -s appimagetool
           chmod +x appimagetool
           ARCH=x86_64 ./appimagetool AppDir kute-x86_64.AppImage
+          ls -la kute-x86_64.AppImage
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v6
@@ -327,18 +327,25 @@ jobs:
         with:
           path: downloads/
 
-      - name: Delete existing v0.99
+      - name: Delete existing v9999
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete v0.99 --repo ${{ github.repository }} --yes --cleanup-tag 2>/dev/null || true
+          gh release delete v9999 --repo ${{ github.repository }} --yes --cleanup-tag 2>/dev/null || true
 
-      - name: Create pre-release v0.99
+      - name: Create pre-release v9999
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.99
-          name: "v0.99 (pre-release)"
-          body: "Auto-generated build from commit ${{ github.sha }}."
+          tag_name: v9999
+          name: "latest build (auto)"
+          body: |
+            Automatically updated build from `dev` branch.
+
+            Commit: `${{ github.sha }}`
+            Date: ${{ github.event.head_commit.timestamp }}
+
+            **This is a rolling pre-release** — files here change on every build.
+            For stable versions, see [all releases](https://github.com/${{ github.repository }}/releases).
           draft: false
           prerelease: true
           make_latest: false
