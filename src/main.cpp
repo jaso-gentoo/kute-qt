@@ -12,6 +12,10 @@
 #include <exception>
 #include <cstdio>
 
+#ifndef KUTE_VERSION_STRING
+#define KUTE_VERSION_STRING "v9999"
+#endif
+
 #include "ThemeManager.h"
 #include "Library.h"
 
@@ -229,8 +233,10 @@ int main(int argc, char *argv[]) {
         }
 
         app.setApplicationName("kute");
-        app.setApplicationVersion("1.0.0");
+        app.setApplicationVersion(QStringLiteral(KUTE_VERSION_STRING));
         app.setOrganizationName("kute");
+
+        emitLog(QtInfoMsg, QString("kute version: %1").arg(app.applicationVersion()));
 
         emitLog(QtInfoMsg, "creating ThemeManager");
         ThemeManager theme;

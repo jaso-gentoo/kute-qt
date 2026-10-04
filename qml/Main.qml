@@ -232,7 +232,7 @@ ApplicationWindow {
                 font.letterSpacing: 0.5
             }
             Text {
-                text: "· v1.0"
+                text: "· " + Qt.application.version
                 color: theme.outline
                 font.pixelSize: 10
                 font.letterSpacing: 1.0

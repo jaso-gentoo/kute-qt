@@ -61,6 +61,11 @@ if(UNIX AND NOT APPLE)
 endif()
 
 qt_add_executable(kute ${SOURCES})
+if(NOT DEFINED KUTE_VERSION_STRING)
+    set(KUTE_VERSION_STRING "v9999")
+endif()
+target_compile_definitions(kute PRIVATE KUTE_VERSION_STRING="${KUTE_VERSION_STRING}")
+message(STATUS "kute version string: ${KUTE_VERSION_STRING}")
 
 qt_add_qml_module(kute
     URI Kute
