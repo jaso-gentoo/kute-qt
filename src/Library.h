@@ -227,6 +227,9 @@ private:
     QStringList m_customOrder;
     QString m_osName;
     bool    m_intentPlaying = false;
+    bool    m_pendingPlay = false;
+    int     m_playRetries = 0;
+    qint64  m_expectedDuration = 0;
     qint64  m_lastPresenceSent = 0;
     int     m_coverVersion = 0;
     int     m_offsetRevision = 0;
