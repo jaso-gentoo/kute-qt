@@ -8,21 +8,10 @@ Text {
     property color iconColor: theme.onSurface
     property bool filled: false
 
-    property real fillProgress: 0
     property real spinAngle: 0
 
     rotation: spinAngle
-
-    Behavior on fillProgress {
-        NumberAnimation { duration: 340; easing.type: Easing.OutCubic }
-    }
-
-    Behavior on rotation {
-        enabled: false
-    }
-
-    Component.onCompleted: fillProgress = filled ? 1 : 0
-    onFilledChanged: fillProgress = filled ? 1 : 0
+    Behavior on rotation { enabled: false }
 
     NumberAnimation {
         id: spinAnim
@@ -46,7 +35,7 @@ Text {
     text: glyph
     renderType: Text.NativeRendering
     font.variableAxes: ({
-        "FILL": fillProgress,
+        "FILL": filled ? 1 : 0,
         "wght": 400,
         "GRAD": 0,
         "opsz": 24

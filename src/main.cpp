@@ -39,6 +39,7 @@ static void reexecWithEnv(char *argv[]) {
     setenv("MALLOC_ARENA_MAX", "2", 1);
     setenv("QSG_USE_IMAGE_CACHE", "0", 1);
     setenv("QSG_RENDER_LOOP", "threaded", 1);
+    //setenv("QT_QUICK_BACKEND", "software", 1);
 
     if (!qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) {
         setenv("QT_QPA_PLATFORM", "wayland;xcb", 1);
