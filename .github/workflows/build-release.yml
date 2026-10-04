@@ -207,42 +207,6 @@ jobs:
           cp /ucrt64/bin/libsoxr.dll dist/ 2>/dev/null || true
           cp /ucrt64/bin/libgomp-1.dll dist/ 2>/dev/null || true
 
-      - name: Compress DLLs with UPX
-        run: |
-          echo "=== installing upx via pacman ==="
-          pacman -S --noconfirm mingw-w64-ucrt-x86_64-upx || true
-
-          UPX_BIN=""
-          if command -v upx &> /dev/null; then
-            UPX_BIN="upx"
-          elif command -v /ucrt64/bin/upx &> /dev/null; then
-            UPX_BIN="/ucrt64/bin/upx"
-          else
-            echo "=== downloading upx binary ==="
-            curl -fL --retry 3 -o upx.zip \
-              "https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip"
-            unzip -q upx.zip
-            UPX_BIN="$(find . -name upx.exe | head -n1)"
-          fi
-
-          echo "=== UPX binary: $UPX_BIN ==="
-          "$UPX_BIN" --version || true
-
-          echo "=== size before ==="
-          du -sh dist/
-
-          cd dist
-          for f in *.dll kute.exe; do
-            [ -f "$f" ] || continue
-            echo "--- compressing $f ---"
-            "$UPX_BIN" --best --lzma "$f" 2>&1 | tail -1 || true
-          done
-          cd ..
-
-          echo "=== size after ==="
-          du -sh dist/
-          ls -la dist/kute.exe
-
       - name: Build single exe with NSIS
         shell: bash
         run: |
