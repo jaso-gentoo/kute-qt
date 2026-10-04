@@ -70,6 +70,14 @@ static TagLib::String toTaglib(const QString &s) {
     return TagLib::String(utf8.constData(), TagLib::String::UTF8);
 }
 
+static TagLib::FileRef makeFileRef(const QString &path) {
+#ifdef Q_OS_WIN
+    return TagLib::FileRef(path.toStdWString().c_str());
+#else
+    return TagLib::FileRef(path.toUtf8().constData());
+#endif
+}
+
 QString Library::lyricsDir() const {
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
                         + "/kute/txts";
@@ -489,7 +497,7 @@ void Library::extractImages(const QString &filePath,
     QByteArray data;
     {
         StderrSilencer silencer;
-        TagLib::FileRef f(filePath.toUtf8().constData());
+        TagLib::FileRef f = makeFileRef(filePath);
         if (f.isNull() || !f.file()) return;
 
         TagLib::File *file = f.file();
@@ -588,7 +596,7 @@ void Library::loadFolder(const QString &path) {
 
         {
             StderrSilencer silencer;
-            TagLib::FileRef f(filePath.toUtf8().constData());
+            TagLib::FileRef f = makeFileRef(filePath);
 
             if (firstFilesLogged < 5) {
                 qWarning() << "  file:" << filePath
@@ -1061,7 +1069,7 @@ bool Library::saveMetadata(int index,
     {
         StderrSilencer silencer;
 
-        TagLib::FileRef fr(path.toUtf8().constData());
+        TagLib::FileRef fr = makeFileRef(path);
         if (fr.isNull() || !fr.file()) {
             if (wasCurrent) {
                 m_player->setSource(QUrl::fromLocalFile(path));
@@ -1203,7 +1211,7 @@ bool Library::removeCurrentCover() {
     bool ok = false;
     {
         StderrSilencer silencer;
-        TagLib::FileRef fr(path.toUtf8().constData());
+        TagLib::FileRef fr = makeFileRef(path);
         if (fr.isNull() || !fr.file()) return false;
 
         TagLib::File *file = fr.file();
@@ -1264,7 +1272,7 @@ bool Library::saveCoverTo(const QString &destPath) {
     QByteArray data;
     {
         StderrSilencer silencer;
-        TagLib::FileRef f(m_currentTrack.path.toUtf8().constData());
+        TagLib::FileRef f = makeFileRef(m_currentTrack.path);
         if (f.isNull() || !f.file()) return false;
         TagLib::File *file = f.file();
 
@@ -1296,7 +1304,7 @@ bool Library::saveCoverTo(const QString &destPath) {
 
 QString Library::readTextFromTags(const QString &path) const {
     StderrSilencer silencer;
-    TagLib::FileRef fr(path.toUtf8().constData());
+    TagLib::FileRef fr = makeFileRef(path);
     if (fr.isNull() || !fr.file()) return QString();
 
     TagLib::File *file = fr.file();
@@ -1347,7 +1355,7 @@ QString Library::readTextFromTags(const QString &path) const {
 
 bool Library::writeTextToTags(const QString &path, const QString &content) {
     StderrSilencer silencer;
-    TagLib::FileRef fr(path.toUtf8().constData());
+    TagLib::FileRef fr = makeFileRef(path);
     if (fr.isNull() || !fr.file()) return false;
 
     TagLib::File *file = fr.file();
