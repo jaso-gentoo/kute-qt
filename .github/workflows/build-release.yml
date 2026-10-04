@@ -2,6 +2,7 @@ name: Build
 
 on:
   push:
+    branches: [main, dev]
     tags: ['v*']
   workflow_dispatch:
 
@@ -263,7 +264,7 @@ jobs:
             cp site/kute-windows-x86_64.exe "site/kute-${VERSION}-windows-x86_64.exe"
           fi
 
-          printf '%s' '<!DOCTYPE html><html><head><meta charset="utf-8"><title>kute downloads</title><style>body{font-family:sans-serif;padding:40px;max-width:700px;margin:auto;color:#222}a{color:#0b6bcb}li{margin:8px 0}</style></head><body><h1>kute downloads</h1><p>Latest builds:</p><ul><li><a href="kute-x86_64.AppImage">kute-x86_64.AppImage</a> — Linux</li><li><a href="kute-windows-x86_64.exe">kute-windows-x86_64.exe</a> — Windows</li></ul><p style="color:#888;font-size:12px">Build: '"${GITHUB_SHA:0:8}"'</p></body></html>' > site/index.html
+          printf '%s' '<!DOCTYPE html><html><head><meta charset="utf-8"><title>kute downloads</title><style>body{font-family:sans-serif;padding:40px;max-width:700px;margin:auto;color:#222}a{color:#0b6bcb}li{margin:8px 0}code{background:#eee;padding:2px 6px;border-radius:4px}</style></head><body><h1>kute downloads</h1><p>Latest builds:</p><ul><li><a href="kute-x86_64.AppImage">kute-x86_64.AppImage</a> &mdash; Linux</li><li><a href="kute-windows-x86_64.exe">kute-windows-x86_64.exe</a> &mdash; Windows</li></ul><p style="color:#888;font-size:12px">Build: <code>'"${GITHUB_SHA:0:8}"'</code></p></body></html>' > site/index.html
 
           ls -la site/
 
