@@ -160,6 +160,17 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-imageformats
             mingw-w64-ucrt-x86_64-ffmpeg
             mingw-w64-ucrt-x86_64-ntldd
+            mingw-w64-ucrt-x86_64-imagemagick
+
+      - name: Generate .ico from logo
+        run: |
+          mkdir -p packaging
+          if command -v magick &> /dev/null; then
+            magick packaging/kute.jpg -define icon:auto-resize=256,128,64,48,32,16 packaging/kute.ico
+          elif command -v convert &> /dev/null; then
+            convert packaging/kute.jpg -define icon:auto-resize=256,128,64,48,32,16 packaging/kute.ico
+          fi
+          ls -la packaging/kute.ico 2>/dev/null || echo "no ico — continuing"
 
       - name: Configure
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -181,6 +192,8 @@ jobs:
           rm -f dist/libIlmThread*.dll dist/libOpenEXR*.dll dist/libmenuw6.dll
           rm -f dist/libformw6.dll dist/libpanelw6.dll dist/libncurses*.dll
           rm -f dist/vulkan-1.dll dist/OpenCL.dll
+          rm -f dist/Qt6Widgets*.dll dist/Qt6Sql*.dll dist/Qt6Test*.dll
+          rm -f dist/Qt6Concurrent*.dll dist/Qt6PrintSupport*.dll dist/Qt6Designer*.dll
 
           echo "=== dll count ==="
           ls dist/*.dll | wc -l
@@ -210,9 +223,6 @@ jobs:
           done
           if [ -z "$PLUG_SRC" ]; then echo "ERROR: plugins not found"; exit 1; fi
 
-          echo "=== available plugin folders ==="
-          ls "$PLUG_SRC"
-
           for sub in platforms imageformats iconengines multimedia styles generic networkinformation tls; do
             if [ -d "$PLUG_SRC/$sub" ]; then
               mkdir -p "dist/$sub"
@@ -222,16 +232,6 @@ jobs:
 
           echo "=== multimedia plugin folder ==="
           ls -la dist/multimedia/
-
-          echo "=== checking ffmpeg plugin deps ==="
-          if [ -f dist/multimedia/ffmpegmediaplugin.dll ]; then
-            ntldd -R dist/multimedia/ffmpegmediaplugin.dll 2>&1 | grep -i "not found" || echo "ALL DEPS OK"
-          fi
-
-          echo "=== checking wmf plugin deps ==="
-          if [ -f dist/multimedia/windowsmediaplugin.dll ]; then
-            ntldd -R dist/multimedia/windowsmediaplugin.dll 2>&1 | grep -i "not found" || echo "ALL DEPS OK"
-          fi
 
       - name: Copy multimedia deps next to plugin
         run: |
@@ -243,9 +243,6 @@ jobs:
           cp -L /ucrt64/bin/libsoxr.dll dist/multimedia/ 2>/dev/null || true
           cp -L /ucrt64/bin/libgomp-1.dll dist/multimedia/ 2>/dev/null || true
           cp -L /ucrt64/bin/libssp-0.dll dist/multimedia/ 2>/dev/null || true
-
-          echo "=== dist/multimedia after deps ==="
-          ls -la dist/multimedia/
 
       - name: Create qt.conf
         shell: bash
@@ -265,25 +262,6 @@ jobs:
           cp -L /ucrt64/bin/libcrypto-3-x64.dll dist/ 2>/dev/null || true
           cp -L /ucrt64/bin/libssl-3-x64.dll dist/ 2>/dev/null || true
 
-      - name: Final check
-        run: |
-          du -sh dist/
-          ls -la dist/kute.exe
-          ls -la dist/Qt6Core.dll 2>/dev/null || echo "MISSING Qt6Core"
-          ls -la dist/libtag.dll 2>/dev/null || echo "MISSING libtag"
-          ls dist/multimedia/
-          ls dist/qml/QtQuick/Layouts/qmldir 2>/dev/null || echo "MISSING Layouts"
-
-          echo ""
-          echo "=== libtag dependencies check ==="
-          if [ -f dist/libtag.dll ]; then
-            ntldd -R dist/libtag.dll 2>&1 | grep -i "not found" || echo "ALL DEPS OK"
-          fi
-
-          echo ""
-          echo "=== kute.exe dependencies check ==="
-          ntldd -R dist/kute.exe 2>&1 | grep -i "not found" || echo "ALL DEPS OK"
-
       - name: Build single exe with NSIS
         shell: bash
         run: |
@@ -296,6 +274,8 @@ jobs:
             'RequestExecutionLevel user' \
             'OutFile "kute-windows-x86_64.exe"' \
             'InstallDir "$TEMP\kute"' \
+            'Icon "packaging\kute.ico"' \
+            'UninstallIcon "packaging\kute.ico"' \
             '' \
             'Section' \
             'InitPluginsDir' \
