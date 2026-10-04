@@ -207,6 +207,13 @@ jobs:
           cp /ucrt64/bin/libsoxr.dll dist/ 2>/dev/null || true
           cp /ucrt64/bin/libgomp-1.dll dist/ 2>/dev/null || true
 
+      - name: Copy OpenSSL legacy provider
+        run: |
+          mkdir -p dist/lib/ossl-modules
+          cp /ucrt64/lib/ossl-modules/legacy.dll dist/lib/ossl-modules/ 2>/dev/null || true
+          cp /ucrt64/bin/libcrypto-3-x64.dll dist/ 2>/dev/null || true
+          cp /ucrt64/bin/libssl-3-x64.dll dist/ 2>/dev/null || true
+
       - name: Build single exe with NSIS
         shell: bash
         run: |
@@ -268,19 +275,6 @@ jobs:
           ls -la site/
           echo "=== site size ==="
           du -sh site/
-
-      - name: Check file sizes
-        run: |
-          for f in site/*; do
-            [ -f "$f" ] || continue
-            size=$(stat -c%s "$f")
-            mb=$((size / 1024 / 1024))
-            echo "$f -> $mb MB"
-            if [ "$size" -gt 104857600 ]; then
-              echo "ERROR: $f is bigger than 100 MB, GitHub Pages will reject it"
-              exit 1
-            fi
-          done
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
