@@ -39,8 +39,6 @@ ApplicationWindow {
         if (floatingSearchOpen) {
             closeFloatingSearch()
         } else {
-            // Ignore if the same click that propagated from the FloatingSearch scrim
-            // just closed it in this tick
             if (Date.now() - lastSearchClose < 250) return
             if (settingsOpen) settingsOpen = false
             if (playlistView) playlistView.closeSort()
@@ -84,6 +82,7 @@ ApplicationWindow {
     function openFolderDialog()   { folderDialog.open() }
     function toggleReorder()      { library.toggleReorderMode() }
     function toggleInfoPanel()    { library.infoPanelVisible = !library.infoPanelVisible }
+    function toggleCurrentLike()  { library.toggleCurrentLike() }
 
     function goToHome() {
         library.clearFilter()
@@ -171,7 +170,7 @@ ApplicationWindow {
 
         InfoPanel {
             Layout.fillHeight: true
-            Layout.preferredWidth: library.infoPanelVisible ? 340 : 0
+            Layout.preferredWidth: library.infoPanelVisible ? 300 : 0
             Layout.minimumWidth: 0
             clip: true
             opacity: library.infoPanelVisible ? 1 : 0

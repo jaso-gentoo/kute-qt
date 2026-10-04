@@ -52,6 +52,7 @@ public:
     void updateFiltered(const QList<Track> &newTracks);
     void moveRow(int from, int to);
     void updateTrack(int index, const Track &t);
+    bool removeByPath(const QString &path);
     void clear();
     int count() const { return m_tracks.size(); }
     const Track *at(int i) const;

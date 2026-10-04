@@ -94,6 +94,16 @@ QString Library::offsetsPath() const {
         + "/kute/offsets.json";
 }
 
+QString Library::likedPath() const {
+    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
+        + "/kute/liked.json";
+}
+
+QString Library::playlistOrderPath() const {
+    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
+        + "/kute/playlist_order.json";
+}
+
 void Library::loadOffsets() {
     m_lrcOffsets.clear();
     QFile f(offsetsPath());
@@ -120,6 +130,45 @@ void Library::saveOffsets() {
     if (f.open(QIODevice::WriteOnly)) {
         f.write(QJsonDocument(o).toJson(QJsonDocument::Indented));
     }
+}
+
+void Library::loadLiked() {
+    m_likedPaths.clear();
+    QFile f(likedPath());
+    if (!f.open(QIODevice::ReadOnly)) return;
+
+    QJsonParseError err;
+    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll(), &err);
+    if (err.error != QJsonParseError::NoError || !doc.isObject()) return;
+
+    const QJsonArray arr = doc.object().value("paths").toArray();
+    for (const auto &v : arr) {
+        const QString p = v.toString();
+        if (!p.isEmpty()) m_likedPaths.insert(p);
+    }
+}
+
+void Library::saveLiked() {
+    QStringList sorted = m_likedPaths.values();
+    sorted.sort(Qt::CaseInsensitive);
+
+    QJsonArray arr;
+    for (const QString &p : sorted) arr.append(p);
+
+    QJsonObject o;
+    o["paths"] = arr;
+    o["version"] = 1;
+
+    const QString path = likedPath();
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QFile f(path);
+    if (f.open(QIODevice::WriteOnly)) {
+        f.write(QJsonDocument(o).toJson(QJsonDocument::Indented));
+    }
+}
+
+void Library::flushLikedSave() {
+    saveLiked();
 }
 
 double Library::getLrcOffset(int index) const {
@@ -161,6 +210,11 @@ Library::Library(QObject *parent) : QObject(parent) {
     m_offsetSaveTimer->setInterval(600);
     connect(m_offsetSaveTimer, &QTimer::timeout, this, &Library::flushOffsetSave);
 
+    m_likedSaveTimer = new QTimer(this);
+    m_likedSaveTimer->setSingleShot(true);
+    m_likedSaveTimer->setInterval(600);
+    connect(m_likedSaveTimer, &QTimer::timeout, this, &Library::flushLikedSave);
+
     m_osName = QSysInfo::prettyProductName();
     if (m_osName.isEmpty()) m_osName = QSysInfo::productType();
 
@@ -180,6 +234,8 @@ Library::Library(QObject *parent) : QObject(parent) {
     m_repeatMode = s.value("player/repeatMode", 0).toInt();
 
     loadOffsets();
+    loadLiked();
+    loadPlaylistOrder();
 
     connect(m_player, &QMediaPlayer::positionChanged,
             this, [this](qint64) { emit positionChanged(); });
@@ -295,6 +351,89 @@ void Library::setInfoPanelVisible(bool v) {
     m_infoPanelVisible = v;
     QSettings().setValue("ui/infoPanelVisible", v);
     emit infoPanelVisibleChanged();
+}
+
+void Library::setShowOnlyLiked(bool v) {
+    if (m_showOnlyLiked == v) return;
+    m_showOnlyLiked = v;
+    sortAndApply(false);
+    emit showOnlyLikedChanged();
+    emit currentChanged();
+}
+
+bool Library::isLiked(int index) const {
+    if (index < 0 || index >= m_tracks.count()) return false;
+    const Track *t = m_tracks.at(index);
+    if (!t) return false;
+    return m_likedPaths.contains(t->path);
+}
+
+bool Library::isCurrentLiked() const {
+    if (m_currentTrack.path.isEmpty()) return false;
+    return m_likedPaths.contains(m_currentTrack.path);
+}
+
+void Library::toggleLike(int index) {
+    if (index < 0 || index >= m_tracks.count()) return;
+    const Track *t = m_tracks.at(index);
+    if (!t) return;
+
+    const QString path = t->path;
+    const bool wasLiked = m_likedPaths.contains(path);
+
+    if (wasLiked) {
+        m_likedPaths.remove(path);
+    } else {
+        m_likedPaths.insert(path);
+    }
+
+    m_likedRevision++;
+    emit likedChanged();
+
+    if (m_likedSaveTimer) m_likedSaveTimer->start();
+
+    if (m_showOnlyLiked && wasLiked) {
+        m_tracks.removeByPath(path);
+
+        const QString currentPath = m_currentTrack.path;
+        m_currentIndex = -1;
+        if (!currentPath.isEmpty()) {
+            for (int i = 0; i < m_tracks.count(); ++i) {
+                const Track *tt = m_tracks.at(i);
+                if (tt && tt->path == currentPath) { m_currentIndex = i; break; }
+            }
+        }
+        emit currentChanged();
+    }
+}
+
+void Library::toggleCurrentLike() {
+    if (m_currentTrack.path.isEmpty()) return;
+
+    const QString path = m_currentTrack.path;
+    const bool wasLiked = m_likedPaths.contains(path);
+
+    if (wasLiked) {
+        m_likedPaths.remove(path);
+    } else {
+        m_likedPaths.insert(path);
+    }
+
+    m_likedRevision++;
+    emit likedChanged();
+
+    if (m_likedSaveTimer) m_likedSaveTimer->start();
+
+    if (m_showOnlyLiked && wasLiked) {
+        m_tracks.removeByPath(path);
+
+        m_currentIndex = -1;
+        for (int i = 0; i < m_tracks.count(); ++i) {
+            const Track *tt = m_tracks.at(i);
+            if (tt && tt->path == path) { m_currentIndex = i; break; }
+        }
+        emit currentChanged();
+    }
 }
 
 QString Library::formatDuration(qint64 ms) const {
@@ -478,9 +617,12 @@ void Library::loadFolder(const QString &path) {
     m_searchQuery.clear();
     m_reorderMode = false;
     m_customOrder.clear();
-    if (m_sortField == "custom") loadPlaylistOrder();
+    m_showOnlyLiked = false;
+
+    loadPlaylistOrder();
+
     rebuildArtists();
-    sortAndApply();
+    sortAndApply(false);
     m_searchResults.clear();
 
     QSettings s;
@@ -493,12 +635,8 @@ void Library::loadFolder(const QString &path) {
     emit filterTextChanged();
     emit searchQueryChanged();
     emit reorderModeChanged();
+    emit showOnlyLikedChanged();
     schedulePresence();
-}
-
-QString Library::playlistOrderPath() const {
-    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
-        + "/kute/playlist_order.json";
 }
 
 void Library::loadPlaylistOrder() {
@@ -519,7 +657,8 @@ void Library::loadPlaylistOrder() {
 
         const QJsonObject o = doc.object();
 
-        QJsonArray arr = o.value("order").toArray();
+        QJsonArray arr = o.value("customOrder").toArray();
+        if (arr.isEmpty()) arr = o.value("order").toArray();
         if (arr.isEmpty()) arr = o.value("playlistOrder").toArray();
         if (arr.isEmpty()) continue;
 
@@ -527,29 +666,18 @@ void Library::loadPlaylistOrder() {
             const QString p = v.toString();
             if (!p.isEmpty()) m_customOrder.append(p);
         }
+
         if (!m_customOrder.isEmpty()) return;
     }
 }
 
-void Library::savePlaylistOrder() {
-    QStringList order;
-    if (m_tracks.count() > 0) {
-        for (int i = 0; i < m_tracks.count(); ++i) {
-            const Track *t = m_tracks.at(i);
-            if (t) order.append(t->path);
-        }
-    } else if (!m_customOrder.isEmpty()) {
-        order = m_customOrder;
-    } else {
-        return;
-    }
-    m_customOrder = order;
-
-    QJsonArray arr;
-    for (const QString &p : order) arr.append(p);
+void Library::savePlaylistOrderNow() {
+    QJsonArray orderArr;
+    for (const QString &p : m_customOrder) orderArr.append(p);
 
     QJsonObject o;
-    o["order"] = arr;
+    o["version"] = 1;
+    o["customOrder"] = orderArr;
     o["libraryPath"] = m_folder;
     o["lastModified"] = QDateTime::currentDateTime().toString(Qt::ISODate);
 
@@ -561,7 +689,11 @@ void Library::savePlaylistOrder() {
     }
 }
 
-void Library::sortAndApply() {
+void Library::savePlaylistOrder() {
+    savePlaylistOrderNow();
+}
+
+void Library::sortAndApply(bool animate) {
     const QString currentPath = m_currentTrack.path;
     const QString q = m_filterText.toLower().trimmed();
 
@@ -569,6 +701,7 @@ void Library::sortAndApply() {
     filtered.reserve(m_allTracks.size());
 
     for (const Track &t : m_allTracks) {
+        if (m_showOnlyLiked && !m_likedPaths.contains(t.path)) continue;
         if (!m_filterArtist.isEmpty() && t.artist != m_filterArtist) continue;
         if (!q.isEmpty()) {
             if (!t.title.toLower().contains(q) &&
@@ -579,7 +712,7 @@ void Library::sortAndApply() {
         filtered.append(t);
     }
 
-    if (m_sortField == "custom" && !m_customOrder.isEmpty()) {
+    if (m_sortField == "custom") {
         QHash<QString, int> rank;
         rank.reserve(m_customOrder.size());
         for (int i = 0; i < m_customOrder.size(); ++i)
@@ -589,7 +722,8 @@ void Library::sortAndApply() {
             [&rank](const Track &a, const Track &b) {
                 const int ra = rank.value(a.path, 999999);
                 const int rb = rank.value(b.path, 999999);
-                return ra < rb;
+                if (ra != rb) return ra < rb;
+                return QString::compare(a.path, b.path, Qt::CaseInsensitive) < 0;
             });
     } else {
         std::stable_sort(filtered.begin(), filtered.end(),
@@ -614,7 +748,11 @@ void Library::sortAndApply() {
             });
     }
 
-    m_tracks.setTracksAnimated(filtered);
+    if (animate) {
+        m_tracks.setTracksAnimated(filtered);
+    } else {
+        m_tracks.setTracks(filtered);
+    }
 
     m_currentIndex = -1;
     if (!currentPath.isEmpty()) {
@@ -692,10 +830,9 @@ void Library::applySort(const QString &field, bool ascending) {
     m_sortAscending = ascending;
 
     if (field == "custom") {
-        loadPlaylistOrder();
         if (m_customOrder.isEmpty()) {
             for (const Track &t : m_allTracks) m_customOrder.append(t.path);
-            savePlaylistOrder();
+            savePlaylistOrderNow();
         }
     }
 
@@ -703,7 +840,7 @@ void Library::applySort(const QString &field, bool ascending) {
     s.setValue("library/sortField", field);
     s.setValue("library/sortAscending", ascending);
 
-    sortAndApply();
+    sortAndApply(false);
     rebuildSearch();
     emit sortChanged();
     emit currentChanged();
@@ -712,7 +849,7 @@ void Library::applySort(const QString &field, bool ascending) {
 void Library::setFilterArtist(const QString &artist) {
     if (m_filterArtist == artist) return;
     m_filterArtist = artist;
-    sortAndApply();
+    sortAndApply(true);
     emit filterArtistChanged();
     emit currentChanged();
 }
@@ -721,7 +858,7 @@ void Library::setFilterText(const QString &text) {
     if (m_filterText == text) return;
     m_filterText = text;
     rebuildArtists();
-    sortAndApply();
+    sortAndApply(true);
     emit filterTextChanged();
     emit currentChanged();
 }
@@ -740,7 +877,7 @@ void Library::clearFilter() {
     }
     if (changed) {
         rebuildArtists();
-        sortAndApply();
+        sortAndApply(true);
         emit currentChanged();
     }
 }
@@ -753,22 +890,23 @@ void Library::setSearch(const QString &q) {
 }
 
 void Library::toggleReorderMode() {
-    if (m_sortField != "custom") {
+    if (m_sortField != "custom" && !m_showOnlyLiked) {
         applySort("custom", true);
     }
     m_reorderMode = !m_reorderMode;
     emit reorderModeChanged();
 
     if (!m_reorderMode) {
-        savePlaylistOrder();
+        savePlaylistOrderNow();
     }
 }
 
 void Library::moveTrack(int from, int to) {
-    if (m_sortField != "custom") return;
     if (from == to) return;
     if (from < 0 || to < 0) return;
     if (from >= m_tracks.count() || to >= m_tracks.count()) return;
+
+    if (m_sortField != "custom") return;
 
     m_tracks.moveRow(from, to);
 
@@ -781,7 +919,18 @@ void Library::moveTrack(int from, int to) {
     }
     emit currentChanged();
 
-    savePlaylistOrder();
+    QStringList order;
+    for (int i = 0; i < m_tracks.count(); ++i) {
+        const Track *t = m_tracks.at(i);
+        if (t) order.append(t->path);
+    }
+    QSet<QString> seen;
+    for (const QString &p : order) seen.insert(p);
+    for (const Track &t : m_allTracks) {
+        if (!seen.contains(t.path)) { order.append(t.path); seen.insert(t.path); }
+    }
+    m_customOrder = order;
+    savePlaylistOrderNow();
 }
 
 void Library::cycleRepeat() {
@@ -1017,6 +1166,64 @@ bool Library::saveMetadata(int index,
 
     m_coverVersion++;
     emit coverVersionChanged();
+    return true;
+}
+
+bool Library::removeCurrentCover() {
+    if (m_currentTrack.path.isEmpty()) return false;
+    const QString path = m_currentTrack.path;
+
+    bool ok = false;
+    {
+        StderrSilencer silencer;
+        TagLib::FileRef fr(path.toUtf8().constData());
+        if (fr.isNull() || !fr.file()) return false;
+
+        TagLib::File *file = fr.file();
+
+        if (auto *mpeg = dynamic_cast<TagLib::MPEG::File*>(file)) {
+            if (auto *tag = mpeg->ID3v2Tag()) {
+                tag->removeFrames("APIC");
+                ok = mpeg->save();
+            }
+        } else if (auto *flac = dynamic_cast<TagLib::FLAC::File*>(file)) {
+            flac->removePictures();
+            ok = flac->save();
+        }
+    }
+
+    if (!ok) return false;
+
+    const QString hash = QString::fromLatin1(
+        QCryptographicHash::hash(path.toUtf8(), QCryptographicHash::Md5).toHex());
+    QFile::remove(coverCacheDir() + "/" + hash + ".jpg");
+    QFile::remove(thumbCacheDir() + "/" + hash + ".png");
+
+    for (auto &t : m_allTracks) {
+        if (t.path == path) {
+            t.cover.clear();
+            t.thumb.clear();
+            break;
+        }
+    }
+
+    for (int i = 0; i < m_tracks.count(); ++i) {
+        const Track *tt = m_tracks.at(i);
+        if (tt && tt->path == path) {
+            Track copy = *tt;
+            copy.cover.clear();
+            copy.thumb.clear();
+            m_tracks.updateTrack(i, copy);
+            break;
+        }
+    }
+
+    m_currentTrack.cover.clear();
+    m_currentTrack.thumb.clear();
+
+    m_coverVersion++;
+    emit coverVersionChanged();
+    emit currentChanged();
     return true;
 }
 

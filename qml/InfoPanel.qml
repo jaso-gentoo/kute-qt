@@ -343,31 +343,6 @@ Item {
                             horizontalAlignment: Text.AlignRight
                         }
 
-                        Text { text: "Channels"; color: theme.outline; font.pixelSize: 10 }
-                        Text {
-                            Layout.fillWidth: true
-                            text: panel.dChannels === 1 ? "Mono"
-                                  : panel.dChannels === 2 ? "Stereo"
-                                  : panel.dChannels > 2 ? panel.dChannels + " ch"
-                                  : "—"
-                            color: theme.onSurface; font.pixelSize: 10
-                            font.family: "monospace"
-                            horizontalAlignment: Text.AlignRight
-                        }
-
-                        Text {
-                            text: "Year"; color: theme.outline; font.pixelSize: 10
-                            visible: panel.dYear > 0
-                        }
-                        Text {
-                            Layout.fillWidth: true
-                            text: panel.dYear > 0 ? panel.dYear.toString() : ""
-                            color: theme.onSurface; font.pixelSize: 10
-                            font.family: "monospace"
-                            horizontalAlignment: Text.AlignRight
-                            visible: panel.dYear > 0
-                        }
-
                         Text { text: "Size"; color: theme.outline; font.pixelSize: 10 }
                         Text {
                             Layout.fillWidth: true

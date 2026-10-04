@@ -65,8 +65,8 @@ Item {
 
         readonly property int preferredHeight: {
             switch (modal.currentTab) {
-                case modal.tabSettings: return 520
-                case modal.tabTrack:    return 520
+                case modal.tabSettings: return 400
+                case modal.tabTrack:    return 370
                 case modal.tabLyrics:   return 640
             }
             return 560

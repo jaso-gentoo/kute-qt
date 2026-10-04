@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 
 Rectangle {
@@ -8,10 +9,39 @@ Rectangle {
 
     signal coverClicked
 
+    property string sTitle: ""
+    property string sArtist: ""
+    property string sCover: ""
+
+    function snapshot() {
+        sTitle = library.currentTitle
+        sArtist = library.currentArtist
+        sCover = library.currentCover
+    }
+
+    Component.onCompleted: snapshot()
+
+    Connections {
+        target: library
+        function onCurrentChanged() {
+            if (!library.hasCurrent) {
+                snapshot()
+                return
+            }
+            trackAnim.restart()
+        }
+    }
+
     readonly property string displayTitle: {
         if (!library.hasCurrent) return "—"
-        const t = library.currentTitle
+        const t = sTitle
         return t.length > 34 ? t.substring(0, 32) + "…" : t
+    }
+
+    readonly property bool currentLiked: {
+        library.likedRevision
+        library.currentIndex
+        return library.isCurrentLiked()
     }
 
     Rectangle {
@@ -32,43 +62,68 @@ Rectangle {
         spacing: 16
 
         RowLayout {
-            Layout.preferredWidth: 200
+            Layout.preferredWidth: 230
             Layout.minimumWidth: 80
-            Layout.maximumWidth: 220
+            Layout.maximumWidth: 250
             Layout.fillHeight: true
             spacing: 10
 
             Item {
+                id: coverWrap
                 Layout.preferredWidth: 46
                 Layout.preferredHeight: 46
                 Layout.alignment: Qt.AlignVCenter
+                transformOrigin: Item.Center
+
+                transform: Translate { id: coverShift; y: 0 }
 
                 Rectangle {
                     anchors.fill: parent
                     radius: 11
                     color: theme.surfaceVariant
-                    clip: true
+                }
 
-                    Image {
-                        id: miniCover
+                MaterialIcon {
+                    anchors.centerIn: parent
+                    glyph: "\ue405"
+                    iconSize: 20
+                    iconColor: theme.outline
+                    visible: !bar.sCover || coverImg.status !== Image.Ready
+                    z: 2
+                }
+
+                Image {
+                    id: coverImg
+                    anchors.fill: parent
+                    source: bar.sCover ? "file://" + bar.sCover + "?v=" + library.coverVersion : ""
+                    sourceSize.width: 92
+                    sourceSize.height: 92
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: false
+                    smooth: true
+                    visible: false
+                }
+
+                Item {
+                    id: coverMask
+                    anchors.fill: parent
+                    visible: false
+                    layer.enabled: true
+
+                    Rectangle {
                         anchors.fill: parent
-                        source: library.currentCover ? "file://" + library.currentCover + "?v=" + library.coverVersion : ""
-                        sourceSize.width: 60
-                        sourceSize.height: 60
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        cache: false
-                        smooth: true
-                        visible: status === Image.Ready
+                        radius: 11
+                        color: "white"
                     }
+                }
 
-                    MaterialIcon {
-                        anchors.centerIn: parent
-                        glyph: "\ue405"
-                        iconSize: 20
-                        iconColor: theme.outline
-                        visible: !library.currentCover || miniCover.status !== Image.Ready
-                    }
+                MultiEffect {
+                    anchors.fill: parent
+                    source: coverImg
+                    maskEnabled: true
+                    maskSource: coverMask
+                    visible: coverImg.status === Image.Ready
                 }
 
                 Rectangle {
@@ -106,9 +161,13 @@ Rectangle {
             }
 
             ColumnLayout {
+                id: textCol
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignVCenter
                 spacing: 1
+                clip: true
+
+                transform: Translate { id: textShift; y: 0 }
 
                 Text {
                     Layout.fillWidth: true
@@ -121,10 +180,75 @@ Rectangle {
 
                 Text {
                     Layout.fillWidth: true
-                    text: library.hasCurrent ? library.currentArtist : ""
+                    text: library.hasCurrent ? bar.sArtist : ""
                     color: theme.outline
                     font.pixelSize: 10
                     elide: Text.ElideRight
+                }
+            }
+
+            Item {
+                Layout.preferredWidth: 28
+                Layout.preferredHeight: 28
+                Layout.alignment: Qt.AlignVCenter
+                visible: library.hasCurrent
+
+                Item {
+                    id: heartIconWrap
+                    anchors.fill: parent
+                    opacity: bar.currentLiked ? 1.0 : 0.45
+                    scale: hovLike.pressed ? 0.8 : (hovLike.containsMouse ? 1.15 : 1.0)
+
+                    Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 220
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 2.8
+                        }
+                    }
+
+                    MaterialIcon {
+                        anchors.centerIn: parent
+                        glyph: "\ue87d"
+                        iconSize: 18
+                        filled: bar.currentLiked
+                        iconColor: bar.currentLiked ? theme.primary : theme.onSurface
+                        Behavior on iconColor { ColorAnimation { duration: 240 } }
+                    }
+                }
+
+                MouseArea {
+                    id: hovLike
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: library.toggleCurrentLike()
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.bottom: parent.top
+                    anchors.bottomMargin: 4
+                    width: likeTipTxt.implicitWidth + 16
+                    height: 24
+                    radius: 8
+                    color: theme.surface
+                    border.color: theme.outline
+                    border.width: 1
+                    opacity: hovLike.containsMouse ? 1 : 0
+                    visible: opacity > 0
+                    z: 9999
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                    Text {
+                        id: likeTipTxt
+                        anchors.centerIn: parent
+                        text: bar.currentLiked ? "Remove from Liked (Ctrl+W)" : "Add to Liked (Ctrl+W)"
+                        color: theme.onSurface
+                        font.pixelSize: 11
+                        font.weight: Font.Medium
+                    }
                 }
             }
         }
@@ -181,18 +305,47 @@ Rectangle {
                 }
 
                 Rectangle {
-                    width: progHover.hovered || progMouse.pressed ? 14 : 0
+                    id: progDot
+                    readonly property bool paused: library.hasCurrent
+                                                   && !library.isPlaying
+                                                   && library.position > 0
+
+                    width: progHover.hovered || progMouse.pressed
+                           ? 14
+                           : (paused ? 10 : 0)
                     height: width
                     radius: width / 2
                     color: theme.primary
                     anchors.verticalCenter: parent.verticalCenter
                     x: parent.width * progArea.progress - width / 2
+
                     Behavior on width {
                         NumberAnimation {
-                            duration: 180
+                            duration: 260
                             easing.type: Easing.OutBack
                             easing.overshoot: 2.0
                         }
+                    }
+
+                    SequentialAnimation on scale {
+                        running: progDot.paused && !progHover.hovered && !progMouse.pressed
+                        loops: Animation.Infinite
+
+                        NumberAnimation {
+                            to: 1.25
+                            duration: 900
+                            easing.type: Easing.InOutSine
+                        }
+                        NumberAnimation {
+                            to: 0.85
+                            duration: 900
+                            easing.type: Easing.InOutSine
+                        }
+                    }
+
+                    Behavior on scale {
+                        enabled: !(progDot.paused && !progHover.hovered && !progMouse.pressed)
+                        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
                     }
                 }
 
@@ -478,6 +631,52 @@ Rectangle {
                         if (pressed) library.volume = Math.round(mouse.x / width * 100)
                     }
                 }
+            }
+        }
+    }
+
+    SequentialAnimation {
+        id: trackAnim
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: bar; property: "opacity"
+                to: 0.15; duration: 220; easing.type: Easing.InCubic
+            }
+            NumberAnimation {
+                target: coverShift; property: "y"
+                to: -10; duration: 240; easing.type: Easing.InCubic
+            }
+            NumberAnimation {
+                target: textShift; property: "y"
+                to: -10; duration: 240; easing.type: Easing.InCubic
+            }
+        }
+
+        ScriptAction {
+            script: {
+                bar.snapshot()
+                coverShift.y = 10
+                textShift.y = 10
+            }
+        }
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: bar; property: "opacity"
+                to: 1.0; duration: 320; easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                target: coverShift; property: "y"
+                to: 0; duration: 420
+                easing.type: Easing.OutBack
+                easing.overshoot: 1.8
+            }
+            NumberAnimation {
+                target: textShift; property: "y"
+                to: 0; duration: 420
+                easing.type: Easing.OutBack
+                easing.overshoot: 1.8
             }
         }
     }

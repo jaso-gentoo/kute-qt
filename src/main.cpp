@@ -4,6 +4,12 @@
 #include <QKeyEvent>
 #include <QQuickWindow>
 #include <QQuickItem>
+#include <QFile>
+#include <QDir>
+#include <QTextStream>
+#include <QDateTime>
+#include <exception>
+#include <cstdio>
 
 #include "ThemeManager.h"
 #include "Library.h"
@@ -13,10 +19,10 @@
 #endif
 
 #ifdef Q_OS_UNIX
-#include <QFile>
 #include <QByteArray>
 #include <cstdlib>
 #include <unistd.h>
+#include <QFileInfo>
 
 static QByteArray selfPath() {
     return QFile::symLinkTarget("/proc/self/exe").toUtf8();
@@ -28,8 +34,7 @@ static void reexecWithEnv(char *argv[]) {
     setenv("MALLOC_ARENA_MAX", "2", 1);
     setenv("QSG_USE_IMAGE_CACHE", "0", 1);
     setenv("QSG_RENDER_LOOP", "threaded", 1);
-    setenv("QSG_RHI_BACKEND", "vulkan", 1);
-    setenv("QT_QUICK_BACKEND", "vulkan", 1);
+
     if (!qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) {
         setenv("QT_QPA_PLATFORM", "wayland;xcb", 1);
     }
@@ -43,6 +48,82 @@ static void reexecWithEnv(char *argv[]) {
 #else
 static void reexecWithEnv(char *argv[]) { Q_UNUSED(argv) }
 #endif
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+static void enableVT() {
+    HANDLE h = GetStdHandle(STD_ERROR_HANDLE);
+    if (h == INVALID_HANDLE_VALUE) return;
+    DWORD mode = 0;
+    if (!GetConsoleMode(h, &mode)) return;
+    SetConsoleMode(h, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+}
+#else
+static void enableVT() {}
+#endif
+
+static QString logPath() {
+    return QDir::tempPath() + "/kute_debug.log";
+}
+
+// ANSI colors
+static const char *kReset  = "\033[0m";
+static const char *kDebug  = "\033[90m";   // grey
+static const char *kInfo   = "\033[36m";   // cyan
+static const char *kWarn   = "\033[33m";   // yellow
+static const char *kCrit   = "\033[91m";   // bright red
+static const char *kFatal  = "\033[97;41m"; // white on red
+static const char *kPlain  = "";
+
+static const char *colorFor(QtMsgType type) {
+    switch (type) {
+        case QtDebugMsg:    return kDebug;
+        case QtInfoMsg:     return kInfo;
+        case QtWarningMsg:  return kWarn;
+        case QtCriticalMsg: return kCrit;
+        case QtFatalMsg:    return kFatal;
+    }
+    return kPlain;
+}
+
+static const char *prefixFor(QtMsgType type) {
+    switch (type) {
+        case QtDebugMsg:    return "DEBUG";
+        case QtInfoMsg:     return "INFO ";
+        case QtWarningMsg:  return "WARN ";
+        case QtCriticalMsg: return "CRIT ";
+        case QtFatalMsg:    return "FATAL";
+    }
+    return "     ";
+}
+
+static void writeToFile(const QString &line) {
+    QFile f(logPath());
+    if (!f.open(QIODevice::Append | QIODevice::Text)) return;
+    QTextStream ts(&f);
+    ts << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz")
+       << "  " << line << "\n";
+    ts.flush();
+}
+
+static void writeToConsole(const QString &line, const char *color, bool colorize) {
+    if (colorize) {
+        fprintf(stderr, "%s%s%s\n", color, line.toLocal8Bit().constData(), kReset);
+    } else {
+        fprintf(stderr, "%s\n", line.toLocal8Bit().constData());
+    }
+    fflush(stderr);
+}
+
+static void emitLog(QtMsgType type, const QString &msg) {
+    const QString line = QString("%1  %2").arg(prefixFor(type)).arg(msg);
+    writeToFile(line);
+    writeToConsole(line, colorFor(type), true);
+}
+
+static void msgHandler(QtMsgType type, const QMessageLogContext &, const QString &msg) {
+    emitLog(type, msg);
+}
 
 static bool focusIsTextInput() {
     QObject *focus = QGuiApplication::focusObject();
@@ -88,6 +169,7 @@ protected:
             if (k == Qt::Key_Q) { QMetaObject::invokeMethod(m_root, "toggleInfoPanel",  Qt::DirectConnection); return true; }
             if (k == Qt::Key_1) { QMetaObject::invokeMethod(m_root, "goToHome",         Qt::DirectConnection); return true; }
             if (k == Qt::Key_2) { QMetaObject::invokeMethod(m_root, "goToArtists",      Qt::DirectConnection); return true; }
+            if (k == Qt::Key_W) { QMetaObject::invokeMethod(m_root, "toggleCurrentLike",Qt::DirectConnection); return true; }
         }
 
         if (!(mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier))) {
@@ -116,35 +198,82 @@ private:
 #include "main.moc"
 
 int main(int argc, char *argv[]) {
-    reexecWithEnv(argv);
+    enableVT();
+    qInstallMessageHandler(msgHandler);
 
-    QGuiApplication app(argc, argv);
-    app.setApplicationName("kute");
-    app.setApplicationVersion("1.0.0");
-    app.setOrganizationName("kute");
-
-    ThemeManager theme;
-    Library library;
-
-#ifdef Q_OS_LINUX
-    MprisController mpris(&library);
-#endif
-
-    QQmlApplicationEngine engine;
-    engine.rootContext()->setContextProperty("theme", &theme);
-    engine.rootContext()->setContextProperty("library", &library);
-
-    QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
-                     &app, []() { QCoreApplication::exit(-1); },
-                     Qt::QueuedConnection);
-
-    engine.loadFromModule("Kute", "Main");
-
-    if (!engine.rootObjects().isEmpty()) {
-        QObject *root = engine.rootObjects().first();
-        GlobalHotkeys *hk = new GlobalHotkeys(root, &app);
-        app.installEventFilter(hk);
+    {
+        QFile f(logPath());
+        if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            // ok
+        }
+        f.close();
     }
 
-    return app.exec();
+    emitLog(QtInfoMsg, "================ kute starting ================");
+    emitLog(QtInfoMsg, QString("argc=%1").arg(argc));
+    emitLog(QtInfoMsg, QString("tempDir=%1").arg(QDir::tempPath()));
+    emitLog(QtInfoMsg, QString("exePath=%1").arg(QString::fromLocal8Bit(argv[0])));
+    emitLog(QtInfoMsg, QString("Qt version=%1").arg(QT_VERSION_STR));
+
+    try {
+        reexecWithEnv(argv);
+        emitLog(QtInfoMsg, "after reexecWithEnv");
+
+        QGuiApplication app(argc, argv);
+        emitLog(QtInfoMsg, "QGuiApplication constructed");
+        emitLog(QtInfoMsg, QString("platform=%1").arg(app.platformName()));
+
+        app.setApplicationName("kute");
+        app.setApplicationVersion("1.0.0");
+        app.setOrganizationName("kute");
+
+        emitLog(QtInfoMsg, "creating ThemeManager");
+        ThemeManager theme;
+
+        emitLog(QtInfoMsg, "creating Library");
+        Library library;
+
+#ifdef Q_OS_LINUX
+        emitLog(QtInfoMsg, "creating MprisController");
+        MprisController mpris(&library);
+#endif
+
+        emitLog(QtInfoMsg, "creating QQmlApplicationEngine");
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("theme", &theme);
+        engine.rootContext()->setContextProperty("library", &library);
+
+        QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
+                         &app, []() {
+            emitLog(QtCriticalMsg, "QML objectCreationFailed signal");
+            QCoreApplication::exit(-1);
+        }, Qt::QueuedConnection);
+
+        emitLog(QtInfoMsg, "loading QML module Kute/Main");
+        engine.loadFromModule("Kute", "Main");
+        emitLog(QtInfoMsg, QString("loadFromModule returned, rootObjects=%1")
+                  .arg(engine.rootObjects().size()));
+
+        if (engine.rootObjects().isEmpty()) {
+            emitLog(QtCriticalMsg, "FATAL: rootObjects is empty — QML did not load");
+            return 1;
+        }
+
+        QObject *root = engine.rootObjects().first();
+        emitLog(QtInfoMsg, "installing GlobalHotkeys");
+        GlobalHotkeys *hk = new GlobalHotkeys(root, &app);
+        app.installEventFilter(hk);
+
+        emitLog(QtInfoMsg, "entering event loop");
+        const int rc = app.exec();
+        emitLog(QtInfoMsg, QString("event loop exited with code %1").arg(rc));
+        return rc;
+
+    } catch (const std::exception &e) {
+        emitLog(QtCriticalMsg, QString("EXCEPTION: %1").arg(e.what()));
+        return 2;
+    } catch (...) {
+        emitLog(QtCriticalMsg, "UNKNOWN EXCEPTION");
+        return 3;
+    }
 }

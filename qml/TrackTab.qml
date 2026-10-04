@@ -16,6 +16,9 @@ FocusScope {
     property string tagContent: ""
     property string lrcContent: ""
 
+    property bool removeCoverRequested: false
+    property bool savingInProgress: false
+
     signal closeRequested
     signal saved
 
@@ -85,6 +88,7 @@ FocusScope {
 
     function refresh() {
         newCoverPath = ""
+        removeCoverRequested = false
         titleField.text  = library.currentTitle
         artistField.text = library.currentArtist
         albumField.text  = library.currentAlbum
@@ -137,8 +141,16 @@ FocusScope {
         if (library.currentIndex < 0) { tab.closeRequested(); return }
         let ok = false
         if (subTab === 0) {
+            savingInProgress = true
+            const wantRemove = removeCoverRequested
+                                && newCoverPath === ""
+                                && library.currentCover !== ""
+            if (wantRemove) {
+                library.removeCurrentCover()
+            }
             ok = library.saveMetadata(library.currentIndex,
                 titleField.text, artistField.text, albumField.text, newCoverPath)
+            savingInProgress = false
         } else {
             if (textIsLrc) lrcContent = textArea.text; else tagContent = textArea.text
             const tg = String(tagContent ?? "")
@@ -153,7 +165,9 @@ FocusScope {
 
     Connections {
         target: library
-        function onCurrentChanged() { if (tab.isActive) tab.refresh() }
+        function onCurrentChanged() {
+            if (tab.isActive && !tab.savingInProgress) tab.refresh()
+        }
     }
 
     FileDialog {
@@ -164,6 +178,7 @@ FocusScope {
             let p = selectedFile.toString()
             if (p.startsWith("file://")) p = p.substring(7)
             tab.newCoverPath = p
+            tab.removeCoverRequested = false
         }
     }
 
@@ -324,67 +339,213 @@ FocusScope {
                                 maskSource: previewMask
                                 visible: coverPreview.status === Image.Ready
                             }
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: 14
+                                color: "#000"
+                                opacity: tab.removeCoverRequested ? 0.55 : 0
+                                visible: opacity > 0
+                                Behavior on opacity { NumberAnimation { duration: 200 } }
+
+                                ColumnLayout {
+                                    anchors.centerIn: parent
+                                    spacing: 4
+
+                                    MaterialIcon {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        glyph: "\ue872"
+                                        iconSize: 28
+                                        iconColor: "white"
+                                    }
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: "Will be removed"
+                                        color: "white"
+                                        font.pixelSize: 10
+                                        font.weight: Font.Medium
+                                    }
+                                }
+                            }
                         }
 
-                        Rectangle {
-                            Layout.preferredWidth: 140
-                            Layout.preferredHeight: 28
-                            radius: 9
-                            color: coverHov.containsMouse
-                                ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.16)
-                                : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06)
-                            Behavior on color { ColorAnimation { duration: 180 } }
-                            RowLayout {
-                                anchors.centerIn: parent
-                                spacing: 5
-                                MaterialIcon {
-                                    glyph: "\ue3f4"; iconSize: 13
-                                    iconColor: theme.onBackground
-                                }
-                                Text {
-                                    text: "Replace cover"
-                                    color: theme.onBackground
-                                    font.pixelSize: 11; font.weight: Font.Medium
-                                }
-                            }
-                            MouseArea {
-                                id: coverHov
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: coverDialog.open()
-                            }
-                        }
+                        Row {
+                            Layout.alignment: Qt.AlignHCenter
+                            Layout.preferredHeight: 32
+                            spacing: 5
 
-                        Rectangle {
-                            Layout.preferredWidth: 140
-                            Layout.preferredHeight: 28
-                            radius: 9
-                            color: saveCoverHov.containsMouse
-                                ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.16)
-                                : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06)
-                            Behavior on color { ColorAnimation { duration: 180 } }
-                            opacity: (library.hasCurrent && library.currentCover !== "") ? 1.0 : 0.5
-                            RowLayout {
-                                anchors.centerIn: parent
-                                spacing: 5
+                            Rectangle {
+                                id: replaceCoverBtn
+                                width: 42
+                                height: 32
+                                radius: 9
+                                color: replaceCoverHov.containsMouse
+                                    ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.22)
+                                    : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06)
+                                Behavior on color { ColorAnimation { duration: 180 } }
+
                                 MaterialIcon {
-                                    glyph: "\ue2c4"; iconSize: 13
+                                    anchors.centerIn: parent
+                                    glyph: "\ue3f4"
+                                    iconSize: 16
                                     iconColor: theme.onBackground
                                 }
-                                Text {
-                                    text: "Save cover"
-                                    color: theme.onBackground
-                                    font.pixelSize: 11; font.weight: Font.Medium
+
+                                MouseArea {
+                                    id: replaceCoverHov
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: coverDialog.open()
+                                }
+
+                                Rectangle {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.bottom: parent.top
+                                    anchors.bottomMargin: 6
+                                    width: replaceCoverTipTxt.implicitWidth + 16
+                                    height: 24
+                                    radius: 8
+                                    color: theme.surface
+                                    border.color: theme.outline
+                                    border.width: 1
+                                    opacity: replaceCoverHov.containsMouse ? 1 : 0
+                                    visible: opacity > 0
+                                    z: 9999
+                                    Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                                    Text {
+                                        id: replaceCoverTipTxt
+                                        anchors.centerIn: parent
+                                        text: "Replace cover"
+                                        color: theme.onSurface
+                                        font.pixelSize: 10
+                                        font.weight: Font.Medium
+                                    }
                                 }
                             }
-                            MouseArea {
-                                id: saveCoverHov
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                enabled: library.hasCurrent && library.currentCover !== ""
-                                onClicked: saveCoverDialog.open()
+
+                            Rectangle {
+                                id: saveCoverBtn
+                                readonly property bool btnActive: library.hasCurrent
+                                                              && (library.currentCover !== "" || tab.newCoverPath !== "")
+                                width: 42
+                                height: 32
+                                radius: 9
+                                color: (saveCoverHov.containsMouse && btnActive)
+                                    ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.22)
+                                    : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06)
+                                Behavior on color { ColorAnimation { duration: 180 } }
+                                opacity: btnActive ? 1.0 : 0.45
+
+                                MaterialIcon {
+                                    anchors.centerIn: parent
+                                    glyph: "\ue2c4"
+                                    iconSize: 16
+                                    iconColor: theme.onBackground
+                                }
+
+                                MouseArea {
+                                    id: saveCoverHov
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: saveCoverBtn.btnActive ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    enabled: saveCoverBtn.btnActive
+                                    onClicked: saveCoverDialog.open()
+                                }
+
+                                Rectangle {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.bottom: parent.top
+                                    anchors.bottomMargin: 6
+                                    width: saveCoverTipTxt.implicitWidth + 16
+                                    height: 24
+                                    radius: 8
+                                    color: theme.surface
+                                    border.color: theme.outline
+                                    border.width: 1
+                                    opacity: (saveCoverHov.containsMouse && saveCoverBtn.btnActive) ? 1 : 0
+                                    visible: opacity > 0
+                                    z: 9999
+                                    Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                                    Text {
+                                        id: saveCoverTipTxt
+                                        anchors.centerIn: parent
+                                        text: "Save cover to file"
+                                        color: theme.onSurface
+                                        font.pixelSize: 10
+                                        font.weight: Font.Medium
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                id: removeCoverBtn
+                                readonly property bool btnActive: library.hasCurrent
+                                                              && tab.newCoverPath === ""
+                                                              && (library.currentCover !== "" || tab.removeCoverRequested)
+                                readonly property bool confirming: tab.removeCoverRequested
+                                width: 42
+                                height: 32
+                                radius: 9
+                                color: (removeCoverHov.containsMouse && removeCoverBtn.btnActive)
+                                    ? (removeCoverBtn.confirming
+                                        ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.22)
+                                        : Qt.rgba(0.75, 0.22, 0.17, 0.85))
+                                    : (removeCoverBtn.confirming
+                                        ? Qt.rgba(0.75, 0.22, 0.17, 0.25)
+                                        : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06))
+                                Behavior on color { ColorAnimation { duration: 180 } }
+                                opacity: removeCoverBtn.btnActive ? 1.0 : 0.45
+
+                                MaterialIcon {
+                                    anchors.centerIn: parent
+                                    glyph: removeCoverBtn.confirming ? "\ue8f4" : "\ue92e"
+                                    iconSize: 16
+                                    iconColor: (removeCoverHov.containsMouse && removeCoverBtn.btnActive && !removeCoverBtn.confirming)
+                                               ? "white" : theme.onBackground
+                                    Behavior on iconColor { ColorAnimation { duration: 180 } }
+                                }
+
+                                MouseArea {
+                                    id: removeCoverHov
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: removeCoverBtn.btnActive ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    enabled: removeCoverBtn.btnActive
+                                    onClicked: {
+                                        tab.removeCoverRequested = !tab.removeCoverRequested
+                                        if (tab.removeCoverRequested) tab.newCoverPath = ""
+                                    }
+                                }
+
+                                Rectangle {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.bottom: parent.top
+                                    anchors.bottomMargin: 6
+                                    width: removeCoverTipTxt.implicitWidth + 16
+                                    height: 24
+                                    radius: 8
+                                    color: theme.surface
+                                    border.color: theme.outline
+                                    border.width: 1
+                                    opacity: (removeCoverHov.containsMouse && removeCoverBtn.btnActive) ? 1 : 0
+                                    visible: opacity > 0
+                                    z: 9999
+                                    Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                                    Text {
+                                        id: removeCoverTipTxt
+                                        anchors.centerIn: parent
+                                        text: removeCoverBtn.confirming
+                                              ? "Click again to cancel"
+                                              : "Remove cover"
+                                        color: theme.onSurface
+                                        font.pixelSize: 10
+                                        font.weight: Font.Medium
+                                    }
+                                }
                             }
                         }
                     }

@@ -55,8 +55,6 @@ void TrackModel::setTracks(const QList<Track> &tracks) {
 }
 
 void TrackModel::setTracksAnimated(const QList<Track> &newTracks) {
-    // Fallback на reset при большой разнице — иначе Qt Quick наслаивает
-    // delegates при множественных begin/endMoveRows подряд.
     int commonPrefix = 0;
     const int minSize = qMin(m_tracks.size(), newTracks.size());
     while (commonPrefix < minSize
@@ -160,6 +158,19 @@ void TrackModel::updateTrack(int index, const Track &t) {
     m_tracks[index] = t;
     const QModelIndex idx = createIndex(index, 0);
     emit dataChanged(idx, idx);
+}
+
+bool TrackModel::removeByPath(const QString &path) {
+    for (int i = 0; i < m_tracks.size(); ++i) {
+        if (m_tracks[i].path == path) {
+            beginRemoveRows(QModelIndex(), i, i);
+            m_tracks.removeAt(i);
+            endRemoveRows();
+            emit countChanged();
+            return true;
+        }
+    }
+    return false;
 }
 
 void TrackModel::clear() {

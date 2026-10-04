@@ -4,6 +4,7 @@
 #include <QString>
 #include <QStringList>
 #include <QHash>
+#include <QSet>
 #include <QMediaPlayer>
 #include <QAudioOutput>
 #include "TrackModel.h"
@@ -50,6 +51,9 @@ class Library : public QObject {
     Q_PROPERTY(bool        reorderMode   READ reorderMode   NOTIFY reorderModeChanged)
     Q_PROPERTY(int         coverVersion  READ coverVersion  NOTIFY coverVersionChanged)
     Q_PROPERTY(int         offsetRevision READ offsetRevision NOTIFY offsetRevisionChanged)
+    Q_PROPERTY(int         likedCount    READ likedCount    NOTIFY likedChanged)
+    Q_PROPERTY(int         likedRevision READ likedRevision NOTIFY likedChanged)
+    Q_PROPERTY(bool        showOnlyLiked READ showOnlyLiked WRITE setShowOnlyLiked NOTIFY showOnlyLikedChanged)
 
 public:
     explicit Library(QObject *parent = nullptr);
@@ -95,6 +99,10 @@ public:
     bool reorderMode() const { return m_reorderMode; }
     int coverVersion() const { return m_coverVersion; }
     int offsetRevision() const { return m_offsetRevision; }
+    int likedCount() const { return m_likedPaths.size(); }
+    int likedRevision() const { return m_likedRevision; }
+    bool showOnlyLiked() const { return m_showOnlyLiked; }
+    void setShowOnlyLiked(bool v);
 
     bool discordRpcEnabled() const;
     void setDiscordRpcEnabled(bool v);
@@ -124,11 +132,16 @@ public:
                                   const QString &artist,
                                   const QString &album,
                                   const QString &coverSourcePath);
+    Q_INVOKABLE bool removeCurrentCover();
     Q_INVOKABLE bool saveCoverTo(const QString &destPath);
     Q_INVOKABLE QString loadTrackText(int index, bool preferLrc);
     Q_INVOKABLE bool saveTrackText(int index, const QString &content, bool isLrc);
     Q_INVOKABLE double getLrcOffset(int index) const;
     Q_INVOKABLE void setLrcOffset(int index, double value);
+    Q_INVOKABLE bool isLiked(int index) const;
+    Q_INVOKABLE bool isCurrentLiked() const;
+    Q_INVOKABLE void toggleLike(int index);
+    Q_INVOKABLE void toggleCurrentLike();
     void setVolume(int v);
 
     Q_INVOKABLE QString formatDuration(qint64 ms) const;
@@ -156,10 +169,13 @@ signals:
     void reorderModeChanged();
     void coverVersionChanged();
     void offsetRevisionChanged();
+    void likedChanged();
+    void showOnlyLikedChanged();
 
 private slots:
     void flushPresence();
     void flushOffsetSave();
+    void flushLikedSave();
 
 private:
     QString coverCacheDir() const;
@@ -172,9 +188,13 @@ private:
     QString offsetsPath() const;
     void    loadOffsets();
     void    saveOffsets();
+    QString likedPath() const;
+    void    loadLiked();
+    void    saveLiked();
     void    extractImages(const QString &filePath, QString &coverOut, QString &thumbOut) const;
-    void    sortAndApply();
+    void    sortAndApply(bool animate = true);
     void    loadPlaylistOrder();
+    void    savePlaylistOrderNow();
     QString playlistOrderPath() const;
     void    rebuildArtists();
     void    rebuildSearch();
@@ -192,6 +212,7 @@ private:
     DiscordRPC   *m_rpc = nullptr;
     QTimer       *m_presenceTimer = nullptr;
     QTimer       *m_offsetSaveTimer = nullptr;
+    QTimer       *m_likedSaveTimer = nullptr;
 
     QString m_sortField = "path";
     bool    m_sortAscending = true;
@@ -209,4 +230,7 @@ private:
     int     m_coverVersion = 0;
     int     m_offsetRevision = 0;
     QHash<QString, double> m_lrcOffsets;
+    QSet<QString> m_likedPaths;
+    int     m_likedRevision = 0;
+    bool    m_showOnlyLiked = false;
 };
