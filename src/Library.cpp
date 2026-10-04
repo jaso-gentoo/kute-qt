@@ -14,6 +14,7 @@
 #include <QSet>
 #include <QDateTime>
 #include <QSysInfo>
+#include <QThread>
 #include <QTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -1205,23 +1206,43 @@ bool Library::removeCurrentCover() {
     if (m_currentTrack.path.isEmpty()) return false;
     const QString path = m_currentTrack.path;
 
+    // Стоп плеер, чтобы отпустил файл
+    const bool wasPlaying = isPlaying();
+    const qint64 savedPos = m_player->position();
+    m_player->stop();
+    m_player->setSource(QUrl());
+    m_intentPlaying = false;
+    QThread::msleep(200);
+
     bool ok = false;
     {
         StderrSilencer silencer;
         TagLib::FileRef fr = makeFileRef(path);
-        if (fr.isNull() || !fr.file()) return false;
+        if (fr.isNull() || !fr.file()) {
+            qWarning() << "removeCurrentCover: can't open" << path;
+        } else {
+            TagLib::File *file = fr.file();
 
-        TagLib::File *file = fr.file();
-
-        if (auto *mpeg = dynamic_cast<TagLib::MPEG::File*>(file)) {
-            if (auto *tag = mpeg->ID3v2Tag()) {
-                tag->removeFrames("APIC");
-                ok = mpeg->save();
+            if (auto *mpeg = dynamic_cast<TagLib::MPEG::File*>(file)) {
+                if (auto *tag = mpeg->ID3v2Tag()) {
+                    tag->removeFrames("APIC");
+                    ok = mpeg->save();
+                    qWarning() << "removeCurrentCover: mpeg->save() =" << ok;
+                }
+            } else if (auto *flac = dynamic_cast<TagLib::FLAC::File*>(file)) {
+                flac->removePictures();
+                ok = flac->save();
+                qWarning() << "removeCurrentCover: flac->save() =" << ok;
             }
-        } else if (auto *flac = dynamic_cast<TagLib::FLAC::File*>(file)) {
-            flac->removePictures();
-            ok = flac->save();
         }
+    }
+
+    // Возобновить плеер
+    m_player->setSource(QUrl::fromLocalFile(path));
+    m_player->setPosition(savedPos);
+    if (wasPlaying) {
+        m_player->play();
+        m_intentPlaying = true;
     }
 
     if (!ok) return false;
@@ -1266,35 +1287,59 @@ bool Library::saveCoverTo(const QString &destPath) {
     if (local.startsWith("file://")) local = QUrl(local).toLocalFile();
     if (local.isEmpty()) return false;
 
+    // Стоп плеер, чтобы отпустил файл
+    const bool wasPlaying = isPlaying();
+    const qint64 savedPos = m_player->position();
+    m_player->stop();
+    m_player->setSource(QUrl());
+    m_intentPlaying = false;
+    QThread::msleep(200);
+
     QByteArray data;
     {
         StderrSilencer silencer;
         TagLib::FileRef f = makeFileRef(m_currentTrack.path);
-        if (f.isNull() || !f.file()) return false;
-        TagLib::File *file = f.file();
+        if (!f.isNull() && f.file()) {
+            TagLib::File *file = f.file();
 
-        if (auto *mpeg = dynamic_cast<TagLib::MPEG::File*>(file)) {
-            if (auto *tag = mpeg->ID3v2Tag()) {
-                const auto list = tag->frameList("APIC");
-                if (!list.isEmpty()) {
-                    if (auto *pic = dynamic_cast<TagLib::ID3v2::AttachedPictureFrame*>(list.front()))
-                        data = QByteArray(pic->picture().data(), pic->picture().size());
+            if (auto *mpeg = dynamic_cast<TagLib::MPEG::File*>(file)) {
+                if (auto *tag = mpeg->ID3v2Tag()) {
+                    const auto list = tag->frameList("APIC");
+                    if (!list.isEmpty()) {
+                        if (auto *pic = dynamic_cast<TagLib::ID3v2::AttachedPictureFrame*>(list.front()))
+                            data = QByteArray(pic->picture().data(), pic->picture().size());
+                    }
                 }
-            }
-        } else if (auto *flac = dynamic_cast<TagLib::FLAC::File*>(file)) {
-            const auto pics = flac->pictureList();
-            if (!pics.isEmpty()) {
-                const auto *pic = pics.front();
-                data = QByteArray(pic->data().data(), pic->data().size());
+            } else if (auto *flac = dynamic_cast<TagLib::FLAC::File*>(file)) {
+                const auto pics = flac->pictureList();
+                if (!pics.isEmpty()) {
+                    const auto *pic = pics.front();
+                    data = QByteArray(pic->data().data(), pic->data().size());
+                }
             }
         }
     }
 
-    if (data.isEmpty()) return false;
+    // Возобновить плеер
+    m_player->setSource(QUrl::fromLocalFile(m_currentTrack.path));
+    m_player->setPosition(savedPos);
+    if (wasPlaying) {
+        m_player->play();
+        m_intentPlaying = true;
+    }
+
+    if (data.isEmpty()) {
+        qWarning() << "saveCoverTo: no cover data in file";
+        return false;
+    }
+
     if (QFile::exists(local)) QFile::remove(local);
 
     QFile out(local);
-    if (!out.open(QIODevice::WriteOnly)) return false;
+    if (!out.open(QIODevice::WriteOnly)) {
+        qWarning() << "saveCoverTo: can't write to" << local;
+        return false;
+    }
     out.write(data);
     return true;
 }
@@ -1358,56 +1403,96 @@ QString Library::readTextFromTags(const QString &path) const {
 }
 
 bool Library::writeTextToTags(const QString &path, const QString &content) {
-    StderrSilencer silencer;
-    TagLib::FileRef fr = makeFileRef(path);
-    if (fr.isNull() || !fr.file()) {
-        qWarning() << "writeTextToTags: can't open" << path;
-        return false;
+    qWarning() << "writeTextToTags: path=" << path << "len=" << content.length();
+
+    // Останавливаем плеер, если это текущий трек — иначе Windows блокирует файл
+    const bool isCurrentTrack = (path == m_currentTrack.path);
+    const bool wasPlaying = isCurrentTrack && isPlaying();
+    const qint64 savedPos = isCurrentTrack ? m_player->position() : 0;
+
+    if (isCurrentTrack) {
+        qWarning() << "writeTextToTags: stopping player to release file lock";
+        m_player->stop();
+        m_player->setSource(QUrl());
+        m_intentPlaying = false;
+        QThread::msleep(200);
     }
 
-    TagLib::File *file = fr.file();
-
-    if (auto *mpeg = dynamic_cast<TagLib::MPEG::File*>(file)) {
-        TagLib::ID3v2::Tag *tag = mpeg->ID3v2Tag(true);
-
-        tag->removeFrames("USLT");
-        tag->removeFrames("TXXX");
-
-        if (!content.trimmed().isEmpty()) {
-            auto *frame = new TagLib::ID3v2::UnsynchronizedLyricsFrame;
-            frame->setLanguage("eng");
-            frame->setDescription("");
-            frame->setText(toTaglib(content));
-            tag->addFrame(frame);
-            qWarning() << "writeTextToTags: added USLT frame, len =" << content.length();
-        }
-
-        const bool ok = mpeg->save();
-        qWarning() << "writeTextToTags: mpeg->save() =" << ok;
-        return ok;
-    } else if (auto *flac = dynamic_cast<TagLib::FLAC::File*>(file)) {
-        if (!flac->xiphComment()) return false;
-
-        auto *xc = flac->xiphComment();
-        xc->removeFields("LYRICS");
-        xc->removeFields("UNSYNCEDLYRICS");
-        xc->removeFields("TEXT");
-
-        if (!content.trimmed().isEmpty()) {
-            xc->addField("LYRICS", toTaglib(content), true);
-        }
-
-        return flac->save();
-    } else {
-        TagLib::Tag *tag = file->tag();
-        if (!tag) return false;
-        if (content.trimmed().isEmpty()) {
-            tag->setComment("");
+    bool ok = false;
+    {
+        StderrSilencer silencer;
+        TagLib::FileRef fr = makeFileRef(path);
+        if (fr.isNull() || !fr.file()) {
+            qWarning() << "writeTextToTags: can't open file";
         } else {
-            tag->setComment(toTaglib(content));
+            TagLib::File *file = fr.file();
+
+            if (auto *mpeg = dynamic_cast<TagLib::MPEG::File*>(file)) {
+                TagLib::ID3v2::Tag *tag = mpeg->ID3v2Tag(true);
+                if (!tag) {
+                    qWarning() << "writeTextToTags: failed to create ID3v2 tag";
+                } else {
+                    tag->removeFrames("USLT");
+                    tag->removeFrames("TXXX");
+
+                    if (!content.trimmed().isEmpty()) {
+                        auto *frame = new TagLib::ID3v2::UnsynchronizedLyricsFrame;
+                        frame->setLanguage("eng");
+                        frame->setDescription("");
+                        frame->setText(toTaglib(content));
+                        tag->addFrame(frame);
+                        qWarning() << "writeTextToTags: added USLT frame";
+                    }
+
+                    ok = mpeg->save();
+                    qWarning() << "writeTextToTags: mpeg->save() =" << ok;
+                }
+            } else if (auto *flac = dynamic_cast<TagLib::FLAC::File*>(file)) {
+                if (!flac->xiphComment()) {
+                    qWarning() << "writeTextToTags: no xiph comment";
+                } else {
+                    auto *xc = flac->xiphComment();
+                    xc->removeFields("LYRICS");
+                    xc->removeFields("UNSYNCEDLYRICS");
+                    xc->removeFields("TEXT");
+
+                    if (!content.trimmed().isEmpty()) {
+                        xc->addField("LYRICS", toTaglib(content), true);
+                    }
+
+                    ok = flac->save();
+                    qWarning() << "writeTextToTags: flac->save() =" << ok;
+                }
+            } else {
+                TagLib::Tag *tag = file->tag();
+                if (!tag) {
+                    qWarning() << "writeTextToTags: no generic tag";
+                } else {
+                    if (content.trimmed().isEmpty()) {
+                        tag->setComment("");
+                    } else {
+                        tag->setComment(toTaglib(content));
+                    }
+                    ok = file->save();
+                    qWarning() << "writeTextToTags: file->save() =" << ok;
+                }
+            }
         }
-        return file->save();
     }
+
+    // Возобновляем воспроизведение
+    if (isCurrentTrack) {
+        qWarning() << "writeTextToTags: restoring player";
+        m_player->setSource(QUrl::fromLocalFile(path));
+        m_player->setPosition(savedPos);
+        if (wasPlaying) {
+            m_player->play();
+            m_intentPlaying = true;
+            schedulePresence();
+        }
+    }
+
+    return ok;
 }
 
 QString Library::loadTrackText(int index, bool preferLrc) {
