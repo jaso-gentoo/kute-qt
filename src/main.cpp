@@ -34,12 +34,13 @@ static QByteArray selfPath() {
 }
 
 static void reexecWithEnv(char *argv[]) {
+    setenv("QT_LOGGING_RULES", "qt.multimedia.*=false;qt.quick.*=false", 1);
+    setenv("AV_LOG_FORCE_NOCOLOR", "1", 1);
     if (qEnvironmentVariableIsSet("KUTE_ENV_READY")) return;
 
     setenv("MALLOC_ARENA_MAX", "2", 1);
     setenv("QSG_USE_IMAGE_CACHE", "0", 1);
     setenv("QSG_RENDER_LOOP", "threaded", 1);
-    //setenv("QT_QUICK_BACKEND", "software", 1);
 
     if (!qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) {
         setenv("QT_QPA_PLATFORM", "wayland;xcb", 1);
@@ -205,7 +206,6 @@ int main(int argc, char *argv[]) {
     {
         QFile f(logPath());
         if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            // ok
         }
         f.close();
     }
@@ -272,6 +272,13 @@ int main(int argc, char *argv[]) {
         }
 
         QObject *root = engine.rootObjects().first();
+
+        if (auto *win = qobject_cast<QQuickWindow*>(root)) {
+            win->setPersistentGraphics(false);
+            win->setPersistentSceneGraph(false);
+            emitLog(QtInfoMsg, "persistent graphics disabled");
+        }
+
         emitLog(QtInfoMsg, "installing GlobalHotkeys");
         GlobalHotkeys *hk = new GlobalHotkeys(root, &app);
         app.installEventFilter(hk);

@@ -66,7 +66,6 @@ Item {
                 HoverHandler { cursorShape: Qt.IBeamCursor }
             }
 
-            // === Crossfade Esc ↔ Clear ===
             Item {
                 Layout.preferredWidth: 30
                 Layout.preferredHeight: 22

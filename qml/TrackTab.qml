@@ -311,15 +311,24 @@ FocusScope {
                             }
                             Image {
                                 id: coverPreview
+
+                                readonly property real dpr: Screen.devicePixelRatio > 0
+                                                                ? Screen.devicePixelRatio : 1
+                                readonly property int decodeSize: Math.ceil(140 * dpr)
+
                                 anchors.fill: parent
                                 source: {
                                     if (tab.newCoverPath !== "") return library.toFileUrl(tab.newCoverPath)
                                     if (library.currentCover !== "") return library.toFileUrl(library.currentCover) + "?v=" + library.coverVersion
                                     return ""
                                 }
-                                sourceSize.width: 280; sourceSize.height: 280
+                                sourceSize.width: decodeSize
+                                sourceSize.height: decodeSize
                                 fillMode: Image.PreserveAspectCrop
-                                asynchronous: true; cache: false; smooth: true
+                                asynchronous: true
+                                cache: true
+                                smooth: true
+                                mipmap: true
                                 visible: false
                             }
                             Item {

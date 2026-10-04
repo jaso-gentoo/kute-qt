@@ -1,5 +1,6 @@
 #include "TrackModel.h"
 #include <QSet>
+#include <QHash>
 
 TrackModel::TrackModel(QObject *parent) : QAbstractListModel(parent) {}
 
@@ -79,21 +80,27 @@ void TrackModel::setTracksAnimated(const QList<Track> &newTracks) {
         }
     }
 
+    QHash<QString, int> posByPath;
+    posByPath.reserve(m_tracks.size());
+    for (int j = 0; j < m_tracks.size(); ++j)
+        posByPath.insert(m_tracks[j].path, j);
+
     for (int i = 0; i < newTracks.size(); ++i) {
         const Track &nt = newTracks[i];
-        int curIdx = -1;
-        for (int j = i; j < m_tracks.size(); ++j) {
-            if (m_tracks[j].path == nt.path) { curIdx = j; break; }
-        }
+        const int curIdx = posByPath.value(nt.path, -1);
 
         if (curIdx < 0) {
             beginInsertRows(QModelIndex(), i, i);
             m_tracks.insert(i, nt);
             endInsertRows();
+            for (int j = i + 1; j < m_tracks.size(); ++j)
+                posByPath.insert(m_tracks[j].path, j);
         } else if (curIdx > i) {
             beginMoveRows(QModelIndex(), curIdx, curIdx, QModelIndex(), i);
             m_tracks.move(curIdx, i);
             endMoveRows();
+            for (int j = i; j <= curIdx; ++j)
+                posByPath.insert(m_tracks[j].path, j);
         } else {
             m_tracks[i] = nt;
             QModelIndex idx = createIndex(i, 0);
@@ -106,6 +113,7 @@ void TrackModel::setTracksAnimated(const QList<Track> &newTracks) {
 
 void TrackModel::updateFiltered(const QList<Track> &newTracks) {
     QSet<QString> newPaths;
+    newPaths.reserve(newTracks.size());
     for (const auto &t : newTracks) newPaths.insert(t.path);
 
     for (int i = m_tracks.size() - 1; i >= 0; --i) {
@@ -116,26 +124,27 @@ void TrackModel::updateFiltered(const QList<Track> &newTracks) {
         }
     }
 
-    QSet<QString> curPaths;
-    for (const auto &t : m_tracks) curPaths.insert(t.path);
+    QHash<QString, int> posByPath;
+    posByPath.reserve(m_tracks.size());
+    for (int j = 0; j < m_tracks.size(); ++j)
+        posByPath.insert(m_tracks[j].path, j);
 
     for (int i = 0; i < newTracks.size(); ++i) {
         const Track &nt = newTracks[i];
-        if (!curPaths.contains(nt.path)) {
+        const int curIdx = posByPath.value(nt.path, -1);
+
+        if (curIdx < 0) {
             beginInsertRows(QModelIndex(), i, i);
             m_tracks.insert(i, nt);
             endInsertRows();
-            curPaths.insert(nt.path);
-        } else {
-            int curIdx = -1;
-            for (int j = i; j < m_tracks.size(); ++j) {
-                if (m_tracks[j].path == nt.path) { curIdx = j; break; }
-            }
-            if (curIdx > i) {
-                beginMoveRows(QModelIndex(), curIdx, curIdx, QModelIndex(), i);
-                m_tracks.move(curIdx, i);
-                endMoveRows();
-            }
+            for (int j = i + 1; j < m_tracks.size(); ++j)
+                posByPath.insert(m_tracks[j].path, j);
+        } else if (curIdx > i) {
+            beginMoveRows(QModelIndex(), curIdx, curIdx, QModelIndex(), i);
+            m_tracks.move(curIdx, i);
+            endMoveRows();
+            for (int j = i; j <= curIdx; ++j)
+                posByPath.insert(m_tracks[j].path, j);
         }
     }
 

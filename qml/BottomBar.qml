@@ -94,14 +94,20 @@ Rectangle {
 
                 Image {
                     id: coverImg
+
+                    readonly property real dpr: Screen.devicePixelRatio > 0
+                                                    ? Screen.devicePixelRatio : 1
+                    readonly property int decodeSize: Math.ceil(46 * dpr)
+
                     anchors.fill: parent
                     source: bar.sCover ? library.toFileUrl(bar.sCover) + "?v=" + library.coverVersion : ""
-                    sourceSize.width: 92
-                    sourceSize.height: 92
+                    sourceSize.width: decodeSize
+                    sourceSize.height: decodeSize
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
-                    cache: false
+                    cache: true
                     smooth: true
+                    mipmap: true
                     visible: false
                 }
 

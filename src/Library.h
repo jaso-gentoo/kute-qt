@@ -7,10 +7,10 @@
 #include <QSet>
 #include <QMediaPlayer>
 #include <QAudioOutput>
+#include <QSettings>
+#include <QTimer>
 #include "TrackModel.h"
 #include "DiscordRPC.h"
-
-class QTimer;
 
 class Library : public QObject {
     Q_OBJECT
@@ -183,24 +183,27 @@ private:
     QString thumbCacheDir() const;
     QString lyricsDir() const;
     QString lyricsPath(const Track &t, bool lrc) const;
-    QString safeName(const QString &s) const;
     QString readTextFromTags(const QString &path) const;
     bool    writeTextToTags(const QString &path, const QString &content);
     QString offsetsPath() const;
+    QString likedPath() const;
+    QString playlistOrderPath() const;
+
     void    loadOffsets();
     void    saveOffsets();
-    QString likedPath() const;
     void    loadLiked();
     void    saveLiked();
-    void    extractImages(const QString &filePath, QString &coverOut, QString &thumbOut) const;
-    void    sortAndApply(bool animate = true);
     void    loadPlaylistOrder();
     void    savePlaylistOrderNow();
-    QString playlistOrderPath() const;
+
+    void    extractImages(const QString &filePath, QString &coverOut, QString &thumbOut) const;
+    void    sortAndApply(bool animate = true);
     void    rebuildArtists();
     void    rebuildSearch();
     void    startTrack(const Track &t);
     void    schedulePresence();
+
+    void    restorePlayer(const QString &path, qint64 savedPos, bool wasPlaying);
 
     TrackModel    m_tracks;
     TrackModel    m_searchResults;
@@ -211,6 +214,7 @@ private:
     QMediaPlayer *m_player = nullptr;
     QAudioOutput *m_audioOutput = nullptr;
     DiscordRPC   *m_rpc = nullptr;
+    QSettings    *m_settings = nullptr;
     QTimer       *m_presenceTimer = nullptr;
     QTimer       *m_offsetSaveTimer = nullptr;
     QTimer       *m_likedSaveTimer = nullptr;

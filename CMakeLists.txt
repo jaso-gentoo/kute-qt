@@ -54,6 +54,9 @@ set(SOURCES
     src/ThemeManager.cpp
     src/TrackModel.cpp
     src/Library.cpp
+    src/LibraryPlayback.cpp
+    src/LibraryFiles.cpp
+    src/LibrarySort.cpp
     src/DiscordRPC.cpp
 )
 if(UNIX AND NOT APPLE)
@@ -61,6 +64,7 @@ if(UNIX AND NOT APPLE)
 endif()
 
 qt_add_executable(kute ${SOURCES})
+
 if(NOT DEFINED KUTE_VERSION_STRING)
     set(KUTE_VERSION_STRING "v9999")
 endif()
@@ -93,6 +97,8 @@ qt_add_resources(kute "fonts"
     FILES
         resources/fonts/MaterialSymbolsRounded.ttf
 )
+
+target_include_directories(kute PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 target_link_libraries(kute PRIVATE
     Qt6::Core

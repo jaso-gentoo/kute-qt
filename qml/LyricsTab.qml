@@ -80,11 +80,19 @@ FocusScope {
         offsetField.text = v.toFixed(2)
     }
 
+    // Throttled LRC line update — runs only while tab is visible, in LRC mode,
+    // and player is playing. 200ms is far below the typical line duration, so
+    // visually identical, but CPU load drops from ~10 Hz to 5 Hz.
+    Timer {
+        id: lrcUpdateTimer
+        interval: 200
+        repeat: true
+        running: tab.isActive && tab.isLrcMode && library.isPlaying
+        onTriggered: tab.updateActive()
+    }
+
     Connections {
         target: library
-        function onPositionChanged() {
-            if (tab.isActive && tab.isLrcMode) tab.updateActive()
-        }
         function onCurrentChanged() { if (tab.isActive) tab.refresh() }
     }
 

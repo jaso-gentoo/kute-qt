@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Effects
 import QtQuick.Layouts
+import QtQuick.Window
 
 Item {
     id: panel
@@ -185,14 +186,21 @@ Item {
 
                 Image {
                     id: coverSrc
+                    readonly property real dpr: Screen.devicePixelRatio > 0
+                                                    ? Screen.devicePixelRatio : 1
+                    readonly property int decodeSize: Math.ceil(220 * dpr)
+
                     anchors.fill: parent
-                    source: library.currentCover ? library.toFileUrl(library.currentCover) + "?v=" + library.coverVersion : ""
-                    sourceSize.width: 300
-                    sourceSize.height: 300
+                    source: library.currentCover
+                                ? library.toFileUrl(library.currentCover) + "?v=" + library.coverVersion
+                                : ""
+                    sourceSize.width: decodeSize
+                    sourceSize.height: decodeSize
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
-                    cache: false
+                    cache: true
                     smooth: true
+                    mipmap: true
                     visible: false
                 }
 
