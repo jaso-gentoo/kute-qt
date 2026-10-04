@@ -29,7 +29,7 @@ jobs:
             libtag1-dev libgl1-mesa-dev \
             libwayland-dev libxkbcommon-dev \
             cmake ninja-build patchelf desktop-file-utils \
-            libfuse2 wget curl file
+            libfuse2 wget curl file imagemagick
 
       - name: Configure
         run: |
@@ -43,6 +43,18 @@ jobs:
 
       - name: Install to AppDir
         run: DESTDIR=$PWD/AppDir cmake --install build
+
+      - name: Generate PNG icon from JPG
+        run: |
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          if [ -f packaging/kute.png ]; then
+            cp packaging/kute.png AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+          elif [ -f packaging/kute.jpg ]; then
+            convert packaging/kute.jpg -resize 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+          elif [ -f packaging/kute.jpeg ]; then
+            convert packaging/kute.jpeg -resize 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+          fi
+          ls -la AppDir/usr/share/icons/hicolor/256x256/apps/
 
       - name: Download linuxdeploy
         run: |
@@ -195,9 +207,6 @@ jobs:
           rm -f dist/Qt6Widgets*.dll dist/Qt6Sql*.dll dist/Qt6Test*.dll
           rm -f dist/Qt6Concurrent*.dll dist/Qt6PrintSupport*.dll dist/Qt6Designer*.dll
 
-          echo "=== dll count ==="
-          ls dist/*.dll | wc -l
-
       - name: Copy QML modules
         run: |
           QML_SRC=""
@@ -206,7 +215,6 @@ jobs:
           done
           if [ -z "$QML_SRC" ]; then echo "ERROR: QML not found"; exit 1; fi
 
-          echo "Using: $QML_SRC"
           rm -rf dist/qml
           mkdir -p dist/qml
           cp -rL "$QML_SRC"/* dist/qml/ 2>&1 | head -5 || true
@@ -230,9 +238,6 @@ jobs:
             fi
           done
 
-          echo "=== multimedia plugin folder ==="
-          ls -la dist/multimedia/
-
       - name: Copy multimedia deps next to plugin
         run: |
           mkdir -p dist/multimedia
@@ -253,7 +258,6 @@ jobs:
             'Plugins=./' \
             'Qml2Imports=./qml' \
             > dist/qt.conf
-          cat dist/qt.conf
 
       - name: Copy OpenSSL legacy
         run: |
@@ -275,7 +279,6 @@ jobs:
             'OutFile "kute-windows-x86_64.exe"' \
             'InstallDir "$TEMP\kute"' \
             'Icon "packaging\kute.ico"' \
-            'UninstallIcon "packaging\kute.ico"' \
             '' \
             'Section' \
             'InitPluginsDir' \
