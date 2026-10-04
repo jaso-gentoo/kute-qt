@@ -154,9 +154,6 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-declarative
             mingw-w64-ucrt-x86_64-qt6-tools
             mingw-w64-ucrt-x86_64-taglib
-            mingw-w64-ucrt-x86_64-qt6-quickdialogs
-            mingw-w64-ucrt-x86_64-qt6-quicklayouts
-            mingw-w64-ucrt-x86_64-qt6-quickcontrols2
             mingw-w64-ucrt-x86_64-qt6-shadertools
             mingw-w64-ucrt-x86_64-qt6-svg
             mingw-w64-ucrt-x86_64-qt6-imageformats
