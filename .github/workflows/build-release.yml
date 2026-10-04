@@ -50,11 +50,20 @@ jobs:
           if [ -f packaging/kute.png ]; then
             cp packaging/kute.png AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
           elif [ -f packaging/kute.jpg ]; then
-            convert packaging/kute.jpg -resize 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+            convert packaging/kute.jpg \
+              -resize 256x256^ \
+              -gravity center \
+              -extent 256x256 \
+              AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
           elif [ -f packaging/kute.jpeg ]; then
-            convert packaging/kute.jpeg -resize 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+            convert packaging/kute.jpeg \
+              -resize 256x256^ \
+              -gravity center \
+              -extent 256x256 \
+              AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
           fi
           ls -la AppDir/usr/share/icons/hicolor/256x256/apps/
+          file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
 
       - name: Download linuxdeploy
         run: |
@@ -177,10 +186,20 @@ jobs:
       - name: Generate .ico from logo
         run: |
           mkdir -p packaging
+          IMG=""
+          if [ -f packaging/kute.jpg ]; then IMG="packaging/kute.jpg"; fi
+          if [ -f packaging/kute.jpeg ]; then IMG="packaging/kute.jpeg"; fi
+          if [ -f packaging/kute.png ]; then IMG="packaging/kute.png"; fi
+
+          if [ -z "$IMG" ]; then
+            echo "no source image found"
+            exit 0
+          fi
+
           if command -v magick &> /dev/null; then
-            magick packaging/kute.jpg -define icon:auto-resize=256,128,64,48,32,16 packaging/kute.ico
+            magick "$IMG" -resize 256x256^ -gravity center -extent 256x256 -define icon:auto-resize=256,128,64,48,32,16 packaging/kute.ico
           elif command -v convert &> /dev/null; then
-            convert packaging/kute.jpg -define icon:auto-resize=256,128,64,48,32,16 packaging/kute.ico
+            convert "$IMG" -resize 256x256^ -gravity center -extent 256x256 -define icon:auto-resize=256,128,64,48,32,16 packaging/kute.ico
           fi
           ls -la packaging/kute.ico 2>/dev/null || echo "no ico — continuing"
 
