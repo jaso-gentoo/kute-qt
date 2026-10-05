@@ -33,11 +33,10 @@ Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: 4
 
-        // ===== Main pages =====
         Repeater {
             model: [
                 { ic: "\ue88a", tip: "Home (Ctrl+1)",    page: 0 },
-                { ic: "\ue7fd", tip: "Artists (Ctrl+2)", page: 2 }
+                { ic: "\ue8ef", tip: "Browse (Ctrl+2)",  page: 2 }
             ]
 
             delegate: Item {
@@ -132,7 +131,6 @@ Rectangle {
             opacity: 0.3
         }
 
-        // ===== Now Playing =====
         Item {
             Layout.preferredWidth: 38
             Layout.preferredHeight: 38
@@ -201,7 +199,6 @@ Rectangle {
             }
         }
 
-        // ===== Search =====
         Item {
             Layout.preferredWidth: 38
             Layout.preferredHeight: 38
@@ -280,7 +277,6 @@ Rectangle {
             opacity: 0.3
         }
 
-        // ===== Settings =====
         Item {
             Layout.preferredWidth: 38
             Layout.preferredHeight: 38
@@ -359,7 +355,6 @@ Rectangle {
             opacity: 0.3
         }
 
-        // ===== Discord =====
         Item {
             Layout.preferredWidth: 38
             Layout.preferredHeight: 38

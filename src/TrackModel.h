@@ -3,6 +3,7 @@
 #include <QAbstractListModel>
 #include <QList>
 #include <QString>
+#include <QStringList>
 
 struct Track {
     QString path;
@@ -18,6 +19,13 @@ struct Track {
     int channels = 0;
     int year = 0;
     qint64 fileSize = 0;
+};
+
+struct Playlist {
+    QString id;
+    QString name;
+    QString cover;
+    QStringList tracks;
 };
 
 class TrackModel : public QAbstractListModel {
@@ -57,6 +65,11 @@ public:
     int count() const { return m_tracks.size(); }
     const Track *at(int i) const;
     Track *atMutable(int i);
+
+    Q_INVOKABLE QString pathAt(int index) const;
+    Q_INVOKABLE QString titleAt(int index) const;
+    Q_INVOKABLE QString artistAt(int index) const;
+    Q_INVOKABLE QString thumbAt(int index) const;
 
 signals:
     void countChanged();

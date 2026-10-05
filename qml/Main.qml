@@ -21,6 +21,14 @@ ApplicationWindow {
 
     readonly property bool anyModalOpen: settingsOpen
 
+    readonly property bool editAvailable: {
+        if (currentPage === 0)
+            return library.filterArtist === "" && library.filterAlbum === ""
+        if (currentPage === 2 && browseView.currentTab === 2)
+            return true
+        return false
+    }
+
     function closeFloatingSearch() {
         if (!floatingSearchOpen && library.filterText === "") return
         floatingSearchOpen = false
@@ -80,24 +88,51 @@ ApplicationWindow {
 
     function togglePlayPause()    { library.togglePlayPause() }
     function openFolderDialog()   { folderDialog.open() }
-    function toggleReorder()      { library.toggleReorderMode() }
     function toggleInfoPanel()    { library.infoPanelVisible = !library.infoPanelVisible }
     function toggleCurrentLike()  { library.toggleCurrentLike() }
+
+    function toggleReorder() {
+        if (currentPage === 2 && browseView.currentTab !== 2) return
+        if (currentPage !== 0 && currentPage !== 2) return
+        if (currentPage === 0) {
+            if (library.filterArtist !== "" || library.filterAlbum !== "") return
+        }
+        library.toggleReorderMode()
+    }
+
+    function syncPlaybackContext() {
+        if (currentPage === 0) {
+            library.setPlaybackContext("library")
+        } else if (currentPage === 2) {
+            if (browseView.currentTab === 2 && browseView.playlistsViewing !== "") {
+                library.setPlaybackContext("playlist")
+            } else {
+                library.setPlaybackContext("library")
+            }
+        }
+        if (library.editMode && !window.editAvailable) {
+            library.toggleReorderMode()
+        }
+    }
 
     function goToHome() {
         library.clearFilter()
         closeFloatingSearch()
         if (playlistView) playlistView.closeSort()
+        library.setPlaybackContext("library")
         window.currentPage = 0
         navRail.currentIndex = 0
+        Qt.callLater(window.syncPlaybackContext)
     }
 
     function goToArtists() {
         library.clearFilter()
         closeFloatingSearch()
         if (playlistView) playlistView.closeSort()
+        library.setPlaybackContext("library")
         window.currentPage = 2
         navRail.currentIndex = 1
+        Qt.callLater(window.syncPlaybackContext)
     }
 
     function prevTrack() { library.prev() }
@@ -105,6 +140,18 @@ ApplicationWindow {
 
     function modalPrevSubTab() { if (settingsOpen) settingsModal.previousSubTab() }
     function modalNextSubTab() { if (settingsOpen) settingsModal.nextSubTab() }
+
+    Connections {
+        target: library
+        function onFilterArtistChanged() {
+            if (library.editMode && library.filterArtist !== "")
+                library.toggleReorderMode()
+        }
+        function onFilterAlbumChanged() {
+            if (library.editMode && library.filterAlbum !== "")
+                library.toggleReorderMode()
+        }
+    }
 
     FolderDialog {
         id: folderDialog
@@ -150,7 +197,8 @@ ApplicationWindow {
                 onTrackActivated: window.closeFloatingSearch()
             }
 
-            ArtistsView {
+            BrowseView {
+                id: browseView
                 anchors.fill: parent
                 visible: window.currentPage === 2
                 opacity: visible ? 1 : 0
@@ -165,6 +213,15 @@ ApplicationWindow {
                     navRail.currentIndex = 1
                     window.closeFloatingSearch()
                 }
+                onAlbumSelected: (name) => {
+                    library.clearFilter()
+                    library.setFilterAlbum(name)
+                    window.currentPage = 0
+                    navRail.currentIndex = 1
+                    window.closeFloatingSearch()
+                }
+                onBrowseActivated: window.closeFloatingSearch()
+                onContextChanged: Qt.callLater(window.syncPlaybackContext)
             }
         }
 
@@ -237,6 +294,43 @@ ApplicationWindow {
                 font.pixelSize: 10
                 font.letterSpacing: 1.0
             }
+
+            Rectangle {
+                id: editBadge
+                Layout.leftMargin: 10
+                Layout.preferredWidth: library.editMode ? editBadgeText.implicitWidth + 20 : 0
+                Layout.preferredHeight: 20
+                radius: 10
+                color: theme.primary
+                clip: true
+                opacity: library.editMode ? 0.20 : 0
+
+                Behavior on Layout.preferredWidth {
+                    NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
+                }
+                Behavior on opacity {
+                    NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
+                }
+
+                Text {
+                    id: editBadgeText
+                    anchors.centerIn: parent
+                    text: "EDIT MODE"
+                    color: theme.primary
+                    font.pixelSize: 9
+                    font.weight: Font.Bold
+                    font.letterSpacing: 1.2
+                    x: library.editMode ? 0 : 30
+                    opacity: library.editMode ? 1 : 0
+                    Behavior on x {
+                        NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
+                    }
+                    Behavior on opacity {
+                        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                    }
+                }
+            }
+
             Item { Layout.fillWidth: true }
 
             Repeater {
@@ -294,6 +388,7 @@ ApplicationWindow {
             window.closeFloatingSearch()
             if (playlistView) playlistView.closeSort()
             window.currentPage = page
+            Qt.callLater(window.syncPlaybackContext)
         }
     }
 
@@ -308,11 +403,19 @@ ApplicationWindow {
         sequence: "Escape"
         enabled: !window.anyModalOpen
               && !window.floatingSearchOpen
-              && library.filterArtist.length > 0
+              && (library.filterArtist.length > 0
+                  || library.filterAlbum.length > 0
+                  || (window.currentPage === 2
+                      && browseView.currentTab === 2
+                      && browseView.playlistsViewing !== ""))
         onActivated: {
-            library.clearFilter()
-            window.currentPage = 2
-            navRail.currentIndex = 1
+            if (library.filterArtist.length > 0 || library.filterAlbum.length > 0) {
+                library.clearFilter()
+                window.currentPage = 2
+                navRail.currentIndex = 1
+            } else {
+                browseView.closePlaylistDetail()
+            }
         }
     }
 

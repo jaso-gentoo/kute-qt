@@ -80,7 +80,7 @@ void Library::extractImages(const QString &filePath,
     }
 
     if (!QFile::exists(thumbPath)) {
-        const int sz = 80;
+        const int sz = 256;
         QImage t = src.scaled(sz, sz, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
         const int x = (t.width() - sz) / 2;
         const int y = (t.height() - sz) / 2;
@@ -93,7 +93,7 @@ void Library::extractImages(const QString &filePath,
         p.setRenderHint(QPainter::Antialiasing, true);
         p.setRenderHint(QPainter::SmoothPixmapTransform, true);
         QPainterPath path;
-        path.addRoundedRect(0, 0, sz, sz, 16, 16);
+        path.addRoundedRect(0, 0, sz, sz, 44, 44);
         p.setClipPath(path);
         p.drawImage(0, 0, t);
         p.end();
@@ -166,17 +166,21 @@ void Library::loadFolder(const QString &path) {
     m_currentTrack = Track();
     m_intentPlaying = false;
     m_filterArtist.clear();
+    m_filterAlbum.clear();
     m_filterText.clear();
     m_searchQuery.clear();
-    m_reorderMode = false;
+    m_editMode = false;
     m_customOrder.clear();
     m_showOnlyLiked = false;
 
     loadPlaylistOrder();
 
     rebuildArtists();
+    rebuildAlbums();
     sortAndApply(false);
     m_searchResults.clear();
+
+    if (!m_activePlaylistId.isEmpty()) rebuildPlaylistTracks();
 
     m_settings->setValue("library/folder", localPath);
 
@@ -184,9 +188,10 @@ void Library::loadFolder(const QString &path) {
     emit trackCountChanged();
     emit currentChanged();
     emit filterArtistChanged();
+    emit filterAlbumChanged();
     emit filterTextChanged();
     emit searchQueryChanged();
-    emit reorderModeChanged();
+    emit editModeChanged();
     emit showOnlyLikedChanged();
     schedulePresence();
 }
@@ -317,9 +322,12 @@ bool Library::saveMetadata(int index,
     m_tracks.updateTrack(index, updated);
     if (wasCurrent) m_currentTrack = updated;
 
+    if (!m_activePlaylistId.isEmpty()) rebuildPlaylistTracks();
+
     if (wasCurrent) restorePlayer(path, savedPos, wasPlaying);
 
     rebuildArtists();
+    rebuildAlbums();
     emit currentChanged();
 
     if (wantCover) {
@@ -390,6 +398,8 @@ bool Library::removeCurrentCover() {
 
     m_currentTrack.cover.clear();
     m_currentTrack.thumb.clear();
+
+    if (!m_activePlaylistId.isEmpty()) rebuildPlaylistTracks();
 
     m_coverVersion++;
     emit coverVersionChanged();

@@ -52,10 +52,21 @@ Library::Library(QObject *parent) : QObject(parent) {
     m_sortAscending = m_settings->value("library/sortAscending", true).toBool();
     m_infoPanelVisible = m_settings->value("ui/infoPanelVisible", true).toBool();
     m_repeatMode = m_settings->value("player/repeatMode", 0).toInt();
+    m_artistsAscending = m_settings->value("library/artistsAscending", true).toBool();
+    m_albumsAscending  = m_settings->value("library/albumsAscending", true).toBool();
 
     loadOffsets();
     loadLiked();
     loadPlaylistOrder();
+    m_playlistModel.setCoverResolver([this](const QString &id) {
+        return playlistCover(id);
+    });
+
+    m_playlistsProxy = new PlaylistFilterModel(this);
+    m_playlistsProxy->setSourceModel(&m_playlistModel);
+    m_playlistsProxy->setFilterRole(PlaylistModel::NameRole);
+
+    loadPlaylists();
 
     connect(m_player, &QMediaPlayer::positionChanged,
             this, [this](qint64) { emit positionChanged(); });

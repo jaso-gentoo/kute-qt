@@ -5,10 +5,12 @@
 #include <QFileInfo>
 #include <QFile>
 #include <QSet>
+#include <QMap>
 #include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QStandardPaths>
 #include <algorithm>
 
 void Library::loadOffsets() {
@@ -105,6 +107,11 @@ bool Library::isLiked(int index) const {
     const Track *t = m_tracks.at(index);
     if (!t) return false;
     return m_likedPaths.contains(t->path);
+}
+
+bool Library::isPathLiked(const QString &path) const {
+    if (path.isEmpty()) return false;
+    return m_likedPaths.contains(path);
 }
 
 bool Library::isCurrentLiked() const {
@@ -232,6 +239,7 @@ void Library::sortAndApply(bool animate) {
     for (const Track &t : m_allTracks) {
         if (m_showOnlyLiked && !m_likedPaths.contains(t.path)) continue;
         if (!m_filterArtist.isEmpty() && t.artist != m_filterArtist) continue;
+        if (!m_filterAlbum.isEmpty() && t.album != m_filterAlbum) continue;
         if (!q.isEmpty()) {
             if (!t.title.toLower().contains(q) &&
                 !t.artist.toLower().contains(q) &&
@@ -297,8 +305,55 @@ void Library::rebuildArtists() {
     }
     QStringList list = set.values();
     list.sort(Qt::CaseInsensitive);
+    if (!m_artistsAscending) std::reverse(list.begin(), list.end());
     m_artists = list;
     emit artistsChanged();
+}
+
+void Library::rebuildAlbums() {
+    QMap<QString, QString> covers;
+    QMap<QString, QString> thumbs;
+    QSet<QString> names;
+    const QString q = m_filterText.toLower().trimmed();
+    for (const Track &t : m_allTracks) {
+        if (t.album.isEmpty() || t.album == "Unknown Album") continue;
+        if (!q.isEmpty() && !t.album.toLower().contains(q)) continue;
+        names.insert(t.album);
+        if (!covers.contains(t.album) && !t.cover.isEmpty())
+            covers.insert(t.album, t.cover);
+        if (!thumbs.contains(t.album) && !t.thumb.isEmpty())
+            thumbs.insert(t.album, t.thumb);
+    }
+    QStringList sorted = names.values();
+    sorted.sort(Qt::CaseInsensitive);
+    if (!m_albumsAscending) std::reverse(sorted.begin(), sorted.end());
+
+    m_albums.clear();
+    m_albums.reserve(sorted.size());
+    for (const QString &name : sorted) {
+        QVariantMap m;
+        m["name"]  = name;
+        m["cover"] = covers.value(name, "");
+        m["thumb"] = thumbs.value(name, "");
+        m_albums.append(m);
+    }
+    emit albumsChanged();
+}
+
+void Library::setArtistsAscending(bool v) {
+    if (m_artistsAscending == v) return;
+    m_artistsAscending = v;
+    m_settings->setValue("library/artistsAscending", v);
+    emit artistsAscendingChanged();
+    rebuildArtists();
+}
+
+void Library::setAlbumsAscending(bool v) {
+    if (m_albumsAscending == v) return;
+    m_albumsAscending = v;
+    m_settings->setValue("library/albumsAscending", v);
+    emit albumsAscendingChanged();
+    rebuildAlbums();
 }
 
 void Library::rebuildSearch() {
@@ -345,11 +400,6 @@ void Library::rebuildSearch() {
 void Library::applySort(const QString &field, bool ascending) {
     if (m_sortField == field && m_sortAscending == ascending) return;
 
-    if (field != "custom" && m_reorderMode) {
-        m_reorderMode = false;
-        emit reorderModeChanged();
-    }
-
     m_sortField = field;
     m_sortAscending = ascending;
 
@@ -372,8 +422,24 @@ void Library::applySort(const QString &field, bool ascending) {
 void Library::setFilterArtist(const QString &artist) {
     if (m_filterArtist == artist) return;
     m_filterArtist = artist;
+    if (!artist.isEmpty() && !m_filterAlbum.isEmpty()) {
+        m_filterAlbum.clear();
+        emit filterAlbumChanged();
+    }
     sortAndApply(true);
     emit filterArtistChanged();
+    emit currentChanged();
+}
+
+void Library::setFilterAlbum(const QString &album) {
+    if (m_filterAlbum == album) return;
+    m_filterAlbum = album;
+    if (!album.isEmpty() && !m_filterArtist.isEmpty()) {
+        m_filterArtist.clear();
+        emit filterArtistChanged();
+    }
+    sortAndApply(true);
+    emit filterAlbumChanged();
     emit currentChanged();
 }
 
@@ -381,7 +447,17 @@ void Library::setFilterText(const QString &text) {
     if (m_filterText == text) return;
     m_filterText = text;
     rebuildArtists();
+    rebuildAlbums();
     sortAndApply(true);
+
+    if (m_playlistsProxy) {
+        m_playlistsProxy->setFilterFixedString(text.trimmed());
+    }
+
+    if (!m_activePlaylistId.isEmpty()) {
+        rebuildPlaylistTracks();
+    }
+
     emit filterTextChanged();
     emit currentChanged();
 }
@@ -393,13 +469,25 @@ void Library::clearFilter() {
         emit filterArtistChanged();
         changed = true;
     }
+    if (!m_filterAlbum.isEmpty()) {
+        m_filterAlbum.clear();
+        emit filterAlbumChanged();
+        changed = true;
+    }
     if (!m_filterText.isEmpty()) {
         m_filterText.clear();
+        if (m_playlistsProxy) {
+            m_playlistsProxy->setFilterFixedString(QString());
+        }
+        if (!m_activePlaylistId.isEmpty()) {
+            rebuildPlaylistTracks();
+        }
         emit filterTextChanged();
         changed = true;
     }
     if (changed) {
         rebuildArtists();
+        rebuildAlbums();
         sortAndApply(true);
         emit currentChanged();
     }
@@ -413,13 +501,16 @@ void Library::setSearch(const QString &q) {
 }
 
 void Library::toggleReorderMode() {
-    if (m_sortField != "custom" && !m_showOnlyLiked) {
-        applySort("custom", true);
+    if (!m_editMode) {
+        if (m_sortField != "custom" && !m_showOnlyLiked) {
+            applySort("custom", true);
+        }
+        m_editMode = true;
+    } else {
+        m_editMode = false;
+        savePlaylistOrderNow();
     }
-    m_reorderMode = !m_reorderMode;
-    emit reorderModeChanged();
-
-    if (!m_reorderMode) savePlaylistOrderNow();
+    emit editModeChanged();
 }
 
 void Library::moveTrack(int from, int to) {

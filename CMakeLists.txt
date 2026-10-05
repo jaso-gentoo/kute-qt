@@ -53,10 +53,13 @@ set(SOURCES
     src/main.cpp
     src/ThemeManager.cpp
     src/TrackModel.cpp
+    src/PlaylistModel.cpp
+    src/PlaylistFilterModel.cpp
     src/Library.cpp
     src/LibraryPlayback.cpp
     src/LibraryFiles.cpp
     src/LibrarySort.cpp
+    src/LibraryPlaylist.cpp
     src/DiscordRPC.cpp
 )
 if(UNIX AND NOT APPLE)
@@ -84,6 +87,9 @@ qt_add_qml_module(kute
         qml/BottomBar.qml
         qml/PlaylistView.qml
         qml/ArtistsView.qml
+        qml/AlbumsView.qml
+        qml/BrowseView.qml
+        qml/PlaylistsView.qml
         qml/SettingsModal.qml
         qml/SettingsTab.qml
         qml/TrackTab.qml

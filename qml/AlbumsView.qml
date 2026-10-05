@@ -4,8 +4,8 @@ import QtQuick.Layouts
 Item {
     id: root
 
-    signal artistSelected(string name)
-    signal artistActivated
+    signal albumSelected(string name)
+    signal albumActivated
 
     onVisibleChanged: {
         if (visible && library.editMode) library.toggleReorderMode()
@@ -20,7 +20,7 @@ Item {
             spacing: 6
 
             Text {
-                text: "ARTISTS"
+                text: "ALBUMS"
                 color: theme.outline
                 font.pixelSize: 10
                 font.letterSpacing: 1.4
@@ -57,7 +57,7 @@ Item {
                         easing.type: Easing.InCubic
                     }
                     ScriptAction {
-                        script: library.artistsAscending = !library.artistsAscending
+                        script: library.albumsAscending = !library.albumsAscending
                     }
                     NumberAnimation {
                         target: sortChip
@@ -75,14 +75,14 @@ Item {
 
                     MaterialIcon {
                         anchors.verticalCenter: parent.verticalCenter
-                        glyph: library.artistsAscending ? "\ue5d8" : "\ue5db"
+                        glyph: library.albumsAscending ? "\ue5d8" : "\ue5db"
                         iconSize: 13
                         iconColor: theme.primary
                     }
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: library.artistsAscending ? "A-Z" : "Z-A"
+                        text: library.albumsAscending ? "A-Z" : "Z-A"
                         color: theme.primary
                         font.pixelSize: 11
                         font.weight: Font.DemiBold
@@ -112,7 +112,7 @@ Item {
             flickDeceleration: 500
             maximumFlickVelocity: 8000
 
-            model: library.artists
+            model: library.albums
 
             NumberAnimation {
                 id: wheelAnim
@@ -167,12 +167,12 @@ Item {
             delegate: Rectangle {
                 id: row
 
-                required property string modelData
+                required property var modelData
                 required property int index
 
                 width: list.width
-                height: 48
-                radius: 12
+                height: 42
+                radius: 10
                 color: "transparent"
 
                 scale: hov.pressed ? 0.985 : (hov.containsMouse ? 1.010 : 1.0)
@@ -194,44 +194,78 @@ Item {
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 14
-                    spacing: 14
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    spacing: 10
 
-                    Rectangle {
-                        Layout.preferredWidth: 34
-                        Layout.preferredHeight: 34
-                        radius: 17
-                        color: theme.primary
-                        opacity: hov.containsMouse ? 0.22 : 0.14
-                        Behavior on opacity { NumberAnimation { duration: 220 } }
+                    Item {
+                        Layout.preferredWidth: 30
+                        Layout.preferredHeight: 30
 
-                        scale: hov.containsMouse ? 1.08 : 1.0
-                        Behavior on scale {
-                            NumberAnimation {
-                                duration: 260
-                                easing.type: Easing.OutBack
-                                easing.overshoot: 2.8
-                            }
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 6
+                            color: theme.surfaceVariant
+                            visible: !row.modelData.thumb || coverImg.status !== Image.Ready
                         }
 
                         MaterialIcon {
                             anchors.centerIn: parent
-                            glyph: "\ue7fd"
-                            iconSize: 18
-                            filled: hov.containsMouse
-                            iconColor: theme.primary
+                            glyph: "\ue02b"
+                            iconSize: 14
+                            iconColor: theme.outline
+                            opacity: 0.5
+                            visible: !row.modelData.thumb || coverImg.status !== Image.Ready
+                        }
+
+                        Image {
+                            id: coverImg
+                            anchors.fill: parent
+                            source: row.modelData.thumb
+                                ? library.toFileUrl(row.modelData.thumb) + "?v=" + library.coverVersion
+                                : ""
+                            sourceSize.width: 60
+                            sourceSize.height: 60
+                            fillMode: Image.PreserveAspectFit
+                            asynchronous: true
+                            cache: true
+                            smooth: true
+                            mipmap: true
+                            visible: status === Image.Ready
+
+                            scale: hov.containsMouse ? 1.08 : 1.0
+                            Behavior on scale {
+                                NumberAnimation {
+                                    duration: 320
+                                    easing.type: Easing.OutBack
+                                    easing.overshoot: 2.4
+                                }
+                            }
                         }
                     }
 
-                    Text {
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        text: row.modelData
-                        color: hov.containsMouse ? theme.primary : theme.onSurface
-                        font.pixelSize: 13
-                        font.weight: Font.Medium
-                        elide: Text.ElideRight
-                        Behavior on color { ColorAnimation { duration: 220 } }
+                        Layout.alignment: Qt.AlignVCenter
+                        spacing: 0
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: row.modelData.name
+                            color: hov.containsMouse ? theme.primary : theme.onSurface
+                            font.pixelSize: 12
+                            font.weight: Font.Medium
+                            elide: Text.ElideRight
+                            Behavior on color { ColorAnimation { duration: 220 } }
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Album"
+                            color: theme.outline
+                            font.pixelSize: 10
+                            opacity: 0.7
+                        }
                     }
 
                     MaterialIcon {
@@ -251,8 +285,8 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        root.artistSelected(row.modelData)
-                        root.artistActivated()
+                        root.albumSelected(row.modelData.name)
+                        root.albumActivated()
                     }
                 }
             }
@@ -260,11 +294,11 @@ Item {
 
         Text {
             Layout.fillWidth: true
-            text: library.artists.length === 0 ? "No artists" : library.artists.length + " artists"
+            text: library.albums.length === 0 ? "No albums" : library.albums.length + " albums"
             color: theme.outline
             font.pixelSize: 10
             horizontalAlignment: Text.AlignHCenter
-            visible: library.artists.length > 0
+            visible: library.albums.length > 0
         }
     }
 }

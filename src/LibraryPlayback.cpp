@@ -62,11 +62,8 @@ void Library::startTrack(const Track &t) {
 }
 
 void Library::playIndex(int index) {
-    if (index < 0 || index >= m_tracks.count()) return;
-    const Track *t = m_tracks.at(index);
-    if (!t) return;
-    m_currentIndex = index;
-    startTrack(*t);
+    m_playbackPlaylistId.clear();
+    playFromModel(&m_tracks, index);
 }
 
 void Library::playSearchIndex(int index) {
@@ -74,6 +71,7 @@ void Library::playSearchIndex(int index) {
     const Track *t = m_searchResults.at(index);
     if (!t) return;
 
+    m_playbackPlaylistId.clear();
     m_currentIndex = -1;
     for (int i = 0; i < m_tracks.count(); ++i) {
         const Track *main = m_tracks.at(i);
@@ -96,21 +94,26 @@ void Library::togglePlayPause() {
     } else if (!m_currentTrack.path.isEmpty()) {
         m_intentPlaying = true;
         m_player->play();
-    } else if (m_tracks.count() > 0) {
-        playIndex(m_currentIndex >= 0 ? m_currentIndex : 0);
+    } else {
+        TrackModel *model = currentPlaybackModel();
+        if (model && model->count() > 0) {
+            playFromModel(model, m_currentIndex >= 0 ? m_currentIndex : 0);
+        }
     }
 }
 
 void Library::next() {
-    if (m_tracks.count() == 0) return;
-    if (m_currentIndex < 0) { playIndex(0); return; }
-    playIndex((m_currentIndex + 1) % m_tracks.count());
+    TrackModel *model = currentPlaybackModel();
+    if (!model || model->count() == 0) return;
+    if (m_currentIndex < 0) { playFromModel(model, 0); return; }
+    playFromModel(model, (m_currentIndex + 1) % model->count());
 }
 
 void Library::prev() {
-    if (m_tracks.count() == 0) return;
-    if (m_currentIndex < 0) { playIndex(0); return; }
-    playIndex((m_currentIndex - 1 + m_tracks.count()) % m_tracks.count());
+    TrackModel *model = currentPlaybackModel();
+    if (!model || model->count() == 0) return;
+    if (m_currentIndex < 0) { playFromModel(model, 0); return; }
+    playFromModel(model, (m_currentIndex - 1 + model->count()) % model->count());
 }
 
 void Library::seek(qint64 pos) {

@@ -63,7 +63,7 @@ void TrackModel::setTracksAnimated(const QList<Track> &newTracks) {
         ++commonPrefix;
     }
     const int changes = qMax(m_tracks.size(), newTracks.size()) - commonPrefix;
-    if (changes > 20) {
+    if (changes > 60) {
         setTracks(newTracks);
         return;
     }
@@ -198,4 +198,24 @@ const Track *TrackModel::at(int i) const {
 Track *TrackModel::atMutable(int i) {
     if (i < 0 || i >= m_tracks.size()) return nullptr;
     return &m_tracks[i];
+}
+
+QString TrackModel::pathAt(int index) const {
+    if (index < 0 || index >= m_tracks.size()) return {};
+    return m_tracks[index].path;
+}
+
+QString TrackModel::titleAt(int index) const {
+    if (index < 0 || index >= m_tracks.size()) return {};
+    return m_tracks[index].title;
+}
+
+QString TrackModel::artistAt(int index) const {
+    if (index < 0 || index >= m_tracks.size()) return {};
+    return m_tracks[index].artist;
+}
+
+QString TrackModel::thumbAt(int index) const {
+    if (index < 0 || index >= m_tracks.size()) return {};
+    return m_tracks[index].thumb;
 }
