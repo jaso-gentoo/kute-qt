@@ -1,6 +1,6 @@
 # kute
 
-Music player for Linux, written in C++/Qt6/QML.
+Music player for Linux and Windows, written in C++/Qt6/QML.
 
 ## Features
 
