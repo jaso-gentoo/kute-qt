@@ -36,9 +36,12 @@ sudo apt install qt6-base-dev qt6-multimedia-dev qt6-declarative-dev libtag1-dev
 
 ## Build
 
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-./build/kute
+```bash
+cd ~/kute-qt
+      cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      cmake --build build
+      ./build/kute
+```
 
 ## Install
 
@@ -66,7 +69,7 @@ Space, Up, Down are ignored while a text input has focus (so you can type in sea
 - Ctrl+E — Toggle Settings modal
 - Ctrl+D — Open Lyrics for the current track
 - Ctrl+X — Open metadata editor for the current track
-- Ctrl+Shift+E — Toggle reorder / edit mode (Home page only, only when no artist/album filter is applied)
+- Ctrl+Shift+E — Toggle reorder / edit mode
 
 ### Inside modals
 
@@ -83,7 +86,7 @@ Only active while the Settings / Track / Lyrics modal is open:
 
 ### Drag interactions
 
-- Drag a track — Home (edit mode). Reorders the library
+- Drag a track — Home (edit mode). Reorders the library (custom sorting style)
 - Drag a playlist — Browse -> Playlists (edit mode). Reorders the playlist list
 - Drag a track inside a playlist — Playlist detail (edit mode). Reorders tracks in that playlist
 - Click a playlist name — Browse -> Playlists (edit mode). Rename
@@ -103,3 +106,17 @@ Only active while the Settings / Track / Lyrics modal is open:
 ### Matugen
 
 Put a palette JSON at ~/.config/kute/matugen/kute.json (keys: background, surface, onBackground, onSurface, primary, secondary, surfaceVariant, outline). Enable Matugen in Settings — colors will follow the file and reload automatically when it changes.
+
+`kute.json`
+```json
+{
+  "primary": "{{colors.primary.default.hex}}",
+  "secondary": "{{colors.tertiary.default.hex}}",
+  "background": "{{colors.background.default.hex}}",
+  "surface": "{{colors.surface_container.default.hex}}",
+  "surfaceVariant": "{{colors.surface_container_high.default.hex}}",
+  "outline": "{{colors.outline.default.hex}}",
+  "onBackground": "{{colors.on_background.default.hex}}",
+  "onSurface": "{{colors.on_surface_variant.default.hex}}"
+}
+```
