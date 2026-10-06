@@ -41,7 +41,7 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 
 ### Inside windows
 
--# Only active while the **Settings** / **Lyrics** / **Metadata editor** window is open:
+> Only active while the **Settings** / **Lyrics** / **Metadata editor** window is open:
 
 - `Left arrow` / `Right arrow` - Previous / next sub-tab. In Track: Metadata <-> Text. In Lyrics: TXT <-> LRC
 - `Ctrl` + `S` - Save current edits (in the **Metadata editor** window)
