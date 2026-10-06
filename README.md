@@ -24,8 +24,8 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 - `Space` - Play / pause
 - `Up arrow` - Previous track
 - `Down arrow` - Next track
-- `Ctrl` + `W` - Like / unlike the currently playing track
-- `Middle-click` on a track - Like / unlike that specific track
+- `Ctrl` + `W` - like / unlike the currently playing track
+- `Middle-click` on a track - like / unlike
 
 ### Navigation
 
@@ -58,7 +58,6 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 - Drag a playlist - **Browse page** -> **Playlists** *(edit mode)*. to reorder the playlist list
 - Drag a track inside a playlist - **Playlist** *(edit mode)*. to reorder tracks in that playlist
 - Click a playlist name - **Browse page** -> **Playlists** *(edit mode)* to Rename
-- `Middle-click` on a track to like / unlike
 
 ## Configuration and cache
 
