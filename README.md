@@ -14,68 +14,66 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 
 ## System requirements
 
-- **Linux**: any distro with glibc 2.35+ (Ubuntu 22.04+, Fedora 36+, Arch). AppImage is self-contained — no dependencies to install.
+- **Linux**: any distro with glibc 2.35+ (Ubuntu 22.04+, Fedora 36+, Arch). AppImage is self-contained - no dependencies to install.
 - **Windows**: Windows 10 or newer. The `.exe` is a portable binary.
   
 ## Keyboard shortcuts
 
 ### Playback
 
-- Space — Play / pause
-- Up arrow — Previous track
-- Down arrow — Next track
-- Ctrl+W — Like / unlike the currently playing track
-- Middle-click on a track — Like / unlike that specific track
-
-Space, Up, Down are ignored while a text input has focus (so you can type in search / rename / metadata fields without triggering playback).
+- `Space` - Play / pause
+- `Up arrow` - Previous track
+- `Down arrow` - Next track
+- `Ctrl` + `W` - Like / unlike the currently playing track
+- `Middle-click` on a track - Like / unlike that specific track
 
 ### Navigation
 
-- Ctrl+O — Open music folder dialog
-- Ctrl+1 — Home (library / current filtered list)
-- Ctrl+2 — Browse (Artists / Albums / Playlists)
-- Ctrl+F — Toggle floating search bar (searches current list)
-- Ctrl+Q — Toggle Now Playing side panel
-- Ctrl+E — Toggle Settings modal
-- Ctrl+D — Open Lyrics for the current track
-- Ctrl+X — Open metadata editor for the current track
-- Ctrl+Shift+E — Toggle reorder / edit mode
+- `Ctrl` + `O` - Open music folder dialog
+- `Ctrl` + `1` - **Home page**
+- `Ctrl` + `2` - Browse (Artists / Albums / Playlists)
+- `Ctrl` + `F` - Toggle search bar
+- `Ctrl` + `Q` - Toggle **Now Playing** side panel
+- `Ctrl` + `E` - Toggle **Settings**
+- `Ctrl` + `D` - Open **Lyrics** for the current track
+- `Ctrl` + `X` - Open **Metadata editor** for the current track
+- `Ctrl` + `Shift` + `E` - Toggle edit mode
 
 ### Inside modals
 
-Only active while the Settings / Track / Lyrics modal is open:
+-# Only active while the Settings / Track / Lyrics modal is open:
 
-- Left arrow / Right arrow — Previous / next sub-tab. In Track: Metadata <-> Text. In Lyrics: TXT <-> LRC
-- Ctrl+S — Save current edits (in the Track modal)
+- `Left arrow` / `Right arrow` - Previous / next sub-tab. In Track: Metadata <-> Text. In Lyrics: TXT <-> LRC
+- `Ctrl` + `S` - Save current edits (in the Track modal)
 
 ### Context-sensitive
 
-- Esc — If a modal is open, close it
-- Esc — Else if the floating search is open, close it and clear the search text
-- Esc — Else if an artist / album filter is applied, clear it and return to Browse
+- `Esc` - to close **Settings** / **Lyrics** / **Metadata editor** window
+- `Esc` - to close and clear search bar
+- `Esc` - to return to **Browse page** from **Artists** / **Albums** / **Playlists** tab
 
 ### Drag interactions
 
-- Drag a track — Home (edit mode). Reorders the library (custom sorting style)
-- Drag a playlist — Browse -> Playlists (edit mode). Reorders the playlist list
-- Drag a track inside a playlist — Playlist detail (edit mode). Reorders tracks in that playlist
-- Click a playlist name — Browse -> Playlists (edit mode). Rename
-- Middle-click on a track — Home. Like / unlike
+- Drag a track - **Home page** *(edit mode)* to reorder the library (only custom sorting style)
+- Drag a playlist - **Browse page** -> **Playlists** *(edit mode)*. to reorder the playlist list
+- Drag a track inside a playlist - **Playlist** *(edit mode)*. to reorder tracks in that playlist
+- Click a playlist name - **Browse page** -> **Playlists** *(edit mode)* to Rename
+- `Middle-click` on a track to like / unlike
 
 ## Configuration and cache
 
-- Settings (QSettings) — ~/.config/kute/
-- LRC files — ~/.config/kute/txts/
-- Liked tracks — ~/.config/kute/liked.json
-- Playlists — ~/.config/kute/playlists.json
-- Custom track order — ~/.config/kute/playlist_order.json
-- Lyrics offsets — ~/.config/kute/offsets.json
-- Cover / thumbnail caches — ~/.cache/kute/
-- Playlist cover thumbnails — ~/.cache/kute/kute/playlist_covers/
+- Settings (QSettings) - `~/.config/kute/`
+- LRC files - `~/.config/kute/txts/`
+- Liked tracks - `~/.config/kute/liked.json`
+- Playlists - `~/.config/kute/playlists.json`
+- Custom track order - `~/.config/kute/playlist_order.json`
+- Lyrics offsets - `~/.config/kute/offsets.json`
+- Cover / thumbnail caches - `~/.cache/kute/`
+- Playlist cover thumbnails - `~/.cache/kute/kute/playlist_covers/`
 
 ### Matugen
 
-Put a palette JSON at ~/.config/kute/matugen/kute.json (keys: background, surface, onBackground, onSurface, primary, secondary, surfaceVariant, outline). Enable Matugen in Settings — colors will follow the file and reload automatically when it changes.
+Put a JSON at ~/.config/kute/matugen/kute.json (keys: background, surface, onBackground, onSurface, primary, secondary, surfaceVariant, outline). Enable Matugen in Settings - colors will follow the file and reload automatically when it changes.
 
 `kute.json`
 ```json
