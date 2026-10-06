@@ -15,14 +15,10 @@ Item {
 
     Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
-    MouseArea {
-        anchors.fill: parent
-        enabled: root.open
-        propagateComposedEvents: true
-        onClicked: (mouse) => {
-            root.closeRequested()
-            mouse.accepted = false
-        }
+    function isPointInBar(gx, gy) {
+        const p = bar.mapToItem(null, 0, 0)
+        return gx >= p.x && gx <= p.x + bar.width
+            && gy >= p.y && gy <= p.y + bar.height
     }
 
     Rectangle {

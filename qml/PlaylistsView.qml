@@ -25,6 +25,15 @@ Item {
         return library.playlistCover(root.viewing) !== ""
     }
 
+    function closeDetail() {
+        if (root.pendingRemoveCover) {
+            library.clearPlaylistCover(root.viewing)
+            root.pendingRemoveCover = false
+        }
+        library.setActivePlaylist("")
+        root.viewing = ""
+    }
+
     function closeDialogs() {
         if (nameDialog.opened) nameDialog.close()
         if (deleteDialog.opened) deleteDialog.close()
@@ -43,10 +52,9 @@ Item {
                 root.pendingRemoveCover = false
             }
         }
-    }
-
-    Connections {
-        target: library
+        function onFolderChanged() {
+            root.closeDetail()
+        }
         function onPlaylistsChanged() {
             if (nameDialog.opened) nameDialog.close()
             if (deleteDialog.opened) deleteDialog.close()
@@ -254,7 +262,6 @@ Item {
         }
     }
 
-    // Scrim for nameDialog
     Rectangle {
         parent: Overlay.overlay
         anchors.fill: parent
@@ -279,7 +286,6 @@ Item {
         }
     }
 
-    // Scrim for deleteDialog
     Rectangle {
         parent: Overlay.overlay
         anchors.fill: parent
@@ -562,8 +568,9 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             if (root.pendingDeleteIndex >= 0) {
-                                plList.deleteInProgress = true
                                 plList.deletingIndex = root.pendingDeleteIndex
+                                playlistDeleteTimer.playlistId = root.pendingDeleteId
+                                playlistDeleteTimer.restart()
                                 root.pendingDeleteIndex = -1
                             } else {
                                 library.deletePlaylist(root.pendingDeleteId)
@@ -708,6 +715,7 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
+                            library.requestCloseSearch()
                             const p = newPlaylistBtn.mapToItem(null, 0, 0)
                             nameDialog.x = Math.max(12,
                                 Math.min(p.x + newPlaylistBtn.width - nameDialog.width,
@@ -739,7 +747,18 @@ Item {
                 property int dragTo: -1
                 property bool dragActive: false
                 property int deletingIndex: -1
-                property bool deleteInProgress: false
+
+                Timer {
+                    id: playlistDeleteTimer
+                    property string playlistId: ""
+                    interval: 320
+                    onTriggered: {
+                        const id = playlistId
+                        playlistId = ""
+                        plList.deletingIndex = -1
+                        if (id.length > 0) library.deletePlaylist(id)
+                    }
+                }
 
                 NumberAnimation {
                     id: wheelAnim
@@ -802,17 +821,6 @@ Item {
 
                     onAnimHeightChanged: plList.forceLayout()
 
-                    Timer {
-                        running: plList.deletingIndex === plRowWrap.index
-                        interval: 320
-                        onTriggered: {
-                            const id = plRowWrap.playlistId
-                            plList.deletingIndex = -1
-                            library.deletePlaylist(id)
-                            plList.deleteInProgress = false
-                        }
-                    }
-
                     Item {
                         id: contentItem
                         width: parent.width
@@ -862,7 +870,9 @@ Item {
                             z: -2
                             hoverEnabled: true
                             acceptedButtons: Qt.LeftButton
-                            cursorShape: library.editMode ? Qt.OpenHandCursor : Qt.PointingHandCursor
+                            cursorShape: library.editMode
+                                ? (pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
+                                : Qt.PointingHandCursor
                             preventStealing: true
 
                             property real pressY: 0
@@ -895,7 +905,9 @@ Item {
                             onReleased: {
                                 if (plList.dragActive && plList.dragFrom >= 0 && plList.dragTo >= 0
                                     && plList.dragFrom !== plList.dragTo) {
+                                    const savedY = plList.contentY
                                     library.movePlaylist(plList.dragFrom, plList.dragTo)
+                                    Qt.callLater(function() { plList.contentY = savedY })
                                 }
                                 plList.dragFrom = -1
                                 plList.dragTo = -1
@@ -1067,7 +1079,8 @@ Item {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        if (plList.deleteInProgress) return
+                                        if (plList.deletingIndex !== -1) return
+                                        library.requestCloseSearch()
                                         root.pendingDeleteId = plRowWrap.playlistId
                                         root.pendingDeleteName = plRowWrap.playlistName
                                         root.pendingDeleteIndex = plRowWrap.index
@@ -1307,7 +1320,19 @@ Item {
                 property int dragIndex: -1
                 property int dropIndex: -1
                 property int deletingIndex: -1
-                property bool deleteInProgress: false
+
+                Timer {
+                    id: trackDeleteTimer
+                    property int index: -1
+                    interval: 320
+                    onTriggered: {
+                        const idx = index
+                        index = -1
+                        trackList.deletingIndex = -1
+                        if (idx >= 0)
+                            library.removeTrackFromPlaylist(library.activePlaylistId, idx)
+                    }
+                }
 
                 NumberAnimation {
                     id: trackWheel
@@ -1399,18 +1424,6 @@ Item {
 
                     onAnimHeightChanged: trackList.forceLayout()
 
-                    Timer {
-                        running: trackList.deletingIndex === trackRow.index
-                        interval: 320
-                        onTriggered: {
-                            const idx = trackList.deletingIndex
-                            trackList.deletingIndex = -1
-                            if (idx >= 0)
-                                library.removeTrackFromPlaylist(library.activePlaylistId, idx)
-                            trackList.deleteInProgress = false
-                        }
-                    }
-
                     Item {
                         id: trackContent
                         width: parent.width
@@ -1422,14 +1435,26 @@ Item {
                         MouseArea {
                             anchors.fill: parent
                             hoverEnabled: true
-                            acceptedButtons: Qt.LeftButton
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                             preventStealing: library.editMode
-                            cursorShape: library.editMode ? Qt.OpenHandCursor : Qt.PointingHandCursor
+                            cursorShape: library.editMode
+                                ? (pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
+                                : Qt.PointingHandCursor
 
-                            onClicked: {
+                            onClicked: (mouse) => {
                                 if (library.editMode) return
-                                library.playPlaylistIndex(trackRow.index)
-                                root.playlistActivated()
+
+                                if (mouse.button === Qt.MiddleButton) {
+                                    library.toggleLikeByPath(trackRow.path)
+                                    return
+                                }
+
+                                if (trackRow.isCurrent) {
+                                    library.togglePlayPause()
+                                } else {
+                                    library.playPlaylistIndex(trackRow.index)
+                                    root.playlistActivated()
+                                }
                             }
 
                             onPressed: (mouse) => {
@@ -1454,9 +1479,11 @@ Item {
                                 if (!library.editMode) return
                                 if (trackList.dragIndex >= 0 && trackList.dropIndex >= 0
                                     && trackList.dragIndex !== trackList.dropIndex) {
+                                    const savedY = trackList.contentY
                                     library.moveTrackInPlaylist(library.activePlaylistId,
                                                                  trackList.dragIndex,
                                                                  trackList.dropIndex)
+                                    Qt.callLater(function() { trackList.contentY = savedY })
                                 }
                                 trackList.dragIndex = -1
                                 trackList.dropIndex = -1
@@ -1486,7 +1513,7 @@ Item {
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: trackRow.radius
+                            radius: 10
                             color: trackRow.isCurrent ? theme.primary : theme.onSurface
                             opacity: trackRow.isCurrent
                                 ? 0.14
@@ -1622,13 +1649,22 @@ Item {
                                 spacing: 0
 
                                 Text {
+                                    id: trackTitle
                                     Layout.fillWidth: true
                                     text: trackRow.title
                                     color: trackRow.isCurrent ? theme.primary : theme.onSurface
                                     font.pixelSize: 12
                                     font.weight: trackRow.isCurrent ? Font.DemiBold : Font.Medium
                                     elide: Text.ElideRight
+                                    transformOrigin: Item.Left
+                                    scale: trackRow.isCurrent ? 1.08 : 1.0
                                     Behavior on color { ColorAnimation { duration: 220 } }
+                                    Behavior on scale {
+                                        NumberAnimation {
+                                            duration: 260
+                                            easing.type: Easing.OutCubic
+                                        }
+                                    }
                                 }
 
                                 Text {
@@ -1681,9 +1717,12 @@ Item {
                                     cursorShape: Qt.PointingHandCursor
                                     enabled: library.editMode
                                     onClicked: {
-                                        if (trackList.deleteInProgress) return
-                                        trackList.deleteInProgress = true
-                                        trackList.deletingIndex = trackRow.index
+                                        if (trackList.deletingIndex !== -1) return
+                                        library.requestCloseSearch()
+                                        const idx = trackRow.index
+                                        trackList.deletingIndex = idx
+                                        trackDeleteTimer.index = idx
+                                        trackDeleteTimer.restart()
                                     }
                                 }
                             }

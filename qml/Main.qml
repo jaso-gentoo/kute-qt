@@ -23,7 +23,9 @@ ApplicationWindow {
 
     readonly property bool editAvailable: {
         if (currentPage === 0)
-            return library.filterArtist === "" && library.filterAlbum === ""
+            return library.filterArtist === ""
+                && library.filterAlbum === ""
+                && !library.showOnlyLiked
         if (currentPage === 2 && browseView.currentTab === 2)
             return true
         return false
@@ -104,6 +106,8 @@ ApplicationWindow {
         if (currentPage !== 0 && currentPage !== 2) return
         if (currentPage === 0) {
             if (library.filterArtist !== "" || library.filterAlbum !== "") return
+            if (library.filterText !== "") return
+            if (library.showOnlyLiked) return
         }
         library.toggleReorderMode()
     }
@@ -139,6 +143,7 @@ ApplicationWindow {
 
     function goToArtists() {
         library.clearFilter()
+        library.showOnlyLiked = false
         closeFloatingSearch()
         if (playlistView) {
             playlistView.closeSort()
@@ -157,6 +162,12 @@ ApplicationWindow {
     function modalPrevSubTab() { if (settingsOpen) settingsModal.previousSubTab() }
     function modalNextSubTab() { if (settingsOpen) settingsModal.nextSubTab() }
 
+    function handleGlobalClick(gx, gy) {
+        if (!floatingSearchOpen) return
+        if (floatingSearch.isPointInBar(gx, gy)) return
+        Qt.callLater(closeFloatingSearch)
+    }
+
     Connections {
         target: library
         function onFilterArtistChanged() {
@@ -166,6 +177,17 @@ ApplicationWindow {
         function onFilterAlbumChanged() {
             if (library.editMode && library.filterAlbum !== "")
                 library.toggleReorderMode()
+        }
+        function onFilterTextChanged() {
+            if (library.editMode && library.filterText !== "")
+                library.toggleReorderMode()
+        }
+        function onShowOnlyLikedChanged() {
+            if (library.editMode && library.showOnlyLiked)
+                library.toggleReorderMode()
+        }
+        function onSearchShouldClose() {
+            window.closeFloatingSearch()
         }
     }
 
@@ -226,18 +248,18 @@ ApplicationWindow {
                 Behavior on x       { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
 
                 onArtistSelected: (name) => {
+                    window.closeFloatingSearch()
                     library.clearFilter()
                     library.setFilterArtist(name)
                     window.currentPage = 0
                     navRail.currentIndex = 1
-                    window.closeFloatingSearch()
                 }
                 onAlbumSelected: (name) => {
+                    window.closeFloatingSearch()
                     library.clearFilter()
                     library.setFilterAlbum(name)
                     window.currentPage = 0
                     navRail.currentIndex = 1
-                    window.closeFloatingSearch()
                 }
                 onBrowseActivated: window.closeFloatingSearch()
                 onContextChanged: Qt.callLater(window.syncPlaybackContext)
@@ -404,6 +426,7 @@ ApplicationWindow {
         onSettingsRequested: window.toggleSettings()
         onPageChanged: (page) => {
             library.clearFilter()
+            if (page === 2) library.showOnlyLiked = false
             window.closeFloatingSearch()
             if (playlistView) {
                 playlistView.closeSort()

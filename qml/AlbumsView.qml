@@ -108,11 +108,25 @@ Item {
             spacing: 2
             boundsBehavior: Flickable.StopAtBounds
             cacheBuffer: 600
-            reuseItems: true
+            reuseItems: false
             flickDeceleration: 500
             maximumFlickVelocity: 8000
 
             model: library.albums
+
+            Connections {
+                target: library
+                function onFilterTextChanged() {
+                    list.contentY = 0
+                    list.positionViewAtBeginning()
+                    list.forceLayout()
+                }
+                function onAlbumsChanged() {
+                    list.contentY = 0
+                    list.positionViewAtBeginning()
+                    list.forceLayout()
+                }
+            }
 
             NumberAnimation {
                 id: wheelAnim

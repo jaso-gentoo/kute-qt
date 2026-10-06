@@ -12,6 +12,10 @@ Item {
     property int currentTab: 0
     property alias playlistsViewing: playlistsView.viewing
 
+    function closePlaylistDetail() {
+        playlistsView.closeDetail()
+    }
+
     function closePlaylistsDialogs() {
         playlistsView.closeDialogs()
     }
@@ -78,7 +82,10 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.currentTab = index
+                        onClicked: {
+                            library.requestCloseSearch()
+                            root.currentTab = index
+                        }
                     }
                 }
             }

@@ -61,14 +61,6 @@ Item {
         onActivated: playlistRoot.closeAddMenu()
     }
 
-    Connections {
-        target: library
-        function onPlaylistsChanged() {
-            if (playlistRoot.addMenuOpen) playlistRoot.closeAddMenu()
-            if (sortPopup.shown) sortPopup.shown = false
-        }
-    }
-
     Rectangle {
         id: addMenuScrim
         parent: Overlay.overlay
@@ -423,18 +415,24 @@ Item {
 
                 readonly property bool shouldShow: library.trackCount > 0
                                                     && library.sortField === "custom"
+                                                    && !library.showOnlyLiked
+                                                    && library.filterText === ""
+                                                    && library.filterArtist === ""
+                                                    && library.filterAlbum === ""
 
+                readonly property bool instant: library.filterArtist !== "" || library.filterAlbum !== ""
+
+                visible: shouldShow || opacity > 0.01
                 opacity: shouldShow ? 1 : 0
                 scale: shouldShow ? 1.0 : 0.6
-                visible: opacity > 0.01
 
-                Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                Behavior on opacity {
+                    enabled: !reorderBtnSlot.instant
+                    NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+                }
                 Behavior on scale {
-                    NumberAnimation {
-                        duration: 320
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 1.8
-                    }
+                    enabled: !reorderBtnSlot.instant
+                    NumberAnimation { duration: 320; easing.type: Easing.OutBack; easing.overshoot: 1.8 }
                 }
 
                 Rectangle {
@@ -512,7 +510,25 @@ Item {
                 id: sortBtnSlot
                 Layout.preferredWidth: 30
                 Layout.preferredHeight: 30
-                visible: library.trackCount > 0
+
+                readonly property bool shouldShow: library.trackCount > 0
+                                                    && library.filterArtist === ""
+                                                    && library.filterAlbum === ""
+
+                readonly property bool instant: library.filterArtist !== "" || library.filterAlbum !== ""
+
+                visible: shouldShow || opacity > 0.01
+                opacity: shouldShow ? 1 : 0
+                scale: shouldShow ? 1.0 : 0.6
+
+                Behavior on opacity {
+                    enabled: !sortBtnSlot.instant
+                    NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+                }
+                Behavior on scale {
+                    enabled: !sortBtnSlot.instant
+                    NumberAnimation { duration: 320; easing.type: Easing.OutBack; easing.overshoot: 1.8 }
+                }
 
                 Rectangle {
                     id: sortBtn
@@ -641,14 +657,18 @@ Item {
             boundsBehavior: Flickable.DragOverBounds
             boundsMovement: Flickable.StopAtBounds
             cacheBuffer: 200
-            reuseItems: true
+            reuseItems: false
             flickDeceleration: 500
             maximumFlickVelocity: 8000
 
             property int  dragIndex: -1
             property int  dropIndex: -1
             property real lastMouseY: 0
-            property real handleW: (library.editMode && library.filterArtist === "" && library.filterAlbum === "") ? 18 : 0
+            property real handleW: (library.editMode
+                                    && library.filterArtist === ""
+                                    && library.filterAlbum === ""
+                                    && library.filterText === ""
+                                    && !library.showOnlyLiked) ? 18 : 0
 
             Behavior on handleW {
                 NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
@@ -686,6 +706,9 @@ Item {
                 target: library
                 function onSortChanged() { list.resetScrollAndFade() }
                 function onShowOnlyLikedChanged() { list.resetScrollAndFade() }
+                function onFilterTextChanged() { list.resetScrollAndFade() }
+                function onFilterArtistChanged() { list.resetScrollAndFade() }
+                function onFilterAlbumChanged() { list.resetScrollAndFade() }
             }
 
             NumberAnimation {
@@ -776,6 +799,17 @@ Item {
                 }
             }
 
+            remove: Transition {
+                NumberAnimation {
+                    property: "opacity"; to: 0
+                    duration: 220; easing.type: Easing.OutCubic
+                }
+                NumberAnimation {
+                    property: "x"; to: -60
+                    duration: 300; easing.type: Easing.OutCubic
+                }
+            }
+
             displaced: Transition {
                 NumberAnimation {
                     properties: "x,y"
@@ -802,6 +836,8 @@ Item {
                 readonly property bool canDrag: library.editMode
                     && library.filterArtist === ""
                     && library.filterAlbum === ""
+                    && library.filterText === ""
+                    && !library.showOnlyLiked
 
                 readonly property bool isCurrent: library.currentFilePath === library.tracks.pathAt(row.index)
                 readonly property bool isDragging: list.dragIndex === row.index
@@ -832,7 +868,9 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-                    cursorShape: row.canDrag ? Qt.OpenHandCursor : Qt.ArrowCursor
+                    cursorShape: row.canDrag
+                        ? (pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
+                        : Qt.PointingHandCursor
                     preventStealing: row.canDrag
 
                     onClicked: (mouse) => {
@@ -848,6 +886,7 @@ Item {
                         } else {
                             library.playIndex(row.index)
                         }
+                        if (window.floatingSearchOpen) window.closeFloatingSearch()
                         playlistRoot.trackActivated()
                     }
 
@@ -1163,6 +1202,7 @@ Item {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
+                                library.requestCloseSearch()
                                 const pOverlay = addBtnHov.mapToItem(Overlay.overlay, 0, 0)
                                 const pContent = addBtnHov.mapToItem(list.contentItem, 0, 0)
                                 playlistRoot.openAddMenu(library.tracks.pathAt(row.index),

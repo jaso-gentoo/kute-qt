@@ -327,7 +327,6 @@ void Library::moveTrackInPlaylist(const QString &playlistId, int from, int to) {
 
     if (m_activePlaylistId == playlistId) {
         m_playlistTracks.moveRow(from, to);
-        emit activePlaylistChanged();
     }
     emit playlistsChanged();
 }

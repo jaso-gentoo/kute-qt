@@ -184,9 +184,11 @@ public:
     Q_INVOKABLE void setLrcOffset(int index, double value);
     Q_INVOKABLE bool isLiked(int index) const;
     Q_INVOKABLE bool isPathLiked(const QString &path) const;
+    Q_INVOKABLE void toggleLikeByPath(const QString &path);
     Q_INVOKABLE bool isCurrentLiked() const;
     Q_INVOKABLE void toggleLike(int index);
     Q_INVOKABLE void toggleCurrentLike();
+    Q_INVOKABLE void requestCloseSearch() { emit searchShouldClose(); }
     Q_INVOKABLE QString toFileUrl(const QString &localPath) const;
     void setVolume(int v);
 
@@ -223,6 +225,7 @@ signals:
     void showOnlyLikedChanged();
     void playlistsChanged();
     void activePlaylistChanged();
+    void searchShouldClose();
 
 private slots:
     void flushPresence();

@@ -2,6 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <QFile>
@@ -37,7 +38,6 @@ static void reexecWithEnv(char *argv[]) {
     setenv("QT_LOGGING_RULES", "qt.multimedia.*=false;qt.quick.*=false", 1);
     setenv("AV_LOG_FORCE_NOCOLOR", "1", 1);
     if (qEnvironmentVariableIsSet("KUTE_ENV_READY")) return;
-    setenv("QT_QPA_PLATFORMTHEME", "xdgdesktopportal", 1);
 
     setenv("MALLOC_ARENA_MAX", "2", 1);
     setenv("QSG_USE_IMAGE_CACHE", "0", 1);
@@ -198,6 +198,30 @@ private:
     QObject *m_root;
 };
 
+class GlobalClickMonitor : public QObject {
+    Q_OBJECT
+public:
+    explicit GlobalClickMonitor(QObject *root, QObject *parent = nullptr)
+        : QObject(parent), m_root(root) {}
+
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override {
+        if (event->type() == QEvent::MouseButtonRelease) {
+            auto *me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton) {
+                const QPointF p = me->position();
+                QMetaObject::invokeMethod(m_root, "handleGlobalClick",
+                    Qt::DirectConnection,
+                    Q_ARG(QVariant, QVariant(p.x())),
+                    Q_ARG(QVariant, QVariant(p.y())));
+            }
+        }
+        return QObject::eventFilter(obj, event);
+    }
+private:
+    QObject *m_root;
+};
+
 #include "main.moc"
 
 int main(int argc, char *argv[]) {
@@ -283,6 +307,10 @@ int main(int argc, char *argv[]) {
         emitLog(QtInfoMsg, "installing GlobalHotkeys");
         GlobalHotkeys *hk = new GlobalHotkeys(root, &app);
         app.installEventFilter(hk);
+
+        emitLog(QtInfoMsg, "installing GlobalClickMonitor");
+        GlobalClickMonitor *cm = new GlobalClickMonitor(root, &app);
+        app.installEventFilter(cm);
 
         emitLog(QtInfoMsg, "entering event loop");
         const int rc = app.exec();

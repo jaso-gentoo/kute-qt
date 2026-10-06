@@ -149,8 +149,44 @@ void Library::toggleLike(int index) {
 
     if (m_likedSaveTimer) m_likedSaveTimer->start();
 
-    if (m_showOnlyLiked && wasLiked) {
-        m_tracks.removeByPath(path);
+    if (m_showOnlyLiked) {
+        if (wasLiked) {
+            m_tracks.removeByPath(path);
+        } else {
+            sortAndApply(true);
+        }
+
+        const QString currentPath = m_currentTrack.path;
+        m_currentIndex = -1;
+        if (!currentPath.isEmpty()) {
+            for (int i = 0; i < m_tracks.count(); ++i) {
+                const Track *tt = m_tracks.at(i);
+                if (tt && tt->path == currentPath) { m_currentIndex = i; break; }
+            }
+        }
+        emit currentChanged();
+    }
+}
+
+void Library::toggleLikeByPath(const QString &path) {
+    if (path.isEmpty()) return;
+
+    const bool wasLiked = m_likedPaths.contains(path);
+
+    if (wasLiked) m_likedPaths.remove(path);
+    else m_likedPaths.insert(path);
+
+    m_likedRevision++;
+    emit likedChanged();
+
+    if (m_likedSaveTimer) m_likedSaveTimer->start();
+
+    if (m_showOnlyLiked) {
+        if (wasLiked) {
+            m_tracks.removeByPath(path);
+        } else {
+            sortAndApply(true);
+        }
 
         const QString currentPath = m_currentTrack.path;
         m_currentIndex = -1;
@@ -178,8 +214,12 @@ void Library::toggleCurrentLike() {
 
     if (m_likedSaveTimer) m_likedSaveTimer->start();
 
-    if (m_showOnlyLiked && wasLiked) {
-        m_tracks.removeByPath(path);
+    if (m_showOnlyLiked) {
+        if (wasLiked) {
+            m_tracks.removeByPath(path);
+        } else {
+            sortAndApply(true);
+        }
 
         m_currentIndex = -1;
         for (int i = 0; i < m_tracks.count(); ++i) {
@@ -443,6 +483,10 @@ void Library::setFilterArtist(const QString &artist) {
         m_filterAlbum.clear();
         emit filterAlbumChanged();
     }
+    if (!artist.isEmpty() && m_showOnlyLiked) {
+        m_showOnlyLiked = false;
+        emit showOnlyLikedChanged();
+    }
     sortAndApply(true);
     emit filterArtistChanged();
     emit currentChanged();
@@ -455,6 +499,10 @@ void Library::setFilterAlbum(const QString &album) {
         m_filterArtist.clear();
         emit filterArtistChanged();
     }
+    if (!album.isEmpty() && m_showOnlyLiked) {
+        m_showOnlyLiked = false;
+        emit showOnlyLikedChanged();
+    }
     sortAndApply(true);
     emit filterAlbumChanged();
     emit currentChanged();
@@ -465,7 +513,7 @@ void Library::setFilterText(const QString &text) {
     m_filterText = text;
     rebuildArtists();
     rebuildAlbums();
-    sortAndApply(true);
+    sortAndApply(false);
 
     if (m_playlistsProxy) {
         m_playlistsProxy->setFilterFixedString(text.trimmed());
@@ -519,7 +567,11 @@ void Library::setSearch(const QString &q) {
 
 void Library::toggleReorderMode() {
     if (!m_editMode) {
-        if (m_sortField != "custom" && !m_showOnlyLiked) {
+        if (m_showOnlyLiked) return;
+        if (!m_filterText.isEmpty()) return;
+        if (!m_filterArtist.isEmpty() || !m_filterAlbum.isEmpty()) return;
+
+        if (m_sortField != "custom") {
             applySort("custom", true);
         }
         m_editMode = true;
@@ -535,6 +587,9 @@ void Library::moveTrack(int from, int to) {
     if (from < 0 || to < 0) return;
     if (from >= m_tracks.count() || to >= m_tracks.count()) return;
     if (m_sortField != "custom") return;
+    if (m_showOnlyLiked) return;
+    if (!m_filterText.isEmpty()) return;
+    if (!m_filterArtist.isEmpty() || !m_filterAlbum.isEmpty()) return;
 
     m_tracks.moveRow(from, to);
 
