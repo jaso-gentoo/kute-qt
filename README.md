@@ -14,9 +14,9 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 
 ## System requirements
 
-- **Linux**: any distro with glibc 2.35+ (Ubuntu 22.04+, Fedora 36+, Arch). AppImage is self-contained - no dependencies to install.
+- **Linux**: glibc-based distros with glibc 2.35+ (Ubuntu 22.04+, Fedora 36+, Arch). Musl-based (Alpine, Void) not supported. No dependencies to install.
 - **Windows**: Windows 10 or newer. The `.exe` is a portable binary.
-  
+
 ## Keyboard shortcuts
 
 ### Playback
@@ -24,8 +24,8 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 - `Space` - Play / pause
 - `Up arrow` - Previous track
 - `Down arrow` - Next track
-- `Ctrl` + `W` - like / unlike the currently playing track
-- `Middle-click` on a track - like / unlike
+- `Ctrl` + `W` - Like / unlike the currently playing track
+- `Middle-click` On a track - like / unlike
 
 ### Navigation
 
@@ -39,18 +39,18 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 - `Ctrl` + `X` - Open **Metadata editor** for the current track
 - `Ctrl` + `Shift` + `E` - Toggle edit mode
 
-### Inside modals
+### Inside windows
 
--# Only active while the Settings / Track / Lyrics modal is open:
+-# Only active while the **Settings** / **Lyrics** / **Metadata editor** window is open:
 
 - `Left arrow` / `Right arrow` - Previous / next sub-tab. In Track: Metadata <-> Text. In Lyrics: TXT <-> LRC
-- `Ctrl` + `S` - Save current edits (in the Track modal)
+- `Ctrl` + `S` - Save current edits (in the **Metadata editor** window)
 
 ### Context-sensitive
 
-- `Esc` - to close **Settings** / **Lyrics** / **Metadata editor** window
-- `Esc` - to close and clear search bar
-- `Esc` - to return to **Browse page** from **Artists** / **Albums** / **Playlists** tab
+- `Esc` - To close **Settings** / **Lyrics** / **Metadata editor** window
+- `Esc` - To close and clear search bar
+- `Esc` - To return to **Browse page** from **Artists** / **Albums** / **Playlists** tabs
 
 ### Drag interactions
 
@@ -72,7 +72,7 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 
 ### Matugen
 
-Put a JSON at ~/.config/kute/matugen/kute.json (keys: background, surface, onBackground, onSurface, primary, secondary, surfaceVariant, outline). Enable Matugen in Settings - colors will follow the file and reload automatically when it changes.
+Put a JSON at ~/.config/kute/matugen/kute.json - the file must exist before you can enable Matugen in Settings.
 
 `kute.json`
 ```json
