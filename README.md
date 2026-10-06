@@ -61,18 +61,33 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 
 ## Configuration and cache
 
-- Settings (QSettings) - `~/.config/kute/`
-- LRC files - `~/.config/kute/txts/`
-- Liked tracks - `~/.config/kute/liked.json`
-- Playlists - `~/.config/kute/playlists.json`
-- Custom track order - `~/.config/kute/playlist_order.json`
-- Lyrics offsets - `~/.config/kute/offsets.json`
-- Cover / thumbnail caches - `~/.cache/kute/`
-- Playlist cover thumbnails - `~/.cache/kute/kute/playlist_covers/`
+### Settings
+
+- QSettings file — `~/.config/kute/kute.conf`
+
+### Global
+
+- Lyrics offsets — `~/.config/kute/offsets.json`
+
+### Per-folder
+
+kute stores playlists, liked tracks and custom sort order **per music folder**. Each folder gets its own set of files, named after a SHA-1 hash of the folder's absolute path — so switching between two libraries keeps their data separate.
+
+- Playlists — `~/.config/kute/playlists/<sha1>.json`
+- Liked tracks — `~/.config/kute/liked/<sha1>.json`
+- Custom track order — `~/.config/kute/playlist_order/<sha1>.json`
+
+### Other
+
+- LRC files — `~/.config/kute/txts/`
+- Cover / thumbnail caches — `~/.cache/kute/`
+- Playlist cover thumbnails — `~/.cache/kute/kute/playlist_covers/`
 
 ### Matugen
 
-Put a JSON at ~/.config/kute/matugen/kute.json - the file must exist before you can enable Matugen in Settings.
+Put a JSON file at `~/.config/kute/matugen/kute.json`. The file must exist before Matugen can be enabled in Settings — otherwise the toggle stays disabled.
+
+Keys: `background`, `surface`, `onBackground`, `onSurface`, `primary`, `secondary`, `surfaceVariant`, `outline`.
 
 `kute.json`
 ```json
