@@ -28,69 +28,70 @@ Item {
         anchors.fill: parent
         spacing: 12
 
-        RowLayout {
+        Item {
             Layout.fillWidth: true
-            spacing: 4
+            Layout.preferredHeight: 34
 
-            Repeater {
-                model: [
-                    { label: "Artists",   icon: "\ue7fd" },
-                    { label: "Albums",    icon: "\ue02b" },
-                    { label: "Playlists", icon: "\ue8ef" }
-                ]
-                delegate: Item {
-                    required property var modelData
-                    required property int index
-                    readonly property bool active: root.currentTab === index
+            Row {
+                anchors.centerIn: parent
+                spacing: 4
 
-                    Layout.preferredWidth: tabRow.implicitWidth + 26
-                    Layout.preferredHeight: 34
+                Repeater {
+                    model: [
+                        { label: "Artists",   icon: "\ue7fd" },
+                        { label: "Albums",    icon: "\ue02b" },
+                        { label: "Playlists", icon: "\ue8ef" }
+                    ]
+                    delegate: Item {
+                        required property var modelData
+                        required property int index
+                        readonly property bool active: root.currentTab === index
 
-                    Row {
-                        id: tabRow
-                        anchors.centerIn: parent
-                        spacing: 7
+                        width: tabRow.implicitWidth + 26
+                        height: 34
 
-                        MaterialIcon {
-                            anchors.verticalCenter: parent.verticalCenter
-                            glyph: modelData.icon
-                            iconSize: 15
-                            iconColor: active ? theme.primary : theme.outline
-                            Behavior on iconColor { ColorAnimation { duration: 180 } }
+                        Row {
+                            id: tabRow
+                            anchors.centerIn: parent
+                            anchors.verticalCenterOffset: -2
+                            spacing: 7
+
+                            MaterialIcon {
+                                anchors.verticalCenter: parent.verticalCenter
+                                glyph: modelData.icon
+                                iconSize: 15
+                                iconColor: active ? theme.primary : theme.outline
+                                Behavior on iconColor { ColorAnimation { duration: 180 } }
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modelData.label
+                                color: active ? theme.primary : theme.onBackground
+                                opacity: active ? 1.0 : 0.6
+                                font.pixelSize: 12
+                                font.weight: active ? Font.DemiBold : Font.Medium
+                                Behavior on color { ColorAnimation { duration: 180 } }
+                                Behavior on opacity { NumberAnimation { duration: 180 } }
+                            }
                         }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: modelData.label
-                            color: active ? theme.primary : theme.onBackground
-                            opacity: active ? 1.0 : 0.6
-                            font.pixelSize: 12
-                            font.weight: active ? Font.DemiBold : Font.Medium
-                            Behavior on color { ColorAnimation { duration: 180 } }
-                            Behavior on opacity { NumberAnimation { duration: 180 } }
+
+                        Rectangle {
+                            anchors.bottom: parent.bottom
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            width: active ? tabRow.implicitWidth + 12 : 0
+                            height: 2; radius: 1
+                            color: theme.primary
+                            Behavior on width { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
                         }
-                    }
 
-                    Rectangle {
-                        anchors.bottom: parent.bottom
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        width: active ? tabRow.implicitWidth + 12 : 0
-                        height: 2; radius: 1
-                        color: theme.primary
-                        Behavior on width { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
-                    }
+                        HoverHandler { cursorShape: Qt.PointingHandCursor }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            library.requestCloseSearch()
-                            root.currentTab = index
+                        TapHandler {
+                            onTapped: root.currentTab = index
                         }
                     }
                 }
             }
-
-            Item { Layout.fillWidth: true }
         }
 
         Item {

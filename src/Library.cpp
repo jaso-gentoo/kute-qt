@@ -204,14 +204,6 @@ void Library::setInfoPanelVisible(bool v) {
     emit infoPanelVisibleChanged();
 }
 
-void Library::setShowOnlyLiked(bool v) {
-    if (m_showOnlyLiked == v) return;
-    m_showOnlyLiked = v;
-    sortAndApply(false);
-    emit showOnlyLikedChanged();
-    emit currentChanged();
-}
-
 QString Library::formatDuration(qint64 ms) const {
     if (ms <= 0) return "--:--";
     const qint64 total = ms / 1000;

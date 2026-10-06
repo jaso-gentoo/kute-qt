@@ -133,6 +133,21 @@ bool Library::isCurrentLiked() const {
     return m_likedPaths.contains(m_currentTrack.path);
 }
 
+void Library::setShowOnlyLiked(bool v) {
+    if (m_showOnlyLiked == v) return;
+    m_showOnlyLiked = v;
+
+    if (m_showOnlyLiked && m_editMode) {
+        m_editMode = false;
+        savePlaylistOrderNow();
+        emit editModeChanged();
+    }
+
+    sortAndApply(false);
+    emit showOnlyLikedChanged();
+    emit currentChanged();
+}
+
 void Library::toggleLike(int index) {
     if (index < 0 || index >= m_tracks.count()) return;
     const Track *t = m_tracks.at(index);
