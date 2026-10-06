@@ -1,21 +1,13 @@
+<img width="821" height="517" alt="image" src="https://github.com/user-attachments/assets/871c2d11-5bf0-433a-97f5-ab61232e89fc" />
 # kute
 
 Music player for Linux and Windows, written in C++/Qt6/QML.
 
-## Features
+## Screenshots
 
-- Folder-based library (recursive scan) — FLAC, MP3, OGG, OPUS, WAV, M4A, AAC
-- Browse by Artists, Albums and Playlists
-- Playlists — create, rename, cover art (per-playlist), drag-to-reorder
-- Liked tracks (favorites)
-- Search inside the current list, sort by title / artist / album / duration / file name / custom
-- Reorder mode with drag-and-drop, order persisted per folder
-- Metadata editor — ID3v2 (MP3) and Vorbis comments (FLAC), with cover art embed / remove / export
-- Lyrics — plain text (stored in tags) and LRC (stored in ~/.config/kute/txts/) with live sync and per-track offset
-- LRC download from lrclib.net
-- Discord Rich Presence
-- MPRIS — works with playerctl, waybar, KDE/GNOME media controls
-- Light and dark themes, Matugen integration (colors from wallpaper)
+<img width="821" height="517" alt="image" src="https://github.com/user-attachments/assets/e7605abc-05e9-4dda-a38b-267b45d70348" />
+<img width="824" height="520" alt="image" src="https://github.com/user-attachments/assets/23c0de54-c432-4883-a273-9e3145d645ac" />
+<img width="819" height="586" alt="image" src="https://github.com/user-attachments/assets/c7be5e50-3d0a-4846-8b76-9bca033266bb" />
 
 ## Dependencies
 
