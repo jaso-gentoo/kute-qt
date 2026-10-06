@@ -170,17 +170,35 @@ void Library::loadFolder(const QString &path) {
     m_filterText.clear();
     m_searchQuery.clear();
     m_editMode = false;
-    m_customOrder.clear();
     m_showOnlyLiked = false;
 
+    const bool hadActivePlaylist = !m_activePlaylistId.isEmpty();
+    m_playlists.clear();
+    m_activePlaylistId.clear();
+    m_playbackPlaylistId.clear();
+    m_playlistTracks.clear();
+    if (m_playlistsProxy) m_playlistsProxy->setFilterFixedString(QString());
+
+    migrateLegacyPlaylists();
+    migrateLegacyPlaylistOrder();
+    migrateLegacyLiked();
+
+    m_likedPaths.clear();
+    loadLiked();
+    m_likedRevision++;
+    emit likedChanged();
+
+    m_customOrder.clear();
     loadPlaylistOrder();
+
+    loadPlaylists();
 
     rebuildArtists();
     rebuildAlbums();
     sortAndApply(false);
     m_searchResults.clear();
 
-    if (!m_activePlaylistId.isEmpty()) rebuildPlaylistTracks();
+    if (hadActivePlaylist) emit activePlaylistChanged();
 
     m_settings->setValue("library/folder", localPath);
 

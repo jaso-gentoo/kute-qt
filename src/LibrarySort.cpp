@@ -89,6 +89,7 @@ void Library::saveLiked() {
     QJsonObject o;
     o["paths"] = arr;
     o["version"] = 1;
+    o["folder"] = m_folder;
 
     const QString path = likedPath();
     QDir().mkpath(QFileInfo(path).absolutePath());
@@ -96,6 +97,19 @@ void Library::saveLiked() {
     if (f.open(QIODevice::WriteOnly)) {
         f.write(QJsonDocument(o).toJson(QJsonDocument::Indented));
     }
+}
+
+void Library::migrateLegacyLiked() {
+    const QString legacy = kuteConfigDir() + "/liked.json";
+    if (!QFile::exists(legacy)) return;
+    if (m_folder.isEmpty()) return;
+
+    const QString target = likedPath();
+    if (target == legacy) return;
+    if (QFile::exists(target)) return;
+
+    QDir().mkpath(QFileInfo(target).absolutePath());
+    QFile::rename(legacy, target);
 }
 
 void Library::flushLikedSave() {
@@ -179,32 +193,35 @@ void Library::toggleCurrentLike() {
 void Library::loadPlaylistOrder() {
     m_customOrder.clear();
 
-    QStringList candidates;
-    candidates << playlistOrderPath();
-    candidates << (QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
-                   + "/kute-player/playlist_order.json");
+    QFile f(playlistOrderPath());
+    if (!f.open(QIODevice::ReadOnly)) return;
 
-    for (const QString &path : candidates) {
-        QFile f(path);
-        if (!f.open(QIODevice::ReadOnly)) continue;
+    QJsonParseError err;
+    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll(), &err);
+    if (err.error != QJsonParseError::NoError || !doc.isObject()) return;
 
-        QJsonParseError err;
-        const QJsonDocument doc = QJsonDocument::fromJson(f.readAll(), &err);
-        if (err.error != QJsonParseError::NoError || !doc.isObject()) continue;
+    const QJsonObject o = doc.object();
+    QJsonArray arr = o.value("customOrder").toArray();
+    if (arr.isEmpty()) arr = o.value("order").toArray();
+    if (arr.isEmpty()) arr = o.value("playlistOrder").toArray();
 
-        const QJsonObject o = doc.object();
-        QJsonArray arr = o.value("customOrder").toArray();
-        if (arr.isEmpty()) arr = o.value("order").toArray();
-        if (arr.isEmpty()) arr = o.value("playlistOrder").toArray();
-        if (arr.isEmpty()) continue;
-
-        for (const auto &v : arr) {
-            const QString p = v.toString();
-            if (!p.isEmpty()) m_customOrder.append(p);
-        }
-
-        if (!m_customOrder.isEmpty()) return;
+    for (const auto &v : arr) {
+        const QString p = v.toString();
+        if (!p.isEmpty()) m_customOrder.append(p);
     }
+}
+
+void Library::migrateLegacyPlaylistOrder() {
+    const QString legacy = kuteConfigDir() + "/playlist_order.json";
+    if (!QFile::exists(legacy)) return;
+    if (m_folder.isEmpty()) return;
+
+    const QString target = playlistOrderPath();
+    if (target == legacy) return;
+    if (QFile::exists(target)) return;
+
+    QDir().mkpath(QFileInfo(target).absolutePath());
+    QFile::rename(legacy, target);
 }
 
 void Library::savePlaylistOrderNow() {

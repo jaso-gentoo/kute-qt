@@ -9,13 +9,38 @@
 #include <QPainterPath>
 #include <QStandardPaths>
 #include <QUrl>
+#include <QCryptographicHash>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QUuid>
 
 QString Library::playlistsPath() const {
-    return kuteConfigDir() + "/playlists.json";
+    return playlistsPathFor(m_folder);
+}
+
+QString Library::playlistsPathFor(const QString &folder) const {
+    if (folder.isEmpty()) {
+        return kuteConfigDir() + "/playlists_orphan.json";
+    }
+    const QString hash = QString::fromLatin1(
+        QCryptographicHash::hash(folder.toUtf8(), QCryptographicHash::Sha1).toHex());
+    return kuteConfigDir() + "/playlists/" + hash + ".json";
+}
+
+void Library::migrateLegacyPlaylists() {
+    const QString legacy = kuteConfigDir() + "/playlists.json";
+    if (!QFile::exists(legacy)) return;
+    if (m_folder.isEmpty()) return;
+
+    const QString target = playlistsPath();
+    if (target == legacy) return;
+    if (QFile::exists(target)) {
+        return;
+    }
+
+    QDir().mkpath(QFileInfo(target).absolutePath());
+    QFile::rename(legacy, target);
 }
 
 QString Library::playlistCoverThumbPath(const QString &id) const {
@@ -78,9 +103,11 @@ void Library::savePlaylists() {
     QJsonObject root;
     root["version"]   = 1;
     root["playlists"] = arr;
+    root["folder"]    = m_folder;
 
-    QDir().mkpath(kuteConfigDir());
-    QFile f(playlistsPath());
+    const QString path = playlistsPath();
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QFile f(path);
     if (f.open(QIODevice::WriteOnly)) {
         f.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
     }

@@ -37,6 +37,7 @@ static void reexecWithEnv(char *argv[]) {
     setenv("QT_LOGGING_RULES", "qt.multimedia.*=false;qt.quick.*=false", 1);
     setenv("AV_LOG_FORCE_NOCOLOR", "1", 1);
     if (qEnvironmentVariableIsSet("KUTE_ENV_READY")) return;
+    setenv("QT_QPA_PLATFORMTHEME", "xdgdesktopportal", 1);
 
     setenv("MALLOC_ARENA_MAX", "2", 1);
     setenv("QSG_USE_IMAGE_CACHE", "0", 1);

@@ -119,6 +119,7 @@ ApplicationWindow {
         library.clearFilter()
         closeFloatingSearch()
         if (playlistView) playlistView.closeSort()
+        if (browseView) browseView.closePlaylistDetail()
         library.setPlaybackContext("library")
         window.currentPage = 0
         navRail.currentIndex = 0
@@ -156,7 +157,10 @@ ApplicationWindow {
     FolderDialog {
         id: folderDialog
         title: "Select music folder"
-        onAccepted: library.loadFolder(selectedFolder.toString())
+        onAccepted: {
+            library.loadFolder(selectedFolder.toString())
+            window.goToHome()
+        }
     }
 
     Rectangle {

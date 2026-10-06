@@ -238,10 +238,16 @@ private:
     bool    writeTextToTags(const QString &path, const QString &content);
     QString offsetsPath() const;
     QString likedPath() const;
+    QString likedPathFor(const QString &folder) const;
     QString playlistOrderPath() const;
+    QString playlistOrderPathFor(const QString &folder) const;
     QString playlistsPath() const;
+    QString playlistsPathFor(const QString &folder) const;
     QString playlistCoverThumbPath(const QString &id) const;
 
+    void    migrateLegacyPlaylists();
+    void    migrateLegacyPlaylistOrder();
+    void    migrateLegacyLiked();
     void    refreshPlaylistModel();
 
     void    loadOffsets();

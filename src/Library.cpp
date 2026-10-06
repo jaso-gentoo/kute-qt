@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QSysInfo>
 #include <QTimer>
+#include <QCryptographicHash>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -56,8 +57,7 @@ Library::Library(QObject *parent) : QObject(parent) {
     m_albumsAscending  = m_settings->value("library/albumsAscending", true).toBool();
 
     loadOffsets();
-    loadLiked();
-    loadPlaylistOrder();
+
     m_playlistModel.setCoverResolver([this](const QString &id) {
         return playlistCover(id);
     });
@@ -65,8 +65,6 @@ Library::Library(QObject *parent) : QObject(parent) {
     m_playlistsProxy = new PlaylistFilterModel(this);
     m_playlistsProxy->setSourceModel(&m_playlistModel);
     m_playlistsProxy->setFilterRole(PlaylistModel::NameRole);
-
-    loadPlaylists();
 
     connect(m_player, &QMediaPlayer::positionChanged,
             this, [this](qint64) { emit positionChanged(); });
@@ -260,11 +258,29 @@ QString Library::offsetsPath() const {
 }
 
 QString Library::likedPath() const {
-    return kuteConfigDir() + "/liked.json";
+    return likedPathFor(m_folder);
+}
+
+QString Library::likedPathFor(const QString &folder) const {
+    if (folder.isEmpty()) {
+        return kuteConfigDir() + "/liked_orphan.json";
+    }
+    const QString hash = QString::fromLatin1(
+        QCryptographicHash::hash(folder.toUtf8(), QCryptographicHash::Sha1).toHex());
+    return kuteConfigDir() + "/liked/" + hash + ".json";
 }
 
 QString Library::playlistOrderPath() const {
-    return kuteConfigDir() + "/playlist_order.json";
+    return playlistOrderPathFor(m_folder);
+}
+
+QString Library::playlistOrderPathFor(const QString &folder) const {
+    if (folder.isEmpty()) {
+        return kuteConfigDir() + "/playlist_order_orphan.json";
+    }
+    const QString hash = QString::fromLatin1(
+        QCryptographicHash::hash(folder.toUtf8(), QCryptographicHash::Sha1).toHex());
+    return kuteConfigDir() + "/playlist_order/" + hash + ".json";
 }
 
 QString Library::toFileUrl(const QString &localPath) const {
