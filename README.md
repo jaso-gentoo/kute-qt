@@ -1,44 +1,22 @@
-<img width="821" height="517" alt="image" src="https://github.com/user-attachments/assets/871c2d11-5bf0-433a-97f5-ab61232e89fc" />
-# kute
+<img width="800" height="578" alt="image" src="https://github.com/user-attachments/assets/93a8de35-9f9b-4311-af5d-b7e40182fab6" /># kute
 
 Music player for Linux and Windows, written in C++/Qt6/QML.
 
 ## Screenshots
 
-<img width="821" height="517" alt="image" src="https://github.com/user-attachments/assets/e7605abc-05e9-4dda-a38b-267b45d70348" />
-<img width="824" height="520" alt="image" src="https://github.com/user-attachments/assets/23c0de54-c432-4883-a273-9e3145d645ac" />
-<img width="819" height="586" alt="image" src="https://github.com/user-attachments/assets/c7be5e50-3d0a-4846-8b76-9bca033266bb" />
+<table>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/12495107-bec8-4249-952a-5ae32b46f8e4" width="260"/></td>
+    <td><img src="https://github.com/user-attachments/assets/02ebb28d-c7cb-4ec9-bec2-8ef548cf1455" width="260"/></td>
+    <td><img src="https://github.com/user-attachments/assets/37e5f3c8-f580-40f8-a7f0-dcc7f9932abf" width="260"/></td>
+  </tr>
+</table>
 
-## Dependencies
+## System requirements
 
-- Qt 6.5+ — Core, Gui, Quick, QuickControls2, Multimedia, Network, DBus (Linux)
-- TagLib
-- CMake 3.20+
-- pkg-config (Linux)
-- C++17 compiler
-
-### Arch
-sudo pacman -S qt6-base qt6-multimedia qt6-declarative taglib cmake ninja pkgconf
-
-### Gentoo
-sudo emerge dev-qt/qtbase dev-qt/qtmultimedia dev-qt/qtdeclarative media-libs/taglib dev-build/cmake dev-build/ninja dev-util/pkgconf
-
-### Debian/Ubuntu
-sudo apt install qt6-base-dev qt6-multimedia-dev qt6-declarative-dev libtag1-dev cmake ninja-build pkg-config
-
-## Build
-
-```bash
-cd ~/kute-qt
-      cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-      cmake --build build
-      ./build/kute
-```
-
-## Install
-
-sudo cmake --install build --prefix /usr/local
-
+- **Linux**: any distro with glibc 2.35+ (Ubuntu 22.04+, Fedora 36+, Arch). AppImage is self-contained — no dependencies to install.
+- **Windows**: Windows 10 or newer. The `.exe` is a portable binary.
+  
 ## Keyboard shortcuts
 
 ### Playback
