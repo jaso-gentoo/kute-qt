@@ -1,4 +1,4 @@
-<img width="800" height="578" alt="image" src="https://github.com/user-attachments/assets/93a8de35-9f9b-4311-af5d-b7e40182fab6" /># kute
+# kute
 
 Music player for Linux and Windows, written in C++/Qt6/QML.
 
