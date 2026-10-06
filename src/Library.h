@@ -271,6 +271,7 @@ private:
     const Playlist *findPlaylist(const QString &id) const;
     Playlist       *findPlaylistMutable(const QString &id);
     void            rebuildPlaylistTracks();
+    void            rebuildPlaylistTracksIncremental();
     TrackModel     *currentPlaybackModel();
     void            playFromModel(TrackModel *model, int index);
 

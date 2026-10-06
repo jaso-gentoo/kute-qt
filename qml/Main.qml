@@ -38,7 +38,11 @@ ApplicationWindow {
 
     function openModal(tab) {
         closeFloatingSearch()
-        if (playlistView) playlistView.closeSort()
+        if (playlistView) {
+            playlistView.closeSort()
+            playlistView.closeAddMenu()
+        }
+        if (browseView) browseView.closePlaylistsDialogs()
         settingsModal.currentTab = tab
         settingsOpen = true
     }
@@ -49,7 +53,11 @@ ApplicationWindow {
         } else {
             if (Date.now() - lastSearchClose < 250) return
             if (settingsOpen) settingsOpen = false
-            if (playlistView) playlistView.closeSort()
+            if (playlistView) {
+                playlistView.closeSort()
+                playlistView.closeAddMenu()
+            }
+            if (browseView) browseView.closePlaylistsDialogs()
             floatingSearchOpen = true
         }
     }
@@ -118,8 +126,11 @@ ApplicationWindow {
     function goToHome() {
         library.clearFilter()
         closeFloatingSearch()
-        if (playlistView) playlistView.closeSort()
-        if (browseView) browseView.closePlaylistDetail()
+        if (playlistView) {
+            playlistView.closeSort()
+            playlistView.closeAddMenu()
+        }
+        if (browseView) browseView.closePlaylistsDialogs()
         library.setPlaybackContext("library")
         window.currentPage = 0
         navRail.currentIndex = 0
@@ -129,7 +140,11 @@ ApplicationWindow {
     function goToArtists() {
         library.clearFilter()
         closeFloatingSearch()
-        if (playlistView) playlistView.closeSort()
+        if (playlistView) {
+            playlistView.closeSort()
+            playlistView.closeAddMenu()
+        }
+        if (browseView) browseView.closePlaylistsDialogs()
         library.setPlaybackContext("library")
         window.currentPage = 2
         navRail.currentIndex = 1
@@ -390,7 +405,11 @@ ApplicationWindow {
         onPageChanged: (page) => {
             library.clearFilter()
             window.closeFloatingSearch()
-            if (playlistView) playlistView.closeSort()
+            if (playlistView) {
+                playlistView.closeSort()
+                playlistView.closeAddMenu()
+            }
+            if (browseView) browseView.closePlaylistsDialogs()
             window.currentPage = page
             Qt.callLater(window.syncPlaybackContext)
         }

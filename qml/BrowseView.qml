@@ -12,8 +12,8 @@ Item {
     property int currentTab: 0
     property alias playlistsViewing: playlistsView.viewing
 
-    function closePlaylistDetail() {
-        playlistsView.closeDetail()
+    function closePlaylistsDialogs() {
+        playlistsView.closeDialogs()
     }
 
     onCurrentTabChanged: root.contextChanged()

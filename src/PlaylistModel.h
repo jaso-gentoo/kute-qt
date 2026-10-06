@@ -27,6 +27,7 @@ public:
     void setPlaylists(const QList<Playlist> &list);
     void moveRow(int from, int to);
     void removeRow(int index);
+    void insertRow(const Playlist &p);
     void clear();
     int count() const { return m_playlists.size(); }
 

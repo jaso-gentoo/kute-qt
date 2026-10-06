@@ -15,6 +15,7 @@ Item {
     property string viewingName: ""
     property string pendingDeleteId: ""
     property string pendingDeleteName: ""
+    property int    pendingDeleteIndex: -1
     property bool pendingRemoveCover: false
 
     readonly property bool showCover: root.height > 340
@@ -24,13 +25,9 @@ Item {
         return library.playlistCover(root.viewing) !== ""
     }
 
-    function closeDetail() {
-        if (root.pendingRemoveCover) {
-            library.clearPlaylistCover(root.viewing)
-            root.pendingRemoveCover = false
-        }
-        library.setActivePlaylist("")
-        root.viewing = ""
+    function closeDialogs() {
+        if (nameDialog.opened) nameDialog.close()
+        if (deleteDialog.opened) deleteDialog.close()
     }
 
     onViewingChanged: {
@@ -45,6 +42,14 @@ Item {
                 library.clearPlaylistCover(root.viewing)
                 root.pendingRemoveCover = false
             }
+        }
+    }
+
+    Connections {
+        target: library
+        function onPlaylistsChanged() {
+            if (nameDialog.opened) nameDialog.close()
+            if (deleteDialog.opened) deleteDialog.close()
         }
     }
 
@@ -118,9 +123,10 @@ Item {
             opacity: 0
             Behavior on opacity { NumberAnimation { duration: 150 } }
 
-            property point anchorPos: Qt.point(0, 0)
-            x: anchorPos.x - width / 2
-            y: anchorPos.y
+            property real anchorX: 0
+            property real anchorY: 0
+            x: anchorX - width / 2
+            y: anchorY
 
             Text {
                 id: label2
@@ -136,7 +142,10 @@ Item {
                 function onHoveredChanged() {
                     if (cbHover.hovered && cb.tip.length > 0 && cb.enabled) {
                         const p = cb.mapToItem(Overlay.overlay, cb.width / 2, cb.height + 6)
-                        tooltipRect.anchorPos = p
+                        if (p) {
+                            tooltipRect.anchorX = p.x
+                            tooltipRect.anchorY = p.y
+                        }
                         tooltipRect.opacity = 1
                     } else {
                         tooltipRect.opacity = 0
@@ -245,6 +254,56 @@ Item {
         }
     }
 
+    // Scrim for nameDialog
+    Rectangle {
+        parent: Overlay.overlay
+        anchors.fill: parent
+        color: Qt.rgba(0, 0, 0, 0.5)
+        visible: opacity > 0.01
+        opacity: nameDialog.visible ? 1 : 0
+        z: 9980
+        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+            hoverEnabled: true
+            preventStealing: true
+            onClicked: nameDialog.close()
+        }
+
+        WheelHandler {
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            blocking: true
+            onWheel: (event) => { event.accepted = true }
+        }
+    }
+
+    // Scrim for deleteDialog
+    Rectangle {
+        parent: Overlay.overlay
+        anchors.fill: parent
+        color: Qt.rgba(0, 0, 0, 0.5)
+        visible: opacity > 0.01
+        opacity: deleteDialog.visible ? 1 : 0
+        z: 9980
+        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+            hoverEnabled: true
+            preventStealing: true
+            onClicked: deleteDialog.close()
+        }
+
+        WheelHandler {
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            blocking: true
+            onWheel: (event) => { event.accepted = true }
+        }
+    }
+
     Popup {
         id: nameDialog
         parent: Overlay.overlay
@@ -254,6 +313,7 @@ Item {
         modal: false
         dim: false
         focus: true
+        z: 9990
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
         property string mode: "create"
@@ -373,10 +433,7 @@ Item {
             const name = nameInput.text.trim()
             if (name.length === 0) return
             if (nameDialog.mode === "create") {
-                const id = library.createPlaylistWithTrack(name, "")
-                root.viewing = id
-                root.viewingName = name
-                library.setActivePlaylist(id)
+                library.createPlaylistWithTrack(name, "")
             } else {
                 library.renamePlaylist(nameDialog.playlistId, name)
                 if (root.viewing === nameDialog.playlistId)
@@ -396,6 +453,7 @@ Item {
         modal: false
         dim: false
         focus: true
+        z: 9990
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
         enter: Transition {
@@ -503,7 +561,13 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            library.deletePlaylist(root.pendingDeleteId)
+                            if (root.pendingDeleteIndex >= 0) {
+                                plList.deleteInProgress = true
+                                plList.deletingIndex = root.pendingDeleteIndex
+                                root.pendingDeleteIndex = -1
+                            } else {
+                                library.deletePlaylist(root.pendingDeleteId)
+                            }
                             if (root.viewing === root.pendingDeleteId) root.viewing = ""
                             deleteDialog.close()
                         }
@@ -664,8 +728,9 @@ Item {
                 Layout.fillHeight: true
                 clip: true
                 spacing: 2
-                boundsBehavior: Flickable.StopAtBounds
-                reuseItems: true
+                boundsBehavior: Flickable.DragOverBounds
+                boundsMovement: Flickable.StopAtBounds
+                reuseItems: false
                 model: library.filterText.length === 0
                     ? library.playlists
                     : library.playlistsFiltered
@@ -673,6 +738,8 @@ Item {
                 property int dragFrom: -1
                 property int dragTo: -1
                 property bool dragActive: false
+                property int deletingIndex: -1
+                property bool deleteInProgress: false
 
                 NumberAnimation {
                     id: wheelAnim
@@ -705,8 +772,8 @@ Item {
                 }
 
                 add: Transition {
-                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 320; easing.type: Easing.OutCubic }
-                    NumberAnimation { property: "x"; from: -16; to: 0; duration: 360; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 280; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "x"; from: -60; to: 0; duration: 340; easing.type: Easing.OutCubic }
                 }
                 displaced: Transition {
                     NumberAnimation { properties: "x,y"; duration: 280; easing.type: Easing.OutCubic }
@@ -723,260 +790,289 @@ Item {
                     required property string playlistCover
                     required property int index
 
+                    property real animHeight: plList.deletingIndex === index ? 0 : 46
+
                     width: plList.width
-                    height: 46
+                    height: animHeight
+                    opacity: plList.deletingIndex === index ? 0 : 1
+                    clip: true
 
-                    readonly property bool dragging: plList.dragActive && plList.dragFrom === index
-                    readonly property bool dropAbove: plList.dragActive
-                                   && plList.dragFrom >= 0 && plList.dragTo >= 0
-                                   && plList.dragTo === index
-                                   && plList.dragFrom > index
-                    readonly property bool dropBelow: plList.dragActive
-                                   && plList.dragFrom >= 0 && plList.dragTo >= 0
-                                   && plList.dragTo === index
-                                   && plList.dragFrom < index
+                    Behavior on animHeight { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                    Behavior on opacity    { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
-                    HoverHandler { id: plHov }
+                    onAnimHeightChanged: plList.forceLayout()
 
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: 1
-                        radius: 10
-                        color: theme.onSurface
-                        opacity: plHov.hovered ? 0.08 : 0
-                        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                    Timer {
+                        running: plList.deletingIndex === plRowWrap.index
+                        interval: 320
+                        onTriggered: {
+                            const id = plRowWrap.playlistId
+                            plList.deletingIndex = -1
+                            library.deletePlaylist(id)
+                            plList.deleteInProgress = false
+                        }
                     }
 
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
-                        height: 2
-                        radius: 1
-                        color: theme.primary
-                        y: plRowWrap.dropAbove ? 0
-                           : plRowWrap.dropBelow ? parent.height - 2
-                           : 0
-                        visible: plRowWrap.dropAbove || plRowWrap.dropBelow
-                        opacity: visible ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 120 } }
-                    }
+                    Item {
+                        id: contentItem
+                        width: parent.width
+                        height: 46
+                        anchors.top: parent.top
 
-                    MouseArea {
-                        id: plArea
-                        anchors.fill: parent
-                        z: -2
-                        hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton
-                        cursorShape: library.editMode ? Qt.OpenHandCursor : Qt.PointingHandCursor
-                        preventStealing: true
+                        readonly property bool dragging: plList.dragActive && plList.dragFrom === index
+                        readonly property bool dropAbove: plList.dragActive
+                                       && plList.dragFrom >= 0 && plList.dragTo >= 0
+                                       && plList.dragTo === index
+                                       && plList.dragFrom > index
+                        readonly property bool dropBelow: plList.dragActive
+                                       && plList.dragFrom >= 0 && plList.dragTo >= 0
+                                       && plList.dragTo === index
+                                       && plList.dragFrom < index
 
-                        property real pressY: 0
-                        property bool didDrag: false
+                        HoverHandler { id: plHov }
 
-                        onPressed: (mouse) => {
-                            pressY = mouse.y
-                            didDrag = false
-                            if (library.editMode && library.filterText.length === 0) {
-                                plList.dragFrom = plRowWrap.index
-                                plList.dragTo = plRowWrap.index
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: 1
+                            radius: 10
+                            color: theme.onSurface
+                            opacity: plHov.hovered ? 0.08 : 0
+                            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        }
+
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            height: 2
+                            radius: 1
+                            color: theme.primary
+                            y: contentItem.dropAbove ? 0
+                               : contentItem.dropBelow ? parent.height - 2
+                               : 0
+                            visible: contentItem.dropAbove || contentItem.dropBelow
+                            opacity: visible ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                        }
+
+                        MouseArea {
+                            id: plArea
+                            anchors.fill: parent
+                            z: -2
+                            hoverEnabled: true
+                            acceptedButtons: Qt.LeftButton
+                            cursorShape: library.editMode ? Qt.OpenHandCursor : Qt.PointingHandCursor
+                            preventStealing: true
+
+                            property real pressY: 0
+                            property bool didDrag: false
+
+                            onPressed: (mouse) => {
+                                pressY = mouse.y
+                                didDrag = false
+                                if (library.editMode && library.filterText.length === 0) {
+                                    plList.dragFrom = plRowWrap.index
+                                    plList.dragTo = plRowWrap.index
+                                }
                             }
-                        }
 
-                        onPositionChanged: (mouse) => {
-                            if (!pressed) return
-                            if (!library.editMode || library.filterText.length > 0) return
-                            if (plList.dragFrom < 0) return
-                            const dy = mouse.y - pressY
-                            if (!plList.dragActive && Math.abs(dy) < 6) return
-                            plList.dragActive = true
-                            didDrag = true
-                            const pt = mapToItem(plList, mouse.x, mouse.y)
-                            const stride = plRowWrap.height + plList.spacing
-                            let idx = Math.floor((pt.y + plList.contentY) / stride)
-                            idx = Math.max(0, Math.min(plList.count - 1, idx))
-                            plList.dragTo = idx
-                        }
-
-                        onReleased: {
-                            if (plList.dragActive && plList.dragFrom >= 0 && plList.dragTo >= 0
-                                && plList.dragFrom !== plList.dragTo) {
-                                library.movePlaylist(plList.dragFrom, plList.dragTo)
+                            onPositionChanged: (mouse) => {
+                                if (!pressed) return
+                                if (!library.editMode || library.filterText.length > 0) return
+                                if (plList.dragFrom < 0) return
+                                const dy = mouse.y - pressY
+                                if (!plList.dragActive && Math.abs(dy) < 6) return
+                                plList.dragActive = true
+                                didDrag = true
+                                const pt = mapToItem(plList, mouse.x, mouse.y)
+                                const stride = plRowWrap.height + plList.spacing
+                                let idx = Math.floor((pt.y + plList.contentY) / stride)
+                                idx = Math.max(0, Math.min(plList.count - 1, idx))
+                                plList.dragTo = idx
                             }
-                            plList.dragFrom = -1
-                            plList.dragTo = -1
-                            plList.dragActive = false
-                        }
 
-                        onCanceled: {
-                            plList.dragFrom = -1
-                            plList.dragTo = -1
-                            plList.dragActive = false
-                            didDrag = false
-                        }
-
-                        onExited: {
-                            if (!pressed) {
+                            onReleased: {
+                                if (plList.dragActive && plList.dragFrom >= 0 && plList.dragTo >= 0
+                                    && plList.dragFrom !== plList.dragTo) {
+                                    library.movePlaylist(plList.dragFrom, plList.dragTo)
+                                }
                                 plList.dragFrom = -1
                                 plList.dragTo = -1
                                 plList.dragActive = false
                             }
-                        }
 
-                        onClicked: {
-                            if (didDrag) return
-                            if (library.editMode) return
-                            root.viewing = plRowWrap.playlistId
-                            root.viewingName = plRowWrap.playlistName
-                            library.setActivePlaylist(plRowWrap.playlistId)
-                        }
-                    }
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 8
-                        anchors.rightMargin: 8
-                        spacing: 10
-
-                        Item {
-                            Layout.preferredWidth: library.editMode ? 12 : 0
-                            Layout.preferredHeight: 16
-                            Layout.alignment: Qt.AlignVCenter
-                            clip: true
-                            Behavior on Layout.preferredWidth { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
-                            MaterialIcon {
-                                anchors.centerIn: parent
-                                glyph: "\ue25d"
-                                iconSize: 14
-                                iconColor: theme.outline
-                                opacity: library.editMode ? 1 : 0
-                                Behavior on opacity { NumberAnimation { duration: 200 } }
-                            }
-                        }
-
-                        Item {
-                            Layout.preferredWidth: 34
-                            Layout.preferredHeight: 34
-                            Layout.alignment: Qt.AlignVCenter
-
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 8
-                                color: theme.surfaceVariant
-                                visible: coverImg.status !== Image.Ready
+                            onCanceled: {
+                                plList.dragFrom = -1
+                                plList.dragTo = -1
+                                plList.dragActive = false
+                                didDrag = false
                             }
 
-                            MaterialIcon {
-                                anchors.centerIn: parent
-                                glyph: "\ue8ef"
-                                iconSize: 18
-                                iconColor: theme.outline
-                                opacity: 0.5
-                                visible: coverImg.status !== Image.Ready
-                            }
-
-                            Image {
-                                id: coverImg
-                                anchors.fill: parent
-                                source: plRowWrap.playlistCover || ""
-                                sourceSize.width: 68
-                                sourceSize.height: 68
-                                fillMode: Image.PreserveAspectFit
-                                asynchronous: true
-                                cache: false
-                                smooth: true
-                                mipmap: true
-                                visible: status === Image.Ready
-                            }
-                        }
-
-                        Item {
-                            Layout.preferredWidth: library.editMode ? 16 : 0
-                            Layout.preferredHeight: 16
-                            Layout.alignment: Qt.AlignVCenter
-                            clip: true
-                            Behavior on Layout.preferredWidth { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
-                            MaterialIcon {
-                                anchors.centerIn: parent
-                                glyph: "\ue3c9"
-                                iconSize: 15
-                                iconColor: theme.primary
-                                opacity: library.editMode ? 1 : 0
-                                Behavior on opacity { NumberAnimation { duration: 220 } }
-                            }
-                        }
-
-                        Text {
-                            id: plNameText
-                            Layout.fillWidth: true
-                            Layout.minimumWidth: 40
-                            Layout.alignment: Qt.AlignVCenter
-                            text: plRowWrap.playlistName
-                            color: plHov.hovered ? theme.primary : theme.onSurface
-                            font.pixelSize: 13
-                            font.weight: Font.Medium
-                            elide: Text.ElideRight
-                            Behavior on color { ColorAnimation { duration: 220 } }
-
-                            TapHandler {
-                                enabled: library.editMode
-                                gesturePolicy: TapHandler.DragThreshold
-                                onTapped: {
-                                    const p = plNameText.mapToItem(null, 0, 0)
-                                    nameDialog.x = Math.max(12,
-                                        Math.min(p.x, root.width - nameDialog.width - 12))
-                                    nameDialog.y = p.y + plNameText.height + 4
-                                    nameDialog.mode = "rename"
-                                    nameDialog.playlistId = plRowWrap.playlistId
-                                    nameInput.text = plRowWrap.playlistName
-                                    nameDialog.open()
-                                    Qt.callLater(() => nameInput.forceActiveFocus())
+                            onExited: {
+                                if (!pressed) {
+                                    plList.dragFrom = -1
+                                    plList.dragTo = -1
+                                    plList.dragActive = false
                                 }
                             }
+
+                            onClicked: {
+                                if (didDrag) return
+                                if (library.editMode) return
+                                root.viewing = plRowWrap.playlistId
+                                root.viewingName = plRowWrap.playlistName
+                                library.setActivePlaylist(plRowWrap.playlistId)
+                            }
                         }
 
-                        Text {
-                            Layout.alignment: Qt.AlignVCenter
-                            text: plRowWrap.playlistTrackCount
-                                  + (plRowWrap.playlistTrackCount === 1 ? " track" : " tracks")
-                            color: theme.outline
-                            font.pixelSize: 10
-                        }
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            spacing: 10
 
-                        Item {
-                            Layout.preferredWidth: library.editMode ? 26 : 0
-                            Layout.preferredHeight: 26
-                            Layout.alignment: Qt.AlignVCenter
-                            clip: true
-                            Behavior on Layout.preferredWidth { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 8
-                                color: deleteBtnHov.containsMouse
-                                    ? Qt.rgba(0.9, 0.35, 0.35, 0.22)
-                                    : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.08)
-                                Behavior on color { ColorAnimation { duration: 160 } }
+                            Item {
+                                Layout.preferredWidth: library.editMode ? 12 : 0
+                                Layout.preferredHeight: 16
+                                Layout.alignment: Qt.AlignVCenter
+                                clip: true
+                                Behavior on Layout.preferredWidth { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+                                MaterialIcon {
+                                    anchors.centerIn: parent
+                                    glyph: "\ue25d"
+                                    iconSize: 14
+                                    iconColor: theme.outline
+                                    opacity: library.editMode ? 1 : 0
+                                    Behavior on opacity { NumberAnimation { duration: 200 } }
+                                }
                             }
 
-                            MaterialIcon {
-                                anchors.centerIn: parent
-                                glyph: "\ue872"
-                                iconSize: 14
-                                iconColor: deleteBtnHov.containsMouse ? "#e57373" : theme.onBackground
-                                Behavior on iconColor { ColorAnimation { duration: 150 } }
+                            Item {
+                                Layout.preferredWidth: 34
+                                Layout.preferredHeight: 34
+                                Layout.alignment: Qt.AlignVCenter
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 8
+                                    color: theme.surfaceVariant
+                                    visible: coverImg.status !== Image.Ready
+                                }
+
+                                MaterialIcon {
+                                    anchors.centerIn: parent
+                                    glyph: "\ue8ef"
+                                    iconSize: 18
+                                    iconColor: theme.outline
+                                    opacity: 0.5
+                                    visible: coverImg.status !== Image.Ready
+                                }
+
+                                Image {
+                                    id: coverImg
+                                    anchors.fill: parent
+                                    source: plRowWrap.playlistCover || ""
+                                    sourceSize.width: 68
+                                    sourceSize.height: 68
+                                    fillMode: Image.PreserveAspectFit
+                                    asynchronous: true
+                                    cache: false
+                                    smooth: true
+                                    mipmap: true
+                                    visible: status === Image.Ready
+                                }
                             }
 
-                            MouseArea {
-                                id: deleteBtnHov
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    root.pendingDeleteId = plRowWrap.playlistId
-                                    root.pendingDeleteName = plRowWrap.playlistName
-                                    deleteDialog.open()
+                            Item {
+                                Layout.preferredWidth: library.editMode ? 16 : 0
+                                Layout.preferredHeight: 16
+                                Layout.alignment: Qt.AlignVCenter
+                                clip: true
+                                Behavior on Layout.preferredWidth { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+                                MaterialIcon {
+                                    anchors.centerIn: parent
+                                    glyph: "\ue3c9"
+                                    iconSize: 15
+                                    iconColor: theme.primary
+                                    opacity: library.editMode ? 1 : 0
+                                    Behavior on opacity { NumberAnimation { duration: 220 } }
+                                }
+                            }
+
+                            Text {
+                                id: plNameText
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 40
+                                Layout.alignment: Qt.AlignVCenter
+                                text: plRowWrap.playlistName
+                                color: plHov.hovered ? theme.primary : theme.onSurface
+                                font.pixelSize: 13
+                                font.weight: Font.Medium
+                                elide: Text.ElideRight
+                                Behavior on color { ColorAnimation { duration: 220 } }
+
+                                TapHandler {
+                                    enabled: library.editMode
+                                    gesturePolicy: TapHandler.DragThreshold
+                                    onTapped: {
+                                        const p = plNameText.mapToItem(null, 0, 0)
+                                        nameDialog.x = Math.max(12,
+                                            Math.min(p.x, root.width - nameDialog.width - 12))
+                                        nameDialog.y = p.y + plNameText.height + 4
+                                        nameDialog.mode = "rename"
+                                        nameDialog.playlistId = plRowWrap.playlistId
+                                        nameInput.text = plRowWrap.playlistName
+                                        nameDialog.open()
+                                        Qt.callLater(() => nameInput.forceActiveFocus())
+                                    }
+                                }
+                            }
+
+                            Text {
+                                Layout.alignment: Qt.AlignVCenter
+                                text: plRowWrap.playlistTrackCount
+                                      + (plRowWrap.playlistTrackCount === 1 ? " track" : " tracks")
+                                color: theme.outline
+                                font.pixelSize: 10
+                            }
+
+                            Item {
+                                Layout.preferredWidth: library.editMode ? 26 : 0
+                                Layout.preferredHeight: 26
+                                Layout.alignment: Qt.AlignVCenter
+                                clip: true
+                                Behavior on Layout.preferredWidth { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 8
+                                    color: deleteBtnHov.containsMouse
+                                        ? Qt.rgba(0.9, 0.35, 0.35, 0.22)
+                                        : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.08)
+                                    Behavior on color { ColorAnimation { duration: 160 } }
+                                }
+
+                                MaterialIcon {
+                                    anchors.centerIn: parent
+                                    glyph: "\ue872"
+                                    iconSize: 14
+                                    iconColor: deleteBtnHov.containsMouse ? "#e57373" : theme.onBackground
+                                    Behavior on iconColor { ColorAnimation { duration: 150 } }
+                                }
+
+                                MouseArea {
+                                    id: deleteBtnHov
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (plList.deleteInProgress) return
+                                        root.pendingDeleteId = plRowWrap.playlistId
+                                        root.pendingDeleteName = plRowWrap.playlistName
+                                        root.pendingDeleteIndex = plRowWrap.index
+                                        deleteDialog.open()
+                                    }
                                 }
                             }
                         }
@@ -1202,13 +1298,16 @@ Item {
                 Layout.fillHeight: true
                 clip: true
                 spacing: 2
-                boundsBehavior: Flickable.StopAtBounds
+                boundsBehavior: Flickable.DragOverBounds
+                boundsMovement: Flickable.StopAtBounds
                 cacheBuffer: 300
-                reuseItems: true
+                reuseItems: false
                 model: library.playlistTracks
 
                 property int dragIndex: -1
                 property int dropIndex: -1
+                property int deletingIndex: -1
+                property bool deleteInProgress: false
 
                 NumberAnimation {
                     id: trackWheel
@@ -1254,7 +1353,7 @@ Item {
 
                 add: Transition {
                     NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 280; easing.type: Easing.OutCubic }
-                    NumberAnimation { property: "x"; from: 20; to: 0; duration: 320; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "x"; from: -60; to: 0; duration: 340; easing.type: Easing.OutCubic }
                 }
                 displaced: Transition {
                     NumberAnimation { properties: "x,y"; duration: 280; easing.type: Easing.OutCubic }
@@ -1286,277 +1385,307 @@ Item {
                         return library.isPathLiked(trackRow.path)
                     }
 
-                    HoverHandler { id: trackHover }
+                    property real animHeight: trackList.deletingIndex === index ? 0 : 42
 
                     width: trackList.width
-                    height: 42
+                    height: animHeight
                     radius: 10
                     color: "transparent"
-                    opacity: isDragging ? 0.35 : 1.0
-                    Behavior on opacity { NumberAnimation { duration: 180 } }
+                    opacity: isDragging ? 0.35 : (trackList.deletingIndex === index ? 0 : 1)
+                    clip: true
 
-                    MouseArea {
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton
-                        preventStealing: library.editMode
-                        cursorShape: library.editMode ? Qt.OpenHandCursor : Qt.PointingHandCursor
+                    Behavior on animHeight { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                    Behavior on opacity    { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
-                        onClicked: {
-                            if (library.editMode) return
-                            library.playPlaylistIndex(trackRow.index)
-                            root.playlistActivated()
-                        }
+                    onAnimHeightChanged: trackList.forceLayout()
 
-                        onPressed: (mouse) => {
-                            if (!library.editMode) return
-                            if (mouse.button !== Qt.LeftButton) return
-                            if (library.filterText.length > 0) return
-                            trackList.dragIndex = trackRow.index
-                            trackList.dropIndex = trackRow.index
-                        }
-
-                        onPositionChanged: (mouse) => {
-                            if (!library.editMode || trackList.dragIndex < 0) return
-                            if (library.filterText.length > 0) return
-                            const pt = mapToItem(trackList, mouse.x, mouse.y)
-                            const stride = trackRow.height + trackList.spacing
-                            let idx = Math.floor((pt.y + trackList.contentY) / stride)
-                            idx = Math.max(0, Math.min(trackList.count - 1, idx))
-                            trackList.dropIndex = idx
-                        }
-
-                        onReleased: {
-                            if (!library.editMode) return
-                            if (trackList.dragIndex >= 0 && trackList.dropIndex >= 0
-                                && trackList.dragIndex !== trackList.dropIndex) {
-                                library.moveTrackInPlaylist(library.activePlaylistId,
-                                                             trackList.dragIndex,
-                                                             trackList.dropIndex)
-                            }
-                            trackList.dragIndex = -1
-                            trackList.dropIndex = -1
-                        }
-
-                        onCanceled: {
-                            trackList.dragIndex = -1
-                            trackList.dropIndex = -1
+                    Timer {
+                        running: trackList.deletingIndex === trackRow.index
+                        interval: 320
+                        onTriggered: {
+                            const idx = trackList.deletingIndex
+                            trackList.deletingIndex = -1
+                            if (idx >= 0)
+                                library.removeTrackFromPlaylist(library.activePlaylistId, idx)
+                            trackList.deleteInProgress = false
                         }
                     }
 
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
-                        height: 2
-                        radius: 1
-                        color: theme.primary
-                        y: trackRow.dropAbove ? 0
-                           : trackRow.dropBelow ? parent.height - 2
-                           : 0
-                        visible: trackRow.dropAbove || trackRow.dropBelow
-                        opacity: visible ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 120 } }
-                    }
+                    Item {
+                        id: trackContent
+                        width: parent.width
+                        height: 42
+                        anchors.top: parent.top
 
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: parent.radius
-                        color: trackRow.isCurrent ? theme.primary : theme.onSurface
-                        opacity: trackRow.isCurrent
-                            ? 0.14
-                            : (trackHover.hovered && !library.editMode ? 0.07 : 0)
-                        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                    }
+                        HoverHandler { id: trackHover }
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 10
-                        spacing: 10
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.LeftButton
+                            preventStealing: library.editMode
+                            cursorShape: library.editMode ? Qt.OpenHandCursor : Qt.PointingHandCursor
 
-                        Item {
-                            Layout.preferredWidth: library.editMode ? 14 : 0
-                            Layout.preferredHeight: 16
-                            Layout.alignment: Qt.AlignVCenter
-                            clip: true
-                            Behavior on Layout.preferredWidth { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+                            onClicked: {
+                                if (library.editMode) return
+                                library.playPlaylistIndex(trackRow.index)
+                                root.playlistActivated()
+                            }
 
-                            MaterialIcon {
-                                anchors.centerIn: parent
-                                glyph: "\ue25d"
-                                iconSize: 14
-                                iconColor: theme.outline
-                                opacity: library.editMode ? 1 : 0
-                                Behavior on opacity { NumberAnimation { duration: 200 } }
+                            onPressed: (mouse) => {
+                                if (!library.editMode) return
+                                if (mouse.button !== Qt.LeftButton) return
+                                if (library.filterText.length > 0) return
+                                trackList.dragIndex = trackRow.index
+                                trackList.dropIndex = trackRow.index
+                            }
+
+                            onPositionChanged: (mouse) => {
+                                if (!library.editMode || trackList.dragIndex < 0) return
+                                if (library.filterText.length > 0) return
+                                const pt = mapToItem(trackList, mouse.x, mouse.y)
+                                const stride = trackRow.height + trackList.spacing
+                                let idx = Math.floor((pt.y + trackList.contentY) / stride)
+                                idx = Math.max(0, Math.min(trackList.count - 1, idx))
+                                trackList.dropIndex = idx
+                            }
+
+                            onReleased: {
+                                if (!library.editMode) return
+                                if (trackList.dragIndex >= 0 && trackList.dropIndex >= 0
+                                    && trackList.dragIndex !== trackList.dropIndex) {
+                                    library.moveTrackInPlaylist(library.activePlaylistId,
+                                                                 trackList.dragIndex,
+                                                                 trackList.dropIndex)
+                                }
+                                trackList.dragIndex = -1
+                                trackList.dropIndex = -1
+                            }
+
+                            onCanceled: {
+                                trackList.dragIndex = -1
+                                trackList.dropIndex = -1
                             }
                         }
 
-                        Item {
-                            Layout.preferredWidth: 30
-                            Layout.preferredHeight: 30
-                            Layout.alignment: Qt.AlignVCenter
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            height: 2
+                            radius: 1
+                            color: theme.primary
+                            y: trackRow.dropAbove ? 0
+                               : trackRow.dropBelow ? parent.height - 2
+                               : 0
+                            visible: trackRow.dropAbove || trackRow.dropBelow
+                            opacity: visible ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                        }
 
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 6
-                                color: theme.surfaceVariant
-                                visible: thumbImg.status !== Image.Ready
-                            }
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: trackRow.radius
+                            color: trackRow.isCurrent ? theme.primary : theme.onSurface
+                            opacity: trackRow.isCurrent
+                                ? 0.14
+                                : (trackHover.hovered && !library.editMode ? 0.07 : 0)
+                            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        }
 
-                            MaterialIcon {
-                                anchors.centerIn: parent
-                                glyph: "\ue405"
-                                iconSize: 14
-                                iconColor: theme.outline
-                                visible: thumbImg.status !== Image.Ready
-                            }
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 10
+                            spacing: 10
 
-                            Image {
-                                id: thumbImg
-                                anchors.fill: parent
-                                source: trackRow.thumb
-                                    ? library.toFileUrl(trackRow.thumb) + "?v=" + library.coverVersion
-                                    : ""
-                                sourceSize.width: 60
-                                sourceSize.height: 60
-                                fillMode: Image.PreserveAspectFit
-                                asynchronous: true
-                                cache: true
-                                smooth: true
-                                visible: status === Image.Ready
-                            }
-
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 6
-                                color: "#000"
-                                opacity: trackHover.hovered && !library.editMode ? 0.5 : 0
-                                Behavior on opacity { NumberAnimation { duration: 180 } }
+                            Item {
+                                Layout.preferredWidth: library.editMode ? 14 : 0
+                                Layout.preferredHeight: 16
+                                Layout.alignment: Qt.AlignVCenter
+                                clip: true
+                                Behavior on Layout.preferredWidth { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
 
                                 MaterialIcon {
                                     anchors.centerIn: parent
-                                    glyph: trackRow.isCurrent && library.isPlaying ? "\ue034" : "\ue037"
+                                    glyph: "\ue25d"
                                     iconSize: 14
-                                    iconColor: "white"
+                                    iconColor: theme.outline
+                                    opacity: library.editMode ? 1 : 0
+                                    Behavior on opacity { NumberAnimation { duration: 200 } }
                                 }
                             }
 
-                            Rectangle {
-                                id: likeBadge
-                                anchors.right: parent.right
-                                anchors.top: parent.top
-                                anchors.rightMargin: -4
-                                anchors.topMargin: -4
-                                width: 14
-                                height: 14
-                                radius: 7
-                                color: theme.surface
+                            Item {
+                                Layout.preferredWidth: 30
+                                Layout.preferredHeight: 30
+                                Layout.alignment: Qt.AlignVCenter
 
-                                opacity: trackRow.liked ? 1 : 0
-                                scale: trackRow.liked ? 1.0 : 0.3
-                                rotation: trackRow.liked ? 0 : -30
-
-                                Behavior on opacity {
-                                    NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-                                }
-                                Behavior on scale {
-                                    NumberAnimation {
-                                        duration: 340
-                                        easing.type: Easing.OutBack
-                                        easing.overshoot: 3.5
-                                    }
-                                }
-                                Behavior on rotation {
-                                    NumberAnimation {
-                                        duration: 340
-                                        easing.type: Easing.OutBack
-                                        easing.overshoot: 2.5
-                                    }
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 6
+                                    color: theme.surfaceVariant
+                                    visible: thumbImg.status !== Image.Ready
                                 }
 
                                 MaterialIcon {
                                     anchors.centerIn: parent
-                                    width: 11
-                                    height: 11
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    glyph: "\ue87d"
-                                    iconSize: 11
-                                    filled: true
-                                    iconColor: theme.primary
-                                    anchors.horizontalCenterOffset: 0.5
-                                    anchors.verticalCenterOffset: 0.7
+                                    glyph: "\ue405"
+                                    iconSize: 14
+                                    iconColor: theme.outline
+                                    visible: thumbImg.status !== Image.Ready
+                                }
+
+                                Image {
+                                    id: thumbImg
+                                    anchors.fill: parent
+                                    source: trackRow.thumb
+                                        ? library.toFileUrl(trackRow.thumb) + "?v=" + library.coverVersion
+                                        : ""
+                                    sourceSize.width: 60
+                                    sourceSize.height: 60
+                                    fillMode: Image.PreserveAspectFit
+                                    asynchronous: true
+                                    cache: true
+                                    smooth: true
+                                    visible: status === Image.Ready
+                                }
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 6
+                                    color: "#000"
+                                    opacity: trackHover.hovered && !library.editMode ? 0.5 : 0
+                                    Behavior on opacity { NumberAnimation { duration: 180 } }
+
+                                    MaterialIcon {
+                                        anchors.centerIn: parent
+                                        glyph: trackRow.isCurrent && library.isPlaying ? "\ue034" : "\ue037"
+                                        iconSize: 14
+                                        iconColor: "white"
+                                    }
+                                }
+
+                                Rectangle {
+                                    id: likeBadge
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    anchors.rightMargin: -4
+                                    anchors.topMargin: -4
+                                    width: 14
+                                    height: 14
+                                    radius: 7
+                                    color: theme.surface
+
+                                    opacity: trackRow.liked ? 1 : 0
+                                    scale: trackRow.liked ? 1.0 : 0.3
+                                    rotation: trackRow.liked ? 0 : -30
+
+                                    Behavior on opacity {
+                                        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                                    }
+                                    Behavior on scale {
+                                        NumberAnimation {
+                                            duration: 340
+                                            easing.type: Easing.OutBack
+                                            easing.overshoot: 3.5
+                                        }
+                                    }
+                                    Behavior on rotation {
+                                        NumberAnimation {
+                                            duration: 340
+                                            easing.type: Easing.OutBack
+                                            easing.overshoot: 2.5
+                                        }
+                                    }
+
+                                    MaterialIcon {
+                                        anchors.centerIn: parent
+                                        width: 11
+                                        height: 11
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                        glyph: "\ue87d"
+                                        iconSize: 11
+                                        filled: true
+                                        iconColor: theme.primary
+                                        anchors.horizontalCenterOffset: 0.5
+                                        anchors.verticalCenterOffset: 0.7
+                                    }
                                 }
                             }
-                        }
 
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.alignment: Qt.AlignVCenter
-                            spacing: 0
-
-                            Text {
+                            ColumnLayout {
                                 Layout.fillWidth: true
-                                text: trackRow.title
-                                color: trackRow.isCurrent ? theme.primary : theme.onSurface
-                                font.pixelSize: 12
-                                font.weight: trackRow.isCurrent ? Font.DemiBold : Font.Medium
-                                elide: Text.ElideRight
-                                Behavior on color { ColorAnimation { duration: 220 } }
+                                Layout.alignment: Qt.AlignVCenter
+                                spacing: 0
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: trackRow.title
+                                    color: trackRow.isCurrent ? theme.primary : theme.onSurface
+                                    font.pixelSize: 12
+                                    font.weight: trackRow.isCurrent ? Font.DemiBold : Font.Medium
+                                    elide: Text.ElideRight
+                                    Behavior on color { ColorAnimation { duration: 220 } }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: trackRow.artist
+                                    color: theme.outline
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
                             }
 
                             Text {
-                                Layout.fillWidth: true
-                                text: trackRow.artist
+                                text: library.formatDuration(trackRow.duration)
                                 color: theme.outline
                                 font.pixelSize: 10
-                                elide: Text.ElideRight
-                            }
-                        }
-
-                        Text {
-                            text: library.formatDuration(trackRow.duration)
-                            color: theme.outline
-                            font.pixelSize: 10
-                            font.family: "monospace"
-                            Layout.preferredWidth: 42
-                            horizontalAlignment: Text.AlignRight
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-
-                        Item {
-                            Layout.preferredWidth: (library.editMode && !trackRow.isDragging) ? 24 : 0
-                            Layout.preferredHeight: 24
-                            Layout.alignment: Qt.AlignVCenter
-                            clip: true
-                            Behavior on Layout.preferredWidth { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
-
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 7
-                                color: removeHov.containsMouse
-                                    ? Qt.rgba(0.9, 0.35, 0.35, 0.28)
-                                    : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.08)
-                                Behavior on color { ColorAnimation { duration: 150 } }
+                                font.family: "monospace"
+                                Layout.preferredWidth: 42
+                                horizontalAlignment: Text.AlignRight
+                                Layout.alignment: Qt.AlignVCenter
                             }
 
-                            MaterialIcon {
-                                anchors.centerIn: parent
-                                glyph: "\ue872"
-                                iconSize: 14
-                                iconColor: removeHov.containsMouse ? "#e57373" : theme.onBackground
-                                Behavior on iconColor { ColorAnimation { duration: 150 } }
-                            }
+                            Item {
+                                Layout.preferredWidth: (library.editMode && !trackRow.isDragging) ? 24 : 0
+                                Layout.preferredHeight: 24
+                                Layout.alignment: Qt.AlignVCenter
+                                clip: true
+                                Behavior on Layout.preferredWidth { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
 
-                            MouseArea {
-                                id: removeHov
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                enabled: library.editMode
-                                onClicked: library.removeTrackFromPlaylist(library.activePlaylistId, trackRow.index)
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 7
+                                    color: removeHov.containsMouse
+                                        ? Qt.rgba(0.9, 0.35, 0.35, 0.28)
+                                        : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.08)
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
+
+                                MaterialIcon {
+                                    anchors.centerIn: parent
+                                    glyph: "\ue872"
+                                    iconSize: 14
+                                    iconColor: removeHov.containsMouse ? "#e57373" : theme.onBackground
+                                    Behavior on iconColor { ColorAnimation { duration: 150 } }
+                                }
+
+                                MouseArea {
+                                    id: removeHov
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    enabled: library.editMode
+                                    onClicked: {
+                                        if (trackList.deleteInProgress) return
+                                        trackList.deleteInProgress = true
+                                        trackList.deletingIndex = trackRow.index
+                                    }
+                                }
                             }
                         }
                     }

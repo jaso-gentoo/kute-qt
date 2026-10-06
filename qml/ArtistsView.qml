@@ -175,15 +175,6 @@ Item {
                 radius: 12
                 color: "transparent"
 
-                scale: hov.pressed ? 0.985 : (hov.containsMouse ? 1.010 : 1.0)
-                Behavior on scale {
-                    NumberAnimation {
-                        duration: 240
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 2.2
-                    }
-                }
-
                 Rectangle {
                     anchors.fill: parent
                     radius: parent.radius
@@ -205,15 +196,6 @@ Item {
                         color: theme.primary
                         opacity: hov.containsMouse ? 0.22 : 0.14
                         Behavior on opacity { NumberAnimation { duration: 220 } }
-
-                        scale: hov.containsMouse ? 1.08 : 1.0
-                        Behavior on scale {
-                            NumberAnimation {
-                                duration: 260
-                                easing.type: Easing.OutBack
-                                easing.overshoot: 2.8
-                            }
-                        }
 
                         MaterialIcon {
                             anchors.centerIn: parent

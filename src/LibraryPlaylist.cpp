@@ -158,7 +158,7 @@ QString Library::createPlaylistWithTrack(const QString &name, const QString &tra
 
     m_playlists.append(p);
     savePlaylists();
-    refreshPlaylistModel();
+    m_playlistModel.insertRow(p);
     emit playlistsChanged();
 
     if (m_activePlaylistId == p.id) rebuildPlaylistTracks();
@@ -297,7 +297,7 @@ void Library::addTrackToPlaylist(const QString &playlistId, const QString &track
     refreshPlaylistModel();
     emit playlistsChanged();
     if (m_activePlaylistId == playlistId) {
-        rebuildPlaylistTracks();
+        rebuildPlaylistTracksIncremental();
         emit activePlaylistChanged();
     }
 }
@@ -311,7 +311,7 @@ void Library::removeTrackFromPlaylist(const QString &playlistId, int index) {
     refreshPlaylistModel();
     emit playlistsChanged();
     if (m_activePlaylistId == playlistId) {
-        rebuildPlaylistTracks();
+        rebuildPlaylistTracksIncremental();
         emit activePlaylistChanged();
     }
 }
@@ -393,6 +393,34 @@ void Library::rebuildPlaylistTracks() {
         }
     }
     m_playlistTracks.setTracks(list);
+}
+
+void Library::rebuildPlaylistTracksIncremental() {
+    QList<Track> list;
+    if (!m_activePlaylistId.isEmpty()) {
+        const Playlist *p = findPlaylist(m_activePlaylistId);
+        if (p) {
+            QHash<QString, const Track*> byPath;
+            byPath.reserve(m_allTracks.size());
+            for (const Track &t : m_allTracks) byPath.insert(t.path, &t);
+
+            const QString q = m_filterText.toLower().trimmed();
+
+            list.reserve(p->tracks.size());
+            for (const QString &path : p->tracks) {
+                if (const Track *t = byPath.value(path, nullptr)) {
+                    if (!q.isEmpty()) {
+                        if (!t->title.toLower().contains(q) &&
+                            !t->artist.toLower().contains(q) &&
+                            !t->album.toLower().contains(q))
+                            continue;
+                    }
+                    list.append(*t);
+                }
+            }
+        }
+    }
+    m_playlistTracks.updateFiltered(list);
 }
 
 TrackModel *Library::currentPlaybackModel() {

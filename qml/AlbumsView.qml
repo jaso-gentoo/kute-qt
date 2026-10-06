@@ -175,15 +175,6 @@ Item {
                 radius: 10
                 color: "transparent"
 
-                scale: hov.pressed ? 0.985 : (hov.containsMouse ? 1.010 : 1.0)
-                Behavior on scale {
-                    NumberAnimation {
-                        duration: 240
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 2.2
-                    }
-                }
-
                 Rectangle {
                     anchors.fill: parent
                     radius: parent.radius
@@ -232,15 +223,6 @@ Item {
                             smooth: true
                             mipmap: true
                             visible: status === Image.Ready
-
-                            scale: hov.containsMouse ? 1.08 : 1.0
-                            Behavior on scale {
-                                NumberAnimation {
-                                    duration: 320
-                                    easing.type: Easing.OutBack
-                                    easing.overshoot: 2.4
-                                }
-                            }
                         }
                     }
 

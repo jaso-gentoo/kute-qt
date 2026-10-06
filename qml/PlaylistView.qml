@@ -10,61 +10,120 @@ Item {
 
     readonly property color tipText: theme.onBackground
 
-    function openAddMenu(path, rightX, bottomY) {
-        addMenu.trackPath = path
-        addMenu.x = Math.max(12, rightX - addMenu.width)
-        addMenu.y = bottomY + 4
-        addMenu.shown = true
+    property bool   addMenuOpen: false
+    property string addMenuPath: ""
+    property real   addMenuAnchorContentY: 0
+    property real   addMenuAnchorOffset: 0
+
+    function openAddMenu(path, rightX, anchorContentY, btnHeight) {
+        if (addMenuOpen && addMenuPath === path) {
+            closeAddMenu()
+            return
+        }
+
+        addMenuPath = path
+        addMenuAnchorContentY = anchorContentY
+
+        const ow = Overlay.overlay ? Overlay.overlay.width  : 800
+        const oh = Overlay.overlay ? Overlay.overlay.height : 600
+        const mw = 240
+        const mh = addMenuRect.contentH
+
+        const listTopInOverlay = list.mapToItem(Overlay.overlay, 0, 0).y
+        const btnWindowY = listTopInOverlay + anchorContentY - list.contentY
+
+        let offset = btnHeight + 4
+        if (btnWindowY + offset + mh > oh - 12) {
+            const above = -mh - 8
+            if (btnWindowY + above >= 12) offset = above
+            else offset = Math.max(12 - btnWindowY, oh - mh - 12 - btnWindowY)
+        }
+
+        addMenuAnchorOffset = offset
+        addMenuRect.x = Math.max(12, Math.min(rightX - mw, ow - mw - 12))
+
+        if (sortPopup.shown) sortPopup.shown = false
+
+        addMenuOpen = true
     }
 
     function closeAddMenu() {
-        addMenu.shown = false
+        addMenuOpen = false
     }
 
     function closeSort() {
         if (sortPopup.shown) sortPopup.shown = false
     }
 
+    Shortcut {
+        sequence: "Escape"
+        enabled: playlistRoot.addMenuOpen
+        onActivated: playlistRoot.closeAddMenu()
+    }
+
+    Connections {
+        target: library
+        function onPlaylistsChanged() {
+            if (playlistRoot.addMenuOpen) playlistRoot.closeAddMenu()
+            if (sortPopup.shown) sortPopup.shown = false
+        }
+    }
+
     Rectangle {
         id: addMenuScrim
         parent: Overlay.overlay
         anchors.fill: parent
-        color: "transparent"
-        visible: addMenu.shown
+        color: Qt.rgba(0, 0, 0, 0.45)
+        visible: opacity > 0.01
+        opacity: playlistRoot.addMenuOpen ? 1 : 0
         z: 9998
+        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.AllButtons
             hoverEnabled: true
             preventStealing: true
-            onClicked: addMenu.shown = false
+            onClicked: playlistRoot.closeAddMenu()
+        }
+
+        WheelHandler {
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            blocking: true
+            onWheel: (event) => { event.accepted = true }
         }
     }
 
     Rectangle {
-        id: addMenu
+        id: addMenuRect
         parent: Overlay.overlay
-        property string trackPath: ""
-        property bool shown: false
+
+        readonly property real contentH: addMenuCol.implicitHeight + 16
 
         width: 240
-        height: addMenuCol.implicitHeight + 16
+        height: Math.min(contentH, (parent ? parent.height : 600) - 24)
         radius: 14
         color: theme.surface
         border.color: Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.20)
         border.width: 1
+        z: 9999
+        transformOrigin: Item.TopRight
 
         visible: opacity > 0.01
-        opacity: shown ? 1 : 0
-        scale: shown ? 1.0 : 0.94
-        transformOrigin: Item.TopRight
-        z: 9999
+        opacity: playlistRoot.addMenuOpen ? 1 : 0
+        scale: playlistRoot.addMenuOpen ? 1.0 : 0.94
 
         Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-        Behavior on scale   { NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
+        Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
 
-        onShownChanged: if (!shown) newNameField.text = ""
+        y: {
+            if (!parent) return 0
+            const listTopInOverlay = list.mapToItem(Overlay.overlay, 0, 0).y
+            return listTopInOverlay + playlistRoot.addMenuAnchorContentY
+                   - list.contentY + playlistRoot.addMenuAnchorOffset
+        }
+
+        onVisibleChanged: if (!visible) newNameField.text = ""
 
         MouseArea {
             anchors.fill: parent
@@ -77,116 +136,123 @@ Item {
         function submitNew() {
             const name = newNameField.text.trim()
             if (name.length === 0) return
-            library.createPlaylistWithTrack(name, addMenu.trackPath)
-            addMenu.shown = false
+            library.createPlaylistWithTrack(name, playlistRoot.addMenuPath)
+            playlistRoot.closeAddMenu()
         }
 
-        ColumnLayout {
-            id: addMenuCol
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
+        Flickable {
+            id: addMenuFlick
+            anchors.fill: parent
             anchors.margins: 8
-            spacing: 4
+            contentWidth: width
+            contentHeight: addMenuCol.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
 
-            TextField {
-                id: newNameField
-                Layout.fillWidth: true
-                Layout.preferredHeight: 32
-                placeholderText: "New playlist…"
-                placeholderTextColor: theme.outline
-                color: theme.onBackground
-                font.pixelSize: 12
-                leftPadding: 10
-                rightPadding: 10
-                selectByMouse: true
+            ColumnLayout {
+                id: addMenuCol
+                width: addMenuFlick.width
+                spacing: 4
 
-                background: Rectangle {
-                    color: Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.05)
-                    radius: 8
-                    border.color: newNameField.activeFocus ? theme.primary : "transparent"
-                    border.width: 1
-                    Behavior on border.color { ColorAnimation { duration: 180 } }
+                TextField {
+                    id: newNameField
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 32
+                    placeholderText: "New playlist…"
+                    placeholderTextColor: theme.outline
+                    color: theme.onBackground
+                    font.pixelSize: 12
+                    leftPadding: 10
+                    rightPadding: 10
+                    selectByMouse: true
+
+                    background: Rectangle {
+                        color: Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.05)
+                        radius: 8
+                        border.color: newNameField.activeFocus ? theme.primary : "transparent"
+                        border.width: 1
+                        Behavior on border.color { ColorAnimation { duration: 180 } }
+                    }
+
+                    onAccepted: addMenuRect.submitNew()
+                    HoverHandler { cursorShape: Qt.IBeamCursor }
                 }
 
-                onAccepted: addMenu.submitNew()
-                HoverHandler { cursorShape: Qt.IBeamCursor }
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.topMargin: 4
-                Layout.bottomMargin: 4
-                Layout.preferredHeight: 1
-                color: theme.outline
-                opacity: 0.15
-                visible: library.playlists.length > 0
-            }
-
-            Repeater {
-                model: library.playlists
-
-                delegate: Rectangle {
-                    id: plItem
-                    required property string playlistId
-                    required property string playlistName
+                Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 30
-                    radius: 8
-                    color: "transparent"
+                    Layout.topMargin: 4
+                    Layout.bottomMargin: 4
+                    Layout.preferredHeight: 1
+                    color: theme.outline
+                    opacity: 0.15
+                    visible: library.playlists.length > 0
+                }
 
-                    readonly property bool alreadyIn:
-                        library.isPathInPlaylist(plItem.playlistId, addMenu.trackPath)
+                Repeater {
+                    model: library.playlists
 
-                    scale: plItemHov.pressed ? 0.97 : (plItemHov.containsMouse ? 1.02 : 1.0)
-                    Behavior on scale {
-                        NumberAnimation { duration: 200; easing.type: Easing.OutBack; easing.overshoot: 2.5 }
-                    }
+                    delegate: Rectangle {
+                        id: plItem
+                        required property string playlistId
+                        required property string playlistName
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 30
+                        radius: 8
+                        color: "transparent"
 
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: parent.radius
-                        color: theme.onSurface
-                        opacity: plItemHov.containsMouse ? 0.08 : 0
-                        Behavior on opacity { NumberAnimation { duration: 140 } }
-                    }
+                        readonly property bool alreadyIn:
+                            library.isPathInPlaylist(plItem.playlistId, playlistRoot.addMenuPath)
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 10
-                        spacing: 8
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: plItem.playlistName
-                            color: theme.onBackground
-                            font.pixelSize: 12
-                            elide: Text.ElideRight
+                        scale: plItemHov.pressed ? 0.97 : (plItemHov.containsMouse ? 1.02 : 1.0)
+                        Behavior on scale {
+                            NumberAnimation { duration: 200; easing.type: Easing.OutBack; easing.overshoot: 2.5 }
                         }
 
-                        MaterialIcon {
-                            visible: plItem.alreadyIn
-                            glyph: plItem.alreadyIn ? "\ue5ca" : ""
-                            iconSize: 13
-                            iconColor: theme.primary
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: parent.radius
+                            color: theme.onSurface
+                            opacity: plItemHov.containsMouse ? 0.08 : 0
+                            Behavior on opacity { NumberAnimation { duration: 140 } }
                         }
-                    }
 
-                    MouseArea {
-                        id: plItemHov
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (plItem.alreadyIn) {
-                                library.removeTrackFromPlaylist(
-                                    plItem.playlistId,
-                                    library.playlistIndexOf(plItem.playlistId, addMenu.trackPath))
-                            } else {
-                                library.addTrackToPlaylist(plItem.playlistId, addMenu.trackPath)
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 10
+                            spacing: 8
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: plItem.playlistName
+                                color: theme.onBackground
+                                font.pixelSize: 12
+                                elide: Text.ElideRight
                             }
-                            addMenu.shown = false
+
+                            MaterialIcon {
+                                visible: plItem.alreadyIn
+                                glyph: plItem.alreadyIn ? "\ue5ca" : ""
+                                iconSize: 13
+                                iconColor: theme.primary
+                            }
+                        }
+
+                        MouseArea {
+                            id: plItemHov
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (plItem.alreadyIn) {
+                                    library.removeTrackFromPlaylist(
+                                        plItem.playlistId,
+                                        library.playlistIndexOf(plItem.playlistId, playlistRoot.addMenuPath))
+                                } else {
+                                    library.addTrackToPlaylist(plItem.playlistId, playlistRoot.addMenuPath)
+                                }
+                                playlistRoot.closeAddMenu()
+                            }
                         }
                     }
                 }
@@ -491,7 +557,7 @@ Item {
                             if (sortPopup.shown) {
                                 sortPopup.shown = false
                             } else {
-                                sortPopup.reposition()
+                                sortPopup.reposition(sortBtnSlot)
                                 sortPopup.shown = true
                             }
                         }
@@ -572,7 +638,8 @@ Item {
             visible: library.trackCount > 0
             clip: true
             spacing: 2
-            boundsBehavior: Flickable.StopAtBounds
+            boundsBehavior: Flickable.DragOverBounds
+            boundsMovement: Flickable.StopAtBounds
             cacheBuffer: 200
             reuseItems: true
             flickDeceleration: 500
@@ -702,6 +769,10 @@ Item {
                 NumberAnimation {
                     property: "opacity"; from: 0; to: 1
                     duration: 300; easing.type: Easing.OutCubic
+                }
+                NumberAnimation {
+                    property: "x"; from: -60; to: 0
+                    duration: 360; easing.type: Easing.OutCubic
                 }
             }
 
@@ -1092,10 +1163,12 @@ Item {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                const p = addBtnHov.mapToItem(Overlay.overlay, 0, 0)
+                                const pOverlay = addBtnHov.mapToItem(Overlay.overlay, 0, 0)
+                                const pContent = addBtnHov.mapToItem(list.contentItem, 0, 0)
                                 playlistRoot.openAddMenu(library.tracks.pathAt(row.index),
-                                                         p.x + addBtnHov.width,
-                                                         p.y + addBtnHov.height)
+                                                         pOverlay.x + addBtnHov.width,
+                                                         pContent.y,
+                                                         addBtnHov.height)
                             }
                         }
                     }
@@ -1154,9 +1227,10 @@ Item {
         Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
         Behavior on scale   { NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 1.5 } }
 
-        function reposition() {
-            const p = sortBtnSlot.mapToItem(Overlay.overlay, sortBtnSlot.width, sortBtnSlot.height)
-            const w = Overlay.overlay.width
+        function reposition(slot) {
+            if (!slot) return
+            const p = slot.mapToItem(Overlay.overlay, slot.width, slot.height)
+            const w = Overlay.overlay ? Overlay.overlay.width : 800
             x = Math.max(12, Math.min(p.x - width, w - width - 12))
             y = p.y + 6
         }

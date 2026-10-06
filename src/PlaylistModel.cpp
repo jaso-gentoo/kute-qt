@@ -56,6 +56,14 @@ void PlaylistModel::removeRow(int index) {
     emit countChanged();
 }
 
+void PlaylistModel::insertRow(const Playlist &p) {
+    const int i = m_playlists.size();
+    beginInsertRows(QModelIndex(), i, i);
+    m_playlists.append(p);
+    endInsertRows();
+    emit countChanged();
+}
+
 void PlaylistModel::clear() {
     if (m_playlists.isEmpty()) return;
     beginResetModel();
