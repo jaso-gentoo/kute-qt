@@ -87,3 +87,13 @@ Put a JSON at ~/.config/kute/matugen/kute.json - the file must exist before you 
   "onSurface": "{{colors.on_surface_variant.default.hex}}"
 }
 ```
+<details>
+<summary>Building from source</summary>
+
+Requires Qt 6.5+, TagLib, CMake 3.20+, C++17 compiler.
+
+\```bash
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+\```
+</details>
