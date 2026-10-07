@@ -57,6 +57,12 @@ private:
     int           m_attemptIndex = 0;
     int           m_passIndex = 0;
 
+    QString       m_lastDetails;
+    QString       m_lastState;
+    qint64        m_lastStart = 0;
+    bool          m_hasLastActivity = false;
+    bool          m_hasLastCleared = false;
+
     static constexpr int    kMaxRequests = 5;
     static constexpr qint64 kWindowMs    = 20000;
 };

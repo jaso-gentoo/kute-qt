@@ -85,16 +85,23 @@ qt_add_qml_module(kute
         qml/NavRail.qml
         qml/InfoPanel.qml
         qml/BottomBar.qml
-        qml/PlaylistView.qml
         qml/ArtistsView.qml
         qml/AlbumsView.qml
         qml/BrowseView.qml
-        qml/PlaylistsView.qml
         qml/SettingsModal.qml
         qml/SettingsTab.qml
         qml/TrackTab.qml
         qml/LyricsTab.qml
         qml/FloatingSearch.qml
+        qml/TrackListPage.qml
+        qml/TrackRow.qml
+        qml/TrackSortMenu.qml
+        qml/AddToPlaylistMenu.qml
+        qml/PlaylistsPage.qml
+        qml/PlaylistListPage.qml
+        qml/PlaylistDetailPage.qml
+        qml/PlaylistRow.qml
+        qml/PlaylistTrackRow.qml
 )
 
 qt_add_resources(kute "fonts"
@@ -137,23 +144,13 @@ if(UNIX AND NOT APPLE)
     include(GNUInstallDirs)
     install(TARGETS kute RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-    if(EXISTS "${CMAKE_SOURCE_DIR}/packaging/kute.desktop")
-        install(FILES "${CMAKE_SOURCE_DIR}/packaging/kute.desktop"
-                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
-                RENAME kute.desktop)
-    elseif(EXISTS "${CMAKE_SOURCE_DIR}/packaging/kute-qt.desktop")
+    if(EXISTS "${CMAKE_SOURCE_DIR}/packaging/kute-qt.desktop")
         install(FILES "${CMAKE_SOURCE_DIR}/packaging/kute-qt.desktop"
-                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
-                RENAME kute.desktop)
+                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
     endif()
 
     if(EXISTS "${CMAKE_SOURCE_DIR}/packaging/kute.png")
         install(FILES "${CMAKE_SOURCE_DIR}/packaging/kute.png"
-                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps
-                RENAME kute.png)
-    elseif(EXISTS "${CMAKE_SOURCE_DIR}/packaging/kute-qt.png")
-        install(FILES "${CMAKE_SOURCE_DIR}/packaging/kute-qt.png"
-                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps
-                RENAME kute.png)
+                DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps)
     endif()
 endif()

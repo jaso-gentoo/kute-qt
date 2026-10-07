@@ -5,11 +5,13 @@
 #include <QMouseEvent>
 #include <QQuickWindow>
 #include <QQuickItem>
+#include <QSGRendererInterface>
 #include <QFile>
 #include <QDir>
 #include <QTextStream>
 #include <QDateTime>
 #include <QFontDatabase>
+#include <QSettings>
 #include <exception>
 #include <cstdio>
 
@@ -207,6 +209,8 @@ public:
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override {
         if (event->type() == QEvent::MouseButtonRelease) {
+            if (!m_root->property("floatingSearchOpen").toBool())
+                return QObject::eventFilter(obj, event);
             auto *me = static_cast<QMouseEvent*>(event);
             if (me->button() == Qt::LeftButton) {
                 const QPointF p = me->position();
@@ -244,6 +248,24 @@ int main(int argc, char *argv[]) {
     try {
         reexecWithEnv(argv);
         emitLog(QtInfoMsg, "after reexecWithEnv");
+
+        QSettings rhiSettings("kute", "kute");
+#ifdef Q_OS_WIN
+        const QString defaultBackend = "d3d11";
+#else
+        const QString defaultBackend = "vulkan";
+#endif
+        const QString rhiBackend = rhiSettings.value("ui/renderBackend", defaultBackend).toString();
+        if (rhiBackend == "opengl") {
+            qputenv("QSG_RHI_BACKEND", "opengl");
+            emitLog(QtInfoMsg, "RHI backend: opengl");
+        } else if (rhiBackend == "d3d11") {
+            qputenv("QSG_RHI_BACKEND", "d3d11");
+            emitLog(QtInfoMsg, "RHI backend: d3d11");
+        } else {
+            qputenv("QSG_RHI_BACKEND", "vulkan");
+            emitLog(QtInfoMsg, "RHI backend: vulkan");
+        }
 
         QGuiApplication app(argc, argv);
         emitLog(QtInfoMsg, "QGuiApplication constructed");
@@ -302,6 +324,23 @@ int main(int argc, char *argv[]) {
             win->setPersistentGraphics(false);
             win->setPersistentSceneGraph(false);
             emitLog(QtInfoMsg, "persistent graphics disabled");
+
+            QObject::connect(win, &QQuickWindow::sceneGraphInitialized, win, [win]() {
+                QString name = "Unknown";
+                if (auto *ri = win->rendererInterface()) {
+                    switch (ri->graphicsApi()) {
+                        case QSGRendererInterface::OpenGL:     name = "OpenGL";     break;
+                        case QSGRendererInterface::Vulkan:     name = "Vulkan";     break;
+                        case QSGRendererInterface::Direct3D11: name = "Direct3D11"; break;
+                        case QSGRendererInterface::Direct3D12: name = "Direct3D12"; break;
+                        case QSGRendererInterface::Metal:      name = "Metal";      break;
+                        case QSGRendererInterface::Null:       name = "Null";       break;
+                        default: break;
+                    }
+                }
+                win->setProperty("activeRenderer", name);
+                emitLog(QtInfoMsg, QString("Active renderer: %1").arg(name));
+            });
         }
 
         emitLog(QtInfoMsg, "installing GlobalHotkeys");

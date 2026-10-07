@@ -133,6 +133,54 @@ bool Library::isCurrentLiked() const {
     return m_likedPaths.contains(m_currentTrack.path);
 }
 
+void Library::refreshCurrentIndexFromPath(const QString &path) {
+    m_currentIndex = -1;
+    if (path.isEmpty()) return;
+    for (int i = 0; i < m_tracks.count(); ++i) {
+        const Track *t = m_tracks.at(i);
+        if (t && t->path == path) { m_currentIndex = i; break; }
+    }
+}
+
+void Library::setLikedInternal(const QString &path, bool liked) {
+    if (path.isEmpty()) return;
+    const bool wasLiked = m_likedPaths.contains(path);
+    if (wasLiked == liked) return;
+
+    if (liked) m_likedPaths.insert(path);
+    else       m_likedPaths.remove(path);
+
+    m_likedRevision++;
+    emit likedChanged();
+
+    if (m_likedSaveTimer) m_likedSaveTimer->start();
+
+    if (!m_showOnlyLiked) return;
+
+    const QString currentPath = m_currentTrack.path;
+
+    if (!liked) m_tracks.removeByPath(path);
+    else        sortAndApply(true);
+
+    refreshCurrentIndexFromPath(currentPath);
+    emit currentChanged();
+}
+
+void Library::toggleLike(int index) {
+    if (index < 0 || index >= m_tracks.count()) return;
+    const Track *t = m_tracks.at(index);
+    if (!t) return;
+    setLikedInternal(t->path, !m_likedPaths.contains(t->path));
+}
+
+void Library::toggleLikeByPath(const QString &path) {
+    setLikedInternal(path, !m_likedPaths.contains(path));
+}
+
+void Library::toggleCurrentLike() {
+    setLikedInternal(m_currentTrack.path, !m_likedPaths.contains(m_currentTrack.path));
+}
+
 void Library::setShowOnlyLiked(bool v) {
     if (m_showOnlyLiked == v) return;
     m_showOnlyLiked = v;
@@ -146,103 +194,6 @@ void Library::setShowOnlyLiked(bool v) {
     sortAndApply(false);
     emit showOnlyLikedChanged();
     emit currentChanged();
-}
-
-void Library::toggleLike(int index) {
-    if (index < 0 || index >= m_tracks.count()) return;
-    const Track *t = m_tracks.at(index);
-    if (!t) return;
-
-    const QString path = t->path;
-    const bool wasLiked = m_likedPaths.contains(path);
-
-    if (wasLiked) m_likedPaths.remove(path);
-    else m_likedPaths.insert(path);
-
-    m_likedRevision++;
-    emit likedChanged();
-
-    if (m_likedSaveTimer) m_likedSaveTimer->start();
-
-    if (m_showOnlyLiked) {
-        if (wasLiked) {
-            m_tracks.removeByPath(path);
-        } else {
-            sortAndApply(true);
-        }
-
-        const QString currentPath = m_currentTrack.path;
-        m_currentIndex = -1;
-        if (!currentPath.isEmpty()) {
-            for (int i = 0; i < m_tracks.count(); ++i) {
-                const Track *tt = m_tracks.at(i);
-                if (tt && tt->path == currentPath) { m_currentIndex = i; break; }
-            }
-        }
-        emit currentChanged();
-    }
-}
-
-void Library::toggleLikeByPath(const QString &path) {
-    if (path.isEmpty()) return;
-
-    const bool wasLiked = m_likedPaths.contains(path);
-
-    if (wasLiked) m_likedPaths.remove(path);
-    else m_likedPaths.insert(path);
-
-    m_likedRevision++;
-    emit likedChanged();
-
-    if (m_likedSaveTimer) m_likedSaveTimer->start();
-
-    if (m_showOnlyLiked) {
-        if (wasLiked) {
-            m_tracks.removeByPath(path);
-        } else {
-            sortAndApply(true);
-        }
-
-        const QString currentPath = m_currentTrack.path;
-        m_currentIndex = -1;
-        if (!currentPath.isEmpty()) {
-            for (int i = 0; i < m_tracks.count(); ++i) {
-                const Track *tt = m_tracks.at(i);
-                if (tt && tt->path == currentPath) { m_currentIndex = i; break; }
-            }
-        }
-        emit currentChanged();
-    }
-}
-
-void Library::toggleCurrentLike() {
-    if (m_currentTrack.path.isEmpty()) return;
-
-    const QString path = m_currentTrack.path;
-    const bool wasLiked = m_likedPaths.contains(path);
-
-    if (wasLiked) m_likedPaths.remove(path);
-    else m_likedPaths.insert(path);
-
-    m_likedRevision++;
-    emit likedChanged();
-
-    if (m_likedSaveTimer) m_likedSaveTimer->start();
-
-    if (m_showOnlyLiked) {
-        if (wasLiked) {
-            m_tracks.removeByPath(path);
-        } else {
-            sortAndApply(true);
-        }
-
-        m_currentIndex = -1;
-        for (int i = 0; i < m_tracks.count(); ++i) {
-            const Track *tt = m_tracks.at(i);
-            if (tt && tt->path == path) { m_currentIndex = i; break; }
-        }
-        emit currentChanged();
-    }
 }
 
 void Library::loadPlaylistOrder() {
@@ -301,6 +252,25 @@ void Library::savePlaylistOrder() {
     savePlaylistOrderNow();
 }
 
+bool Library::compareTracks(const Track &a, const Track &b) const {
+    int cmp = 0;
+    if (m_sortField == "title") {
+        cmp = QString::compare(a.title, b.title, Qt::CaseInsensitive);
+        if (cmp == 0) cmp = QString::compare(a.artist, b.artist, Qt::CaseInsensitive);
+    } else if (m_sortField == "artist") {
+        cmp = QString::compare(a.artist, b.artist, Qt::CaseInsensitive);
+        if (cmp == 0) cmp = QString::compare(a.title, b.title, Qt::CaseInsensitive);
+    } else if (m_sortField == "album") {
+        cmp = QString::compare(a.album, b.album, Qt::CaseInsensitive);
+        if (cmp == 0) cmp = QString::compare(a.title, b.title, Qt::CaseInsensitive);
+    } else if (m_sortField == "duration") {
+        cmp = (a.durationMs < b.durationMs) ? -1 : (a.durationMs > b.durationMs) ? 1 : 0;
+    } else {
+        cmp = QString::compare(a.path, b.path, Qt::CaseInsensitive);
+    }
+    return m_sortAscending ? (cmp < 0) : (cmp > 0);
+}
+
 void Library::sortAndApply(bool animate) {
     const QString currentPath = m_currentTrack.path;
     const QString q = m_filterText.toLower().trimmed();
@@ -337,34 +307,14 @@ void Library::sortAndApply(bool animate) {
     } else {
         std::stable_sort(filtered.begin(), filtered.end(),
             [this](const Track &a, const Track &b) {
-                int cmp = 0;
-                if (m_sortField == "title") {
-                    cmp = QString::compare(a.title, b.title, Qt::CaseInsensitive);
-                    if (cmp == 0) cmp = QString::compare(a.artist, b.artist, Qt::CaseInsensitive);
-                } else if (m_sortField == "artist") {
-                    cmp = QString::compare(a.artist, b.artist, Qt::CaseInsensitive);
-                    if (cmp == 0) cmp = QString::compare(a.title, b.title, Qt::CaseInsensitive);
-                } else if (m_sortField == "album") {
-                    cmp = QString::compare(a.album, b.album, Qt::CaseInsensitive);
-                    if (cmp == 0) cmp = QString::compare(a.title, b.title, Qt::CaseInsensitive);
-                } else if (m_sortField == "duration") {
-                    cmp = (a.durationMs < b.durationMs) ? -1 : (a.durationMs > b.durationMs) ? 1 : 0;
-                } else {
-                    cmp = QString::compare(a.path, b.path, Qt::CaseInsensitive);
-                }
-                return m_sortAscending ? (cmp < 0) : (cmp > 0);
+                return compareTracks(a, b);
             });
     }
 
     if (animate) m_tracks.setTracksAnimated(filtered);
     else          m_tracks.setTracks(filtered);
 
-    m_currentIndex = -1;
-    if (!currentPath.isEmpty()) {
-        for (int i = 0; i < filtered.size(); ++i) {
-            if (filtered[i].path == currentPath) { m_currentIndex = i; break; }
-        }
-    }
+    refreshCurrentIndexFromPath(currentPath);
 }
 
 void Library::rebuildArtists() {
@@ -383,30 +333,44 @@ void Library::rebuildArtists() {
 }
 
 void Library::rebuildAlbums() {
-    QMap<QString, QString> covers;
-    QMap<QString, QString> thumbs;
-    QSet<QString> names;
+    struct AlbumInfo {
+        QString cover;
+        QString thumb;
+    };
+
+    QHash<QString, AlbumInfo> albums;
+    albums.reserve(m_allTracks.size());
+
     const QString q = m_filterText.toLower().trimmed();
+
     for (const Track &t : m_allTracks) {
         if (t.album.isEmpty() || t.album == "Unknown Album") continue;
         if (!q.isEmpty() && !t.album.toLower().contains(q)) continue;
-        names.insert(t.album);
-        if (!covers.contains(t.album) && !t.cover.isEmpty())
-            covers.insert(t.album, t.cover);
-        if (!thumbs.contains(t.album) && !t.thumb.isEmpty())
-            thumbs.insert(t.album, t.thumb);
+
+        auto it = albums.find(t.album);
+        if (it == albums.end()) {
+            AlbumInfo info;
+            info.cover = t.cover;
+            info.thumb = t.thumb;
+            albums.insert(t.album, info);
+        } else {
+            if (it->cover.isEmpty() && !t.cover.isEmpty()) it->cover = t.cover;
+            if (it->thumb.isEmpty() && !t.thumb.isEmpty()) it->thumb = t.thumb;
+        }
     }
-    QStringList sorted = names.values();
+
+    QStringList sorted = albums.keys();
     sorted.sort(Qt::CaseInsensitive);
     if (!m_albumsAscending) std::reverse(sorted.begin(), sorted.end());
 
     m_albums.clear();
     m_albums.reserve(sorted.size());
     for (const QString &name : sorted) {
+        const AlbumInfo &info = albums.value(name);
         QVariantMap m;
         m["name"]  = name;
-        m["cover"] = covers.value(name, "");
-        m["thumb"] = thumbs.value(name, "");
+        m["cover"] = info.cover;
+        m["thumb"] = info.thumb;
         m_albums.append(m);
     }
     emit albumsChanged();
@@ -448,22 +412,7 @@ void Library::rebuildSearch() {
 
     std::stable_sort(results.begin(), results.end(),
         [this](const Track &a, const Track &b) {
-            int cmp = 0;
-            if (m_sortField == "title") {
-                cmp = QString::compare(a.title, b.title, Qt::CaseInsensitive);
-                if (cmp == 0) cmp = QString::compare(a.artist, b.artist, Qt::CaseInsensitive);
-            } else if (m_sortField == "artist") {
-                cmp = QString::compare(a.artist, b.artist, Qt::CaseInsensitive);
-                if (cmp == 0) cmp = QString::compare(a.title, b.title, Qt::CaseInsensitive);
-            } else if (m_sortField == "album") {
-                cmp = QString::compare(a.album, b.album, Qt::CaseInsensitive);
-                if (cmp == 0) cmp = QString::compare(a.title, b.title, Qt::CaseInsensitive);
-            } else if (m_sortField == "duration") {
-                cmp = (a.durationMs < b.durationMs) ? -1 : (a.durationMs > b.durationMs) ? 1 : 0;
-            } else {
-                cmp = QString::compare(a.path, b.path, Qt::CaseInsensitive);
-            }
-            return m_sortAscending ? (cmp < 0) : (cmp > 0);
+            return compareTracks(a, b);
         });
 
     m_searchResults.updateFiltered(results);

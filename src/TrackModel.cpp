@@ -68,6 +68,16 @@ void TrackModel::setTracksAnimated(const QList<Track> &newTracks) {
         return;
     }
 
+    diffApply(newTracks, true);
+    emit countChanged();
+}
+
+void TrackModel::updateFiltered(const QList<Track> &newTracks) {
+    diffApply(newTracks, false);
+    emit countChanged();
+}
+
+void TrackModel::diffApply(const QList<Track> &newTracks, bool updateData) {
     QSet<QString> newPaths;
     newPaths.reserve(newTracks.size());
     for (const auto &t : newTracks) newPaths.insert(t.path);
@@ -101,54 +111,12 @@ void TrackModel::setTracksAnimated(const QList<Track> &newTracks) {
             endMoveRows();
             for (int j = i; j <= curIdx; ++j)
                 posByPath.insert(m_tracks[j].path, j);
-        } else {
+        } else if (updateData) {
             m_tracks[i] = nt;
             QModelIndex idx = createIndex(i, 0);
             emit dataChanged(idx, idx);
         }
     }
-
-    emit countChanged();
-}
-
-void TrackModel::updateFiltered(const QList<Track> &newTracks) {
-    QSet<QString> newPaths;
-    newPaths.reserve(newTracks.size());
-    for (const auto &t : newTracks) newPaths.insert(t.path);
-
-    for (int i = m_tracks.size() - 1; i >= 0; --i) {
-        if (!newPaths.contains(m_tracks[i].path)) {
-            beginRemoveRows(QModelIndex(), i, i);
-            m_tracks.removeAt(i);
-            endRemoveRows();
-        }
-    }
-
-    QHash<QString, int> posByPath;
-    posByPath.reserve(m_tracks.size());
-    for (int j = 0; j < m_tracks.size(); ++j)
-        posByPath.insert(m_tracks[j].path, j);
-
-    for (int i = 0; i < newTracks.size(); ++i) {
-        const Track &nt = newTracks[i];
-        const int curIdx = posByPath.value(nt.path, -1);
-
-        if (curIdx < 0) {
-            beginInsertRows(QModelIndex(), i, i);
-            m_tracks.insert(i, nt);
-            endInsertRows();
-            for (int j = i + 1; j < m_tracks.size(); ++j)
-                posByPath.insert(m_tracks[j].path, j);
-        } else if (curIdx > i) {
-            beginMoveRows(QModelIndex(), curIdx, curIdx, QModelIndex(), i);
-            m_tracks.move(curIdx, i);
-            endMoveRows();
-            for (int j = i; j <= curIdx; ++j)
-                posByPath.insert(m_tracks[j].path, j);
-        }
-    }
-
-    emit countChanged();
 }
 
 void TrackModel::moveRow(int from, int to) {

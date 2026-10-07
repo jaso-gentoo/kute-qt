@@ -6,6 +6,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSettings>
+#include <QProcess>
+#include <QCoreApplication>
 
 ThemeManager::ThemeManager(QObject *parent) : QObject(parent) {
     const QString configDir =
@@ -19,6 +21,11 @@ ThemeManager::ThemeManager(QObject *parent) : QObject(parent) {
     QSettings s;
     m_lightTheme = s.value("ui/lightTheme", false).toBool();
     m_matugenEnabled = s.value("ui/matugenEnabled", false).toBool();
+#ifdef Q_OS_WIN
+    m_renderBackend = s.value("ui/renderBackend", "d3d11").toString();
+#else
+    m_renderBackend = s.value("ui/renderBackend", "vulkan").toString();
+#endif
 
     if (QFile::exists(m_filePath)) {
         m_watcher.addPath(m_filePath);
@@ -67,6 +74,19 @@ void ThemeManager::setMatugenEnabled(bool v) {
     QSettings().setValue("ui/matugenEnabled", v);
     emit matugenEnabledChanged();
     refresh();
+}
+
+void ThemeManager::setRenderBackend(const QString &v) {
+    if (m_renderBackend == v) return;
+    if (v != "opengl" && v != "vulkan" && v != "d3d11") return;
+    m_renderBackend = v;
+    QSettings().setValue("ui/renderBackend", v);
+    emit renderBackendChanged();
+}
+
+void ThemeManager::restartApplication() {
+    QProcess::startDetached(QCoreApplication::applicationFilePath(), {});
+    QCoreApplication::exit(0);
 }
 
 void ThemeManager::applyDarkPalette() {

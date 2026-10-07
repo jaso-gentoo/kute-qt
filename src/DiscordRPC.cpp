@@ -52,6 +52,8 @@ void DiscordRPC::setEnabled(bool v) {
     if (v) {
         m_attemptIndex = 0;
         m_passIndex = 0;
+        m_hasLastActivity = false;
+        m_hasLastCleared = false;
         tryConnect();
     } else {
         m_hasPendingFrame = false;
@@ -130,6 +132,9 @@ void DiscordRPC::tryConnect() {
 void DiscordRPC::onConnected() {
     m_connected = true;
     m_handshakeDone = false;
+    m_hasLastActivity = false;
+    m_hasLastCleared = false;
+    m_sendHistory.clear();
     emit connectedChanged();
     sendHandshake();
 }
@@ -250,6 +255,19 @@ void DiscordRPC::setActivity(const QString &details,
                              qint64 startTimestamp) {
     if (!m_enabled) return;
 
+    if (m_hasLastActivity
+        && m_lastDetails == details
+        && m_lastState == state
+        && m_lastStart == startTimestamp) {
+        return;
+    }
+
+    m_lastDetails = details;
+    m_lastState = state;
+    m_lastStart = startTimestamp;
+    m_hasLastActivity = true;
+    m_hasLastCleared = false;
+
     QJsonObject activity;
     activity["details"] = details;
     if (!state.isEmpty()) activity["state"] = state;
@@ -275,6 +293,10 @@ void DiscordRPC::setActivity(const QString &details,
 
 void DiscordRPC::clearActivity() {
     if (!m_enabled) return;
+    if (m_hasLastCleared) return;
+
+    m_hasLastCleared = true;
+    m_hasLastActivity = false;
 
     QJsonObject args;
     args["pid"] = (double)QCoreApplication::applicationPid();

@@ -271,10 +271,13 @@ private:
     void    schedulePresence();
     void    restorePlayer(const QString &path, qint64 savedPos, bool wasPlaying);
 
+    bool    compareTracks(const Track &a, const Track &b) const;
+    void    setLikedInternal(const QString &path, bool liked);
+    void    refreshCurrentIndexFromPath(const QString &path);
+
     const Playlist *findPlaylist(const QString &id) const;
     Playlist       *findPlaylistMutable(const QString &id);
-    void            rebuildPlaylistTracks();
-    void            rebuildPlaylistTracksIncremental();
+    void            rebuildPlaylistTracks(bool incremental = false);
     TrackModel     *currentPlaybackModel();
     void            playFromModel(TrackModel *model, int index);
 

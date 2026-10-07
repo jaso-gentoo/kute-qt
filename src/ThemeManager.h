@@ -18,6 +18,7 @@ class ThemeManager : public QObject {
     Q_PROPERTY(bool   lightTheme     READ lightTheme     WRITE setLightTheme     NOTIFY lightThemeChanged)
     Q_PROPERTY(bool   matugenEnabled READ matugenEnabled WRITE setMatugenEnabled NOTIFY matugenEnabledChanged)
     Q_PROPERTY(bool   matugenAvailable READ matugenAvailable NOTIFY matugenAvailableChanged)
+    Q_PROPERTY(QString renderBackend READ renderBackend WRITE setRenderBackend NOTIFY renderBackendChanged)
 
 public:
     explicit ThemeManager(QObject *parent = nullptr);
@@ -35,15 +36,20 @@ public:
     bool lightTheme() const { return m_lightTheme; }
     bool matugenEnabled() const { return m_matugenEnabled; }
     bool matugenAvailable() const { return m_matugenAvailable; }
+    QString renderBackend() const { return m_renderBackend; }
 
     void setLightTheme(bool v);
     void setMatugenEnabled(bool v);
+    void setRenderBackend(const QString &v);
+
+    Q_INVOKABLE void restartApplication();
 
 signals:
     void changed();
     void lightThemeChanged();
     void matugenEnabledChanged();
     void matugenAvailableChanged();
+    void renderBackendChanged();
 
 private:
     void refresh();
@@ -66,4 +72,10 @@ private:
     bool m_lightTheme = false;
     bool m_matugenEnabled = false;
     bool m_matugenAvailable = false;
+
+#ifdef Q_OS_WIN
+    QString m_renderBackend = "d3d11";
+#else
+    QString m_renderBackend = "vulkan";
+#endif
 };

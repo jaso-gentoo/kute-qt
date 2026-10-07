@@ -11,8 +11,6 @@
 static const char *kObjectPath = "/org/mpris/MediaPlayer2";
 static const char *kService    = "org.mpris.MediaPlayer2.kute";
 
-// ---------------- MprisRootAdaptor ----------------
-
 MprisRootAdaptor::MprisRootAdaptor(QObject *parent) : QDBusAbstractAdaptor(parent) {
     setAutoRelaySignals(true);
 }
@@ -26,8 +24,6 @@ void MprisRootAdaptor::Quit() {
     QCoreApplication::quit();
 }
 
-// ---------------- MprisPlayerAdaptor ----------------
-
 MprisPlayerAdaptor::MprisPlayerAdaptor(Library *lib, QObject *parent)
     : QDBusAbstractAdaptor(parent), m_lib(lib) {
     setAutoRelaySignals(true);
@@ -36,7 +32,6 @@ MprisPlayerAdaptor::MprisPlayerAdaptor(Library *lib, QObject *parent)
     connect(lib, &Library::currentChanged,    this, &MprisPlayerAdaptor::metadataChanged);
     connect(lib, &Library::currentChanged,    this, &MprisPlayerAdaptor::playbackStatusChanged);
     connect(lib, &Library::volumeChanged,     this, &MprisPlayerAdaptor::volumeChanged);
-    connect(lib, &Library::positionChanged,   this, &MprisPlayerAdaptor::positionChanged);
     connect(lib, &Library::repeatModeChanged, this, &MprisPlayerAdaptor::loopStatusChanged);
 }
 
@@ -126,8 +121,6 @@ void MprisPlayerAdaptor::SetPosition(const QDBusObjectPath &, qlonglong position
     m_lib->seek(position / 1000);
     emit Seeked(position);
 }
-
-// ---------------- MprisController ----------------
 
 MprisController::MprisController(Library *lib, QObject *parent)
     : QObject(parent), m_lib(lib) {

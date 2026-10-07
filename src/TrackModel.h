@@ -75,5 +75,7 @@ signals:
     void countChanged();
 
 private:
+    void diffApply(const QList<Track> &newTracks, bool updateData);
+
     QList<Track> m_tracks;
 };

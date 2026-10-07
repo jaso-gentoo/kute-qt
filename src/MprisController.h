@@ -7,7 +7,6 @@
 
 class Library;
 
-// ---------------- org.mpris.MediaPlayer2 ----------------
 class MprisRootAdaptor : public QDBusAbstractAdaptor {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.mpris.MediaPlayer2")
@@ -25,8 +24,8 @@ public:
     bool canQuit() const { return true; }
     bool canRaise() const { return false; }
     bool hasTrackList() const { return false; }
-    QString identity() const { return "kute"; }
-    QString desktopEntry() const { return "kute"; }
+    QString identity() const { return "kute-qt"; }
+    QString desktopEntry() const { return "kute-qt"; }
     QStringList supportedUriSchemes() const { return {"file"}; }
     QStringList supportedMimeTypes() const;
 
@@ -35,7 +34,6 @@ public slots:
     void Quit();
 };
 
-// ---------------- org.mpris.MediaPlayer2.Player ----------------
 class MprisPlayerAdaptor : public QDBusAbstractAdaptor {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.mpris.MediaPlayer2.Player")
@@ -99,7 +97,6 @@ private:
     Library *m_lib = nullptr;
 };
 
-// ---------------- Controller ----------------
 class MprisController : public QObject {
     Q_OBJECT
 public:
