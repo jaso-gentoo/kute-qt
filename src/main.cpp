@@ -132,6 +132,18 @@ static void msgHandler(QtMsgType type, const QMessageLogContext &, const QString
     emitLog(type, msg);
 }
 
+static QString apiNameFrom(QSGRendererInterface::GraphicsApi api) {
+    switch (api) {
+        case QSGRendererInterface::OpenGL:     return "OpenGL";
+        case QSGRendererInterface::Vulkan:     return "Vulkan";
+        case QSGRendererInterface::Direct3D11: return "Direct3D11";
+        case QSGRendererInterface::Direct3D12: return "Direct3D12";
+        case QSGRendererInterface::Metal:      return "Metal";
+        case QSGRendererInterface::Null:       return "Null";
+        default: return QString();
+    }
+}
+
 static bool focusIsTextInput() {
     QObject *focus = QGuiApplication::focusObject();
     if (!focus) return false;
@@ -332,41 +344,26 @@ int main(int argc, char *argv[]) {
             win->setPersistentSceneGraph(false);
             emitLog(QtInfoMsg, "persistent graphics disabled");
 
-            QObject::connect(win, &QQuickWindow::sceneGraphInitialized, win, [win]() {
-                QString name = "Unknown";
+            auto tryUpdate = [win]() -> bool {
+                if (!win->property("activeRenderer").toString().isEmpty()) return true;
                 if (auto *ri = win->rendererInterface()) {
-                    switch (ri->graphicsApi()) {
-                        case QSGRendererInterface::OpenGL:     name = "OpenGL";     break;
-                        case QSGRendererInterface::Vulkan:     name = "Vulkan";     break;
-                        case QSGRendererInterface::Direct3D11: name = "Direct3D11"; break;
-                        case QSGRendererInterface::Direct3D12: name = "Direct3D12"; break;
-                        case QSGRendererInterface::Metal:      name = "Metal";      break;
-                        case QSGRendererInterface::Null:       name = "Null";       break;
-                        default: break;
+                    const QString name = apiNameFrom(ri->graphicsApi());
+                    if (!name.isEmpty()) {
+                        win->setProperty("activeRenderer", name);
+                        emitLog(QtInfoMsg, QString("Active renderer: %1").arg(name));
+                        return true;
                     }
                 }
-                win->setProperty("activeRenderer", name);
-                emitLog(QtInfoMsg, QString("Active renderer: %1").arg(name));
+                return false;
+            };
+
+            QObject::connect(win, &QQuickWindow::sceneGraphInitialized, win, [tryUpdate]() {
+                tryUpdate();
             });
 
-            QTimer::singleShot(1500, win, [win]() {
-                if (win->property("activeRenderer").toString().isEmpty()) {
-                    QString name = "Unknown";
-                    if (auto *ri = win->rendererInterface()) {
-                        switch (ri->graphicsApi()) {
-                            case QSGRendererInterface::OpenGL:     name = "OpenGL";     break;
-                            case QSGRendererInterface::Vulkan:     name = "Vulkan";     break;
-                            case QSGRendererInterface::Direct3D11: name = "Direct3D11"; break;
-                            case QSGRendererInterface::Direct3D12: name = "Direct3D12"; break;
-                            case QSGRendererInterface::Metal:      name = "Metal";      break;
-                            case QSGRendererInterface::Null:       name = "Null";       break;
-                            default: break;
-                        }
-                    }
-                    win->setProperty("activeRenderer", name);
-                    emitLog(QtInfoMsg, QString("Active renderer (fallback): %1").arg(name));
-                }
-            });
+            QTimer::singleShot(300, win, [tryUpdate]() { tryUpdate(); });
+            QTimer::singleShot(1000, win, [tryUpdate]() { tryUpdate(); });
+            QTimer::singleShot(2500, win, [tryUpdate]() { tryUpdate(); });
         }
 
         emitLog(QtInfoMsg, "installing GlobalHotkeys");
