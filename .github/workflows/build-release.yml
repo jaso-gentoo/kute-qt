@@ -239,6 +239,17 @@ jobs:
             fi
           done
 
+      - name: Copy imageformats deps
+        run: |
+          cp -L /ucrt64/bin/libjpeg*.dll dist/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libpng*.dll  dist/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libpng16*.dll dist/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libtiff*.dll dist/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libwebp*.dll dist/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libwebpdemux*.dll dist/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libwebpmux*.dll dist/ 2>/dev/null || true
+          cp -L /ucrt64/bin/zlib*.dll dist/ 2>/dev/null || true
+
       - name: Copy multimedia deps
         run: |
           mkdir -p dist/multimedia
