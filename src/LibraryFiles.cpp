@@ -232,6 +232,10 @@ bool Library::saveMetadata(int index,
 
     if (wasCurrent) {
         m_player->stop();
+#ifdef Q_OS_WIN
+        m_player->setSource(QUrl());
+        waitForFileRelease(path, 2000);
+#endif
         m_intentPlaying = false;
         m_pendingPlay = false;
     }
@@ -363,6 +367,10 @@ bool Library::removeCurrentCover() {
     const bool wasPlaying = isPlaying();
     const qint64 savedPos = m_player->position();
     m_player->stop();
+#ifdef Q_OS_WIN
+    m_player->setSource(QUrl());
+    waitForFileRelease(path, 2000);
+#endif
     m_intentPlaying = false;
     m_pendingPlay = false;
 
@@ -437,6 +445,10 @@ bool Library::saveCoverTo(const QString &destPath) {
     const bool wasPlaying = isPlaying();
     const qint64 savedPos = m_player->position();
     m_player->stop();
+#ifdef Q_OS_WIN
+    m_player->setSource(QUrl());
+    waitForFileRelease(m_currentTrack.path, 2000);
+#endif
     m_intentPlaying = false;
     m_pendingPlay = false;
 
@@ -534,6 +546,10 @@ bool Library::writeTextToTags(const QString &path, const QString &content) {
 
     if (isCurrentTrack) {
         m_player->stop();
+#ifdef Q_OS_WIN
+        m_player->setSource(QUrl());
+        waitForFileRelease(path, 2000);
+#endif
         m_intentPlaying = false;
         m_pendingPlay = false;
     }

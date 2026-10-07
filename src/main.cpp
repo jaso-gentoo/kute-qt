@@ -12,6 +12,7 @@
 #include <QDateTime>
 #include <QFontDatabase>
 #include <QSettings>
+#include <QTimer>
 #include <exception>
 #include <cstdio>
 
@@ -57,10 +58,7 @@ static void reexecWithEnv(char *argv[]) {
     execv(path.constData(), argv);
 }
 #else
-static void reexecWithEnv(char *argv[]) {
-    qputenv("QT_MEDIA_BACKEND", "ffmpeg");
-    Q_UNUSED(argv)
-}
+static void reexecWithEnv(char *argv[]) { Q_UNUSED(argv) }
 #endif
 
 #ifdef Q_OS_WIN
@@ -253,8 +251,10 @@ int main(int argc, char *argv[]) {
         reexecWithEnv(argv);
         emitLog(QtInfoMsg, "after reexecWithEnv");
 
+#ifndef Q_OS_WIN
         qputenv("QT_MEDIA_BACKEND", "ffmpeg");
         emitLog(QtInfoMsg, "media backend: ffmpeg");
+#endif
 
         QSettings rhiSettings("kute", "kute");
 #ifdef Q_OS_WIN
@@ -347,6 +347,25 @@ int main(int argc, char *argv[]) {
                 }
                 win->setProperty("activeRenderer", name);
                 emitLog(QtInfoMsg, QString("Active renderer: %1").arg(name));
+            });
+
+            QTimer::singleShot(1500, win, [win]() {
+                if (win->property("activeRenderer").toString().isEmpty()) {
+                    QString name = "Unknown";
+                    if (auto *ri = win->rendererInterface()) {
+                        switch (ri->graphicsApi()) {
+                            case QSGRendererInterface::OpenGL:     name = "OpenGL";     break;
+                            case QSGRendererInterface::Vulkan:     name = "Vulkan";     break;
+                            case QSGRendererInterface::Direct3D11: name = "Direct3D11"; break;
+                            case QSGRendererInterface::Direct3D12: name = "Direct3D12"; break;
+                            case QSGRendererInterface::Metal:      name = "Metal";      break;
+                            case QSGRendererInterface::Null:       name = "Null";       break;
+                            default: break;
+                        }
+                    }
+                    win->setProperty("activeRenderer", name);
+                    emitLog(QtInfoMsg, QString("Active renderer (fallback): %1").arg(name));
+                }
             });
         }
 

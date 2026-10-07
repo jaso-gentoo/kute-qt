@@ -4,6 +4,13 @@
 #include <QUrl>
 #include <QDir>
 #include <QStandardPaths>
+#include <QDateTime>
+#include <QFile>
+#include <QThread>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
 
 #include <taglib/fileref.h>
 #include <taglib/tag.h>
@@ -74,4 +81,33 @@ inline QString safeFileName(const QString &s) {
     r.replace('\\', '_');
     r.replace(':', '_');
     return r;
+}
+
+inline bool waitForFileRelease(const QString &path, int timeoutMs = 2000) {
+    const qint64 deadline = QDateTime::currentMSecsSinceEpoch() + timeoutMs;
+    while (QDateTime::currentMSecsSinceEpoch() < deadline) {
+#ifdef Q_OS_WIN
+        const QString native = QDir::toNativeSeparators(path);
+        HANDLE h = CreateFileW(
+            reinterpret_cast<LPCWSTR>(native.utf16()),
+            GENERIC_READ | GENERIC_WRITE,
+            0,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            nullptr);
+        if (h != INVALID_HANDLE_VALUE) {
+            CloseHandle(h);
+            return true;
+        }
+#else
+        QFile f(path);
+        if (f.open(QIODevice::ReadWrite)) {
+            f.close();
+            return true;
+        }
+#endif
+        QThread::msleep(20);
+    }
+    return false;
 }
