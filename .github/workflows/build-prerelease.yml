@@ -11,7 +11,335 @@ on:
 permissions:
   contents: write
 
+jobs:name: Pre-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Pre-release tag (e.g. v9999, v0.99, v1.1-rc1)'
+        required: true
+        default: 'v9999'
+
+permissions:
+  contents: write
+
 jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.*'
+          host: 'linux'
+          target: 'desktop'
+          arch: 'linux_gcc_64'
+          modules: 'qtmultimedia'
+          cache: true
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libtag1-dev libgl1-mesa-dev \
+            libwayland-dev libxkbcommon-dev \
+            cmake ninja-build patchelf desktop-file-utils \
+            libfuse2 wget curl file imagemagick
+
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DKUTE_VERSION_STRING="${{ github.event.inputs.version }}" \
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Install to AppDir
+        run: DESTDIR=$PWD/AppDir cmake --install build
+
+      - name: Generate PNG icon from JPG
+        run: |
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          if [ -f packaging/kute.png ]; then
+            cp packaging/kute.png AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+          elif [ -f packaging/kute.jpg ]; then
+            convert packaging/kute.jpg -resize 256x256^ -gravity center -extent 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+          elif [ -f packaging/kute.jpeg ]; then
+            convert packaging/kute.jpeg -resize 256x256^ -gravity center -extent 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+          fi
+          file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+
+      - name: Download linuxdeploy
+        run: |
+          set -e
+          for i in 1 2 3; do
+            curl -fL --retry 5 --retry-delay 3 --retry-connrefused \
+              -o linuxdeploy-x86_64.AppImage \
+              "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage" && break || sleep 5
+          done
+          for i in 1 2 3; do
+            curl -fL --retry 5 --retry-delay 3 --retry-connrefused \
+              -o linuxdeploy-plugin-qt-x86_64.AppImage \
+              "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage" && break || sleep 5
+          done
+          test -s linuxdeploy-x86_64.AppImage
+          test -s linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+
+      - name: Bundle Qt Wayland plugins and libs
+        run: |
+          QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
+          mkdir -p AppDir/usr/plugins/platforms
+          mkdir -p AppDir/usr/plugins/wayland-shell-integration
+          mkdir -p AppDir/usr/plugins/wayland-decoration-client
+          mkdir -p AppDir/usr/plugins/wayland-graphics-integration-client
+          mkdir -p AppDir/usr/lib
+
+          cp -v "$QTDIR"/plugins/platforms/libqwayland*.so AppDir/usr/plugins/platforms/
+          cp -v "$QTDIR"/plugins/wayland-shell-integration/*.so AppDir/usr/plugins/wayland-shell-integration/ 2>/dev/null || true
+          cp -v "$QTDIR"/plugins/wayland-decoration-client/*.so AppDir/usr/plugins/wayland-decoration-client/ 2>/dev/null || true
+          cp -v "$QTDIR"/plugins/wayland-graphics-integration-client/*.so AppDir/usr/plugins/wayland-graphics-integration-client/ 2>/dev/null || true
+          cp -v "$QTDIR"/lib/libQt6Wayland*.so* AppDir/usr/lib/
+
+      - name: Fill AppDir with linuxdeploy
+        env:
+          QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
+          QML_SOURCES_PATHS: ${{ github.workspace }}/qml
+          EXTRA_QT_MODULES: "multimedia;dbus"
+        run: |
+          QTDIR="${QT_ROOT_DIR:-$Qt6_DIR/../../..}"
+          export LD_LIBRARY_PATH="$QTDIR/lib:$LD_LIBRARY_PATH"
+          export PATH="$QTDIR/bin:$PATH"
+
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --plugin qt \
+            --desktop-file AppDir/usr/share/applications/kute-qt.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
+
+          rm -f AppDir/usr/lib/libwayland-client.so*  || true
+          rm -f AppDir/usr/lib/libwayland-cursor.so*  || true
+          rm -f AppDir/usr/lib/libwayland-egl.so*     || true
+          rm -f AppDir/usr/lib/libwayland-server.so*  || true
+          rm -f AppDir/usr/lib/libxkbcommon.so*       || true
+          rm -f AppDir/usr/lib/libxkbcommon-x11.so*   || true
+          rm -f AppDir/usr/lib/libEGL.so*             || true
+          rm -f AppDir/usr/lib/libGL.so*              || true
+          rm -f AppDir/usr/lib/libGLX.so*             || true
+          rm -f AppDir/usr/lib/libGLdispatch.so*      || true
+          rm -f AppDir/usr/lib/libpulse.so*           || true
+          rm -f AppDir/usr/lib/libpulsecommon*.so     || true
+
+      - name: Build AppImage
+        run: |
+          curl -fL --retry 5 --retry-delay 3 -o appimagetool \
+            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          test -s appimagetool
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool AppDir kute-x86_64.AppImage
+          ls -la kute-x86_64.AppImage
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-appimage
+          path: kute-x86_64.AppImage
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (-not (Test-Path $nsis)) { exit 1 }
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-multimedia
+            mingw-w64-ucrt-x86_64-qt6-multimedia-wmf
+            mingw-w64-ucrt-x86_64-qt6-declarative
+            mingw-w64-ucrt-x86_64-qt6-tools
+            mingw-w64-ucrt-x86_64-taglib
+            mingw-w64-ucrt-x86_64-qt6-shadertools
+            mingw-w64-ucrt-x86_64-qt6-svg
+            mingw-w64-ucrt-x86_64-qt6-imageformats
+            mingw-w64-ucrt-x86_64-ffmpeg
+            mingw-w64-ucrt-x86_64-imagemagick
+
+      - name: Generate .ico from logo
+        run: |
+          mkdir -p packaging
+          IMG=""
+          if [ -f packaging/kute.jpg ]; then IMG="packaging/kute.jpg"; fi
+          if [ -f packaging/kute.jpeg ]; then IMG="packaging/kute.jpeg"; fi
+          if [ -f packaging/kute.png ]; then IMG="packaging/kute.png"; fi
+          if [ -z "$IMG" ]; then echo "no source image"; exit 0; fi
+
+          if command -v magick &> /dev/null; then
+            magick "$IMG" -resize 256x256^ -gravity center -extent 256x256 -define icon:auto-resize=256,128,64,48,32,16 packaging/kute.ico
+          elif command -v convert &> /dev/null; then
+            convert "$IMG" -resize 256x256^ -gravity center -extent 256x256 -define icon:auto-resize=256,128,64,48,32,16 packaging/kute.ico
+          fi
+          ls -la packaging/kute.ico 2>/dev/null || true
+
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DKUTE_VERSION_STRING="${{ github.event.inputs.version }}"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Prepare dist
+        run: |
+          mkdir -p dist
+          cp build/kute.exe dist/
+          cp -L /ucrt64/bin/*.dll dist/
+          rm -f dist/ggml*.dll dist/libllama*.dll dist/libmtmd*.dll
+          rm -f dist/libwhisper*.dll dist/libparakeet*.dll dist/libpython*.dll
+          rm -f dist/libPyImath*.dll dist/libopenblas*.dll dist/libgfortran*.dll
+          rm -f dist/libquadmath*.dll dist/libgomp*.dll dist/tcl86.dll dist/tk86.dll
+          rm -f dist/libhwy*.dll dist/libcaca*.dll dist/libImath*.dll dist/libIex*.dll
+          rm -f dist/libIlmThread*.dll dist/libOpenEXR*.dll dist/libmenuw6.dll
+          rm -f dist/libformw6.dll dist/libpanelw6.dll dist/libncurses*.dll
+          rm -f dist/OpenCL.dll
+          rm -f dist/Qt6Widgets*.dll dist/Qt6Sql*.dll dist/Qt6Test*.dll
+          rm -f dist/Qt6Concurrent*.dll dist/Qt6PrintSupport*.dll dist/Qt6Designer*.dll
+
+      - name: Copy QML modules
+        run: |
+          QML_SRC=""
+          for cand in /ucrt64/share/qt6/qml /ucrt64/lib/qt6/qml; do
+            if [ -d "$cand" ]; then QML_SRC="$cand"; break; fi
+          done
+          if [ -z "$QML_SRC" ]; then exit 1; fi
+          rm -rf dist/qml
+          mkdir -p dist/qml
+          cp -rL "$QML_SRC"/* dist/qml/ 2>&1 | head -5 || true
+
+      - name: Copy plugins and multimedia
+        run: |
+          PLUG_SRC=""
+          for cand in /ucrt64/share/qt6/plugins /ucrt64/lib/qt6/plugins; do
+            if [ -d "$cand" ]; then PLUG_SRC="$cand"; break; fi
+          done
+          if [ -z "$PLUG_SRC" ]; then exit 1; fi
+          for sub in platforms imageformats iconengines multimedia styles generic networkinformation tls; do
+            if [ -d "$PLUG_SRC/$sub" ]; then
+              mkdir -p "dist/$sub"
+              cp -rL "$PLUG_SRC/$sub"/* "dist/$sub/" 2>&1 | head -3 || true
+            fi
+          done
+
+      - name: Copy multimedia deps
+        run: |
+          mkdir -p dist/multimedia
+          for lib in avcodec avformat avutil swresample swscale; do
+            cp -L /ucrt64/bin/${lib}-*.dll dist/multimedia/ 2>/dev/null || true
+          done
+          cp -L /ucrt64/bin/libjxl*.dll dist/multimedia/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libsoxr.dll dist/multimedia/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libgomp-1.dll dist/multimedia/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libssp-0.dll dist/multimedia/ 2>/dev/null || true
+
+      - name: Create qt.conf
+        shell: bash
+        run: |
+          printf '%s\n' '[Paths]' 'Prefix=./' 'Plugins=./' 'Qml2Imports=./qml' > dist/qt.conf
+
+      - name: Copy OpenSSL legacy
+        run: |
+          mkdir -p dist/lib/ossl-modules
+          cp /ucrt64/lib/ossl-modules/legacy.dll dist/lib/ossl-modules/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libcrypto-3-x64.dll dist/ 2>/dev/null || true
+          cp -L /ucrt64/bin/libssl-3-x64.dll dist/ 2>/dev/null || true
+
+      - name: Build single exe with NSIS
+        shell: bash
+        run: |
+          NSIS="/c/Program Files (x86)/NSIS/makensis.exe"
+          [ -f "$NSIS" ] || exit 1
+          printf '%s\n' \
+            'Unicode true' \
+            'SilentInstall silent' \
+            'RequestExecutionLevel user' \
+            'OutFile "kute-windows-x86_64.exe"' \
+            'InstallDir "$TEMP\kute"' \
+            'Icon "packaging\kute.ico"' \
+            '' \
+            'Section' \
+            'InitPluginsDir' \
+            'SetOutPath $PLUGINSDIR' \
+            'File /r "dist\*"' \
+            'ExecWait '"'"'"$PLUGINSDIR\kute.exe"'"'"'' \
+            'SectionEnd' \
+            > kute.nsi
+          "$NSIS" kute.nsi
+          [ -f "kute-windows-x86_64.exe" ] || exit 1
+          ls -la kute-windows-x86_64.exe
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-portable
+          path: kute-windows-x86_64.exe
+
+  publish:
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          path: downloads/
+
+      - name: Delete existing pre-release if present
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete "${{ github.event.inputs.version }}" \
+            --repo ${{ github.repository }} --yes --cleanup-tag 2>/dev/null || true
+
+      - name: Create pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: "kute ${{ github.event.inputs.version }} (pre-release)"
+          body: |
+            Rolling build from commit `${{ github.sha }}`.
+            Version embedded in binary: `${{ github.event.inputs.version }}`
+
+            **This is a pre-release** — files here may change on every build.
+          draft: false
+          prerelease: true
+          make_latest: false
+          files: |
+            downloads/linux-appimage/kute-x86_64.AppImage
+            downloads/windows-portable/kute-windows-x86_64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   linux:
     runs-on: ubuntu-22.04
     steps:
