@@ -234,7 +234,6 @@ bool Library::saveMetadata(int index,
         m_player->stop();
         m_intentPlaying = false;
         m_pendingPlay = false;
-        QThread::msleep(150);
     }
 
     const QString normalizedCover = normalizeLocalPath(coverSourcePath);
@@ -246,6 +245,7 @@ bool Library::saveMetadata(int index,
 
         TagLib::FileRef fr = makeFileRef(path);
         if (fr.isNull() || !fr.file()) {
+            qWarning() << "saveMetadata: cannot open file" << path;
             if (wasCurrent) restorePlayer(path, savedPos, wasPlaying);
             return false;
         }
@@ -314,6 +314,7 @@ bool Library::saveMetadata(int index,
     }
 
     if (!ok) {
+        qWarning() << "saveMetadata: TagLib save() failed for" << path;
         if (wasCurrent) restorePlayer(path, savedPos, wasPlaying);
         return false;
     }
@@ -364,7 +365,6 @@ bool Library::removeCurrentCover() {
     m_player->stop();
     m_intentPlaying = false;
     m_pendingPlay = false;
-    QThread::msleep(150);
 
     bool ok = false;
     {
@@ -386,6 +386,7 @@ bool Library::removeCurrentCover() {
     }
 
     if (!ok) {
+        qWarning() << "removeCurrentCover: failed for" << path;
         restorePlayer(path, savedPos, wasPlaying);
         return false;
     }
@@ -438,7 +439,6 @@ bool Library::saveCoverTo(const QString &destPath) {
     m_player->stop();
     m_intentPlaying = false;
     m_pendingPlay = false;
-    QThread::msleep(150);
 
     QByteArray data;
     {
@@ -536,7 +536,6 @@ bool Library::writeTextToTags(const QString &path, const QString &content) {
         m_player->stop();
         m_intentPlaying = false;
         m_pendingPlay = false;
-        QThread::msleep(150);
     }
 
     bool ok = false;
@@ -590,6 +589,8 @@ bool Library::writeTextToTags(const QString &path, const QString &content) {
     }
 
     if (isCurrentTrack) restorePlayer(path, savedPos, wasPlaying);
+
+    if (!ok) qWarning() << "writeTextToTags: TagLib save() failed for" << path;
 
     return ok;
 }

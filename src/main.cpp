@@ -39,6 +39,7 @@ static QByteArray selfPath() {
 static void reexecWithEnv(char *argv[]) {
     setenv("QT_LOGGING_RULES", "qt.multimedia.*=false;qt.quick.*=false", 1);
     setenv("AV_LOG_FORCE_NOCOLOR", "1", 1);
+    setenv("QT_MEDIA_BACKEND", "ffmpeg", 1);
     if (qEnvironmentVariableIsSet("KUTE_ENV_READY")) return;
 
     setenv("MALLOC_ARENA_MAX", "2", 1);
@@ -56,7 +57,10 @@ static void reexecWithEnv(char *argv[]) {
     execv(path.constData(), argv);
 }
 #else
-static void reexecWithEnv(char *argv[]) { Q_UNUSED(argv) }
+static void reexecWithEnv(char *argv[]) {
+    qputenv("QT_MEDIA_BACKEND", "ffmpeg");
+    Q_UNUSED(argv)
+}
 #endif
 
 #ifdef Q_OS_WIN
@@ -248,6 +252,9 @@ int main(int argc, char *argv[]) {
     try {
         reexecWithEnv(argv);
         emitLog(QtInfoMsg, "after reexecWithEnv");
+
+        qputenv("QT_MEDIA_BACKEND", "ffmpeg");
+        emitLog(QtInfoMsg, "media backend: ffmpeg");
 
         QSettings rhiSettings("kute", "kute");
 #ifdef Q_OS_WIN
