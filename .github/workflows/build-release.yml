@@ -120,7 +120,6 @@ jobs:
           rm -f AppDir/usr/lib/libGL.so*              || true
           rm -f AppDir/usr/lib/libGLX.so*             || true
           rm -f AppDir/usr/lib/libGLdispatch.so*      || true
-          rm -f AppDir/usr/lib/libvulkan.so*          || true
           rm -f AppDir/usr/lib/libpulse.so*           || true
           rm -f AppDir/usr/lib/libpulsecommon*.so     || true
 
@@ -211,7 +210,7 @@ jobs:
           rm -f dist/libhwy*.dll dist/libcaca*.dll dist/libImath*.dll dist/libIex*.dll
           rm -f dist/libIlmThread*.dll dist/libOpenEXR*.dll dist/libmenuw6.dll
           rm -f dist/libformw6.dll dist/libpanelw6.dll dist/libncurses*.dll
-          rm -f dist/vulkan-1.dll dist/OpenCL.dll
+          rm -f dist/OpenCL.dll
           rm -f dist/Qt6Widgets*.dll dist/Qt6Sql*.dll dist/Qt6Test*.dll
           rm -f dist/Qt6Concurrent*.dll dist/Qt6PrintSupport*.dll dist/Qt6Designer*.dll
 
