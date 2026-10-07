@@ -107,7 +107,7 @@ jobs:
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
             --plugin qt \
-            --desktop-file AppDir/usr/share/applications/kute.desktop \
+            --desktop-file AppDir/usr/share/applications/kute-qt.desktop \
             --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/kute.png
 
           rm -f AppDir/usr/lib/libwayland-client.so*  || true
