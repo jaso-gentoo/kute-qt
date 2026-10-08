@@ -266,23 +266,9 @@ jobs:
           cp -L /ucrt64/bin/libwebpmux*.dll dist/ 2>/dev/null || true
           cp -L /ucrt64/bin/zlib*.dll dist/ 2>/dev/null || true
 
-      - name: Copy multimedia deps
-        run: |
-          mkdir -p dist/multimedia
-          for lib in avcodec avformat avutil swresample swscale avdevice avfilter postproc; do
-            cp -L /ucrt64/bin/${lib}-*.dll dist/ 2>/dev/null || true
-            cp -L /ucrt64/bin/${lib}-*.dll dist/multimedia/ 2>/dev/null || true
-          done
-          for dep in libjxl libsoxr libgomp-1 libssp-0 \
-                     libx264 libx265 libvpx libmp3lame libopus \
-                     libvorbis libvorbisenc libogg libflac libwebp \
-                     libzstd liblzma libbz2 libxml2 libssl-3-x64 libcrypto-3-x64; do
-            cp -L /ucrt64/bin/${dep}*.dll dist/ 2>/dev/null || true
-            cp -L /ucrt64/bin/${dep}*.dll dist/multimedia/ 2>/dev/null || true
-          done
-
       - name: Copy full runtime deps to multimedia dir
         run: |
+          mkdir -p dist/multimedia
           cp -L /ucrt64/bin/*.dll dist/multimedia/ 2>/dev/null || true
           rm -f dist/multimedia/tcl86.dll dist/multimedia/tk86.dll
           rm -f dist/multimedia/libpython*.dll dist/multimedia/libPyImath*.dll
@@ -315,6 +301,7 @@ jobs:
             'Icon "packaging\kute.ico"' \
             '' \
             'Section' \
+            'RMDir /r "$LOCALAPPDATA\kute"' \
             'SetOutPath "$LOCALAPPDATA\kute"' \
             'File /r "dist\*"' \
             'Exec '"'"'"$LOCALAPPDATA\kute\kute.exe"'"'"'' \
