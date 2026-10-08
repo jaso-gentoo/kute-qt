@@ -618,8 +618,8 @@ Rectangle {
                     id: volWave
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    anchors.bottom: volBar.top
-                    anchors.bottomMargin: 4
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -14
                     height: 14
                     spacing: volArea.barSpacing
                     clip: true
