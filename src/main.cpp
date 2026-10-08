@@ -273,53 +273,32 @@ static void setupDllSearchPath() {
 }
 
 static void preloadMultimediaDeps() {
-    const QString mmDir = QCoreApplication::applicationDirPath() + "/multimedia";
-    const QStringList names = {
-        "libgcc_s_seh-1.dll",
-        "libstdc++-6.dll",
-        "libwinpthread-1.dll",
-        "libiconv-2.dll",
-        "liblzma-5.dll",
-        "libzstd.dll",
-        "libbz2-1.dll",
-        "libxml2-16.dll",
-        "libssl-3-x64.dll",
-        "libcrypto-3-x64.dll",
-        "libgomp-1.dll",
-        "libogg-0.dll",
-        "libvorbis-0.dll",
-        "libvorbisenc-2.dll",
-        "libopus-0.dll",
-        "libmp3lame-0.dll",
-        "libsoxr.dll",
-        "libvpx-1.dll",
-        "libx264-165.dll",
-        "libx265-217.dll",
-        "libdav1d-7.dll",
-        "avutil-61.dll",
-        "swresample-7.dll",
-        "swscale-10.dll",
-        "avcodec-63.dll",
-        "avformat-63.dll",
-        "avfilter-12.dll",
-        "avdevice-63.dll"
-    };
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QString mmDir = appDir + "/multimedia";
 
-    for (const QString &name : names) {
-        const std::wstring fullW = QDir::toNativeSeparators(mmDir + "/" + name).toStdWString();
-        HMODULE h = LoadLibraryW(fullW.c_str());
-        if (!h) {
-            const DWORD err1 = GetLastError();
-            const std::wstring justW = name.toStdWString();
-            h = LoadLibraryW(justW.c_str());
+    QStringList searchDirs;
+    searchDirs << mmDir << appDir;
+
+    for (const QString &dirPath : searchDirs) {
+        QDir dir(dirPath);
+        if (!dir.exists()) continue;
+
+        const QStringList dlls = dir.entryList({"*.dll"}, QDir::Files, QDir::Name);
+        for (const QString &name : dlls) {
+            if (name.startsWith("Qt6", Qt::CaseInsensitive)) continue;
+            if (name.compare("ffmpegmediaplugin.dll", Qt::CaseInsensitive) == 0) continue;
+            if (name.compare("vulkan-1.dll", Qt::CaseInsensitive) == 0) continue;
+            if (name.compare("kute.exe", Qt::CaseInsensitive) == 0) continue;
+
+            const std::wstring fullW =
+                QDir::toNativeSeparators(dirPath + "/" + name).toStdWString();
+            HMODULE h = LoadLibraryW(fullW.c_str());
             if (!h) {
-                emitLog(QtWarningMsg, QString("preload FAILED: %1 (abs=%2 name=%3)")
-                    .arg(name).arg(err1).arg(GetLastError()));
-            } else {
-                emitLog(QtInfoMsg, QString("preload OK (name): %1").arg(name));
+                emitLog(QtWarningMsg, QString("preload FAILED [%1]: %2 (err=%3)")
+                    .arg(dirPath.section('/', -1))
+                    .arg(name)
+                    .arg(GetLastError()));
             }
-        } else {
-            emitLog(QtInfoMsg, QString("preload OK (abs): %1").arg(name));
         }
     }
 
