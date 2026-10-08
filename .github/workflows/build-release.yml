@@ -7,6 +7,18 @@ on:
         description: 'Release tag (e.g. v1.0, v1.1)'
         required: true
         default: 'v1.0'
+      changelog:
+        description: 'Changelog (Markdown)'
+        required: true
+        default: |
+          ### Added
+          -
+
+          ### Changed
+          -
+
+          ### Fixed
+          -
 
 permissions:
   contents: write
@@ -326,6 +338,9 @@ jobs:
           tag_name: ${{ github.event.inputs.version }}
           name: "kute ${{ github.event.inputs.version }}"
           body: |
+            ${{ github.event.inputs.changelog }}
+
+            ---
             Build from commit `${{ github.sha }}`.
             Version embedded in binary: `${{ github.event.inputs.version }}`
           draft: false
