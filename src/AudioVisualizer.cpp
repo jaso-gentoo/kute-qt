@@ -29,6 +29,15 @@ AudioVisualizer::AudioVisualizer(QMediaPlayer *player, QObject *parent)
 }
 
 void AudioVisualizer::onBufferReceived(const QAudioBuffer &buffer) {
+    static bool firstLog = true;
+    if (firstLog) {
+        firstLog = false;
+        qDebug() << "AudioVisualizer: first buffer, valid:" << buffer.isValid()
+                 << "frames:" << buffer.frameCount()
+                 << "fmt:" << int(buffer.format().sampleFormat())
+                 << "ch:" << buffer.format().channelCount()
+                 << "rate:" << buffer.format().sampleRate();
+    }
     if (!buffer.isValid()) return;
 
     const QAudioFormat fmt = buffer.format();
@@ -113,5 +122,9 @@ void AudioVisualizer::tick() {
         m_target[i] *= 0.55f;
     }
 
-    if (changed) emit spectrumChanged();
+    if (changed) {
+        static bool firstEmit = true;
+        if (firstEmit) { firstEmit = false; qDebug() << "AudioVisualizer: first spectrum emit"; }
+        emit spectrumChanged();
+    }
 }

@@ -451,7 +451,7 @@ void Library::setFilterArtist(const QString &artist) {
         m_showOnlyLiked = false;
         emit showOnlyLikedChanged();
     }
-    sortAndApply(true);
+    sortAndApply(false);
     emit filterArtistChanged();
     emit currentChanged();
 }
@@ -467,7 +467,7 @@ void Library::setFilterAlbum(const QString &album) {
         m_showOnlyLiked = false;
         emit showOnlyLikedChanged();
     }
-    sortAndApply(true);
+    sortAndApply(false);
     emit filterAlbumChanged();
     emit currentChanged();
 }
@@ -517,7 +517,7 @@ void Library::clearFilter() {
     if (changed) {
         rebuildArtists();
         rebuildAlbums();
-        sortAndApply(true);
+        sortAndApply(false);
         emit currentChanged();
     }
 }
