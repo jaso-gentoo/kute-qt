@@ -241,7 +241,7 @@ jobs:
           mkdir -p dist/qml
           cp -rL "$QML_SRC"/* dist/qml/ 2>&1 | head -5 || true
 
-      - name: Copy plugins and multimedia
+      - name: Copy plugins
         run: |
           PLUG_SRC=""
           for cand in /ucrt64/share/qt6/plugins /ucrt64/lib/qt6/plugins; do
@@ -266,16 +266,6 @@ jobs:
           cp -L /ucrt64/bin/libwebpmux*.dll dist/ 2>/dev/null || true
           cp -L /ucrt64/bin/zlib*.dll dist/ 2>/dev/null || true
 
-      - name: Copy full runtime deps to multimedia dir
-        run: |
-          mkdir -p dist/multimedia
-          cp -L /ucrt64/bin/*.dll dist/multimedia/ 2>/dev/null || true
-          rm -f dist/multimedia/tcl86.dll dist/multimedia/tk86.dll
-          rm -f dist/multimedia/libpython*.dll dist/multimedia/libPyImath*.dll
-          rm -f dist/multimedia/OpenCL.dll
-          rm -f dist/multimedia/Qt6Widgets*.dll dist/multimedia/Qt6Sql*.dll dist/multimedia/Qt6Test*.dll
-          rm -f dist/multimedia/Qt6Concurrent*.dll dist/multimedia/Qt6PrintSupport*.dll dist/multimedia/Qt6Designer*.dll
-
       - name: Create qt.conf
         shell: bash
         run: |
@@ -297,6 +287,8 @@ jobs:
             'Unicode true' \
             'SilentInstall silent' \
             'RequestExecutionLevel user' \
+            'SetCompressor /SOLID lzma' \
+            'SetCompressorDictSize 64' \
             'OutFile "kute-windows-x86_64.exe"' \
             'Icon "packaging\kute.ico"' \
             '' \
