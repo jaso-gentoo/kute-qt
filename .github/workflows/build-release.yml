@@ -7,18 +7,6 @@ on:
         description: 'Release tag (e.g. v1.0, v1.1)'
         required: true
         default: 'v1.0'
-      changelog:
-        description: 'Changelog (Markdown)'
-        required: true
-        default: |
-          ### Added
-          -
-
-          ### Changed
-          -
-
-          ### Fixed
-          -
 
 permissions:
   contents: write
@@ -321,9 +309,40 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
+
       - uses: actions/download-artifact@v6
         with:
           path: downloads/
+
+      - name: Extract changelog section
+        id: changelog
+        run: |
+          python3 - <<'PY'
+          import os, re, pathlib
+          version = os.environ["VERSION"]
+          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+
+          pattern = re.compile(rf"^##\s+{re.escape(version)}\b.*?$", re.MULTILINE)
+          m = pattern.search(text)
+          if not m:
+              print("::warning::No changelog section found for", version)
+              body = f"_No changelog entry for {version}._"
+          else:
+              start = m.start()
+              rest = text[m.end():]
+              next_h = re.search(r"^##\s+", rest, re.MULTILINE)
+              end = m.end() + (next_h.start() if next_h else len(rest))
+              body = text[start:end].strip()
+
+          out = pathlib.Path("release_body.md")
+          out.write_text(body + "\n\n---\n"
+              f"Build from commit `{os.environ['GITHUB_SHA']}`.\n"
+              f"Version embedded in binary: `{version}`\n",
+              encoding="utf-8")
+          PY
+        env:
+          VERSION: ${{ github.event.inputs.version }}
 
       - name: Delete existing release if present
         env:
@@ -337,12 +356,7 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.version }}
           name: "kute ${{ github.event.inputs.version }}"
-          body: |
-            ${{ github.event.inputs.changelog }}
-
-            ---
-            Build from commit `${{ github.sha }}`.
-            Version embedded in binary: `${{ github.event.inputs.version }}`
+          body_path: release_body.md
           draft: false
           prerelease: false
           make_latest: true
