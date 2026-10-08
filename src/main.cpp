@@ -243,6 +243,17 @@ private:
 
 #ifdef Q_OS_WIN
 
+static std::wstring shortPathW(const QString &path) {
+    const std::wstring longW = QDir::toNativeSeparators(path).toStdWString();
+    DWORD needed = GetShortPathNameW(longW.c_str(), nullptr, 0);
+    if (needed == 0) return longW;
+    std::wstring out(needed, L'\0');
+    DWORD written = GetShortPathNameW(longW.c_str(), &out[0], needed);
+    if (written == 0 || written >= needed) return longW;
+    out.resize(written);
+    return out;
+}
+
 static void setupDllSearchPath() {
     SetDefaultDllDirectories(
         LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
@@ -252,10 +263,11 @@ static void setupDllSearchPath() {
     const QString appDir = QCoreApplication::applicationDirPath();
     const QString mmDir = appDir + "/multimedia";
 
-    const std::wstring appW = QDir::toNativeSeparators(appDir).toStdWString();
-    const std::wstring mmW  = QDir::toNativeSeparators(mmDir).toStdWString();
+    const std::wstring appW = shortPathW(appDir);
+    const std::wstring mmW  = shortPathW(mmDir);
 
     SetCurrentDirectoryW(appW.c_str());
+    SetDllDirectoryW(mmW.c_str());
 
     if (AddDllDirectory(appW.c_str())) {
         emitLog(QtInfoMsg, QString("AddDllDirectory OK: %1").arg(appDir));
@@ -272,6 +284,11 @@ static void setupDllSearchPath() {
     }
 }
 
+struct DllEntry {
+    QString name;
+    qint64 size;
+};
+
 static void preloadMultimediaDeps() {
     const QString appDir = QCoreApplication::applicationDirPath();
     const QString mmDir = appDir + "/multimedia";
@@ -279,26 +296,32 @@ static void preloadMultimediaDeps() {
     QStringList searchDirs;
     searchDirs << mmDir << appDir;
 
+    QList<DllEntry> files;
     for (const QString &dirPath : searchDirs) {
         QDir dir(dirPath);
         if (!dir.exists()) continue;
-
-        const QStringList dlls = dir.entryList({"*.dll"}, QDir::Files, QDir::Name);
-        for (const QString &name : dlls) {
+        const QFileInfoList infos = dir.entryInfoList({"*.dll"}, QDir::Files, QDir::Name);
+        for (const QFileInfo &fi : infos) {
+            const QString name = fi.fileName();
             if (name.startsWith("Qt6", Qt::CaseInsensitive)) continue;
             if (name.compare("ffmpegmediaplugin.dll", Qt::CaseInsensitive) == 0) continue;
             if (name.compare("vulkan-1.dll", Qt::CaseInsensitive) == 0) continue;
             if (name.compare("kute.exe", Qt::CaseInsensitive) == 0) continue;
+            files.append({fi.absoluteFilePath(), fi.size()});
+        }
+    }
 
-            const std::wstring fullW =
-                QDir::toNativeSeparators(dirPath + "/" + name).toStdWString();
-            HMODULE h = LoadLibraryW(fullW.c_str());
-            if (!h) {
-                emitLog(QtWarningMsg, QString("preload FAILED [%1]: %2 (err=%3)")
-                    .arg(dirPath.section('/', -1))
-                    .arg(name)
-                    .arg(GetLastError()));
-            }
+    std::sort(files.begin(), files.end(), [](const DllEntry &a, const DllEntry &b) {
+        return a.size < b.size;
+    });
+
+    for (const DllEntry &e : files) {
+        const std::wstring fullW = QDir::toNativeSeparators(e.name).toStdWString();
+        HMODULE h = LoadLibraryW(fullW.c_str());
+        if (!h) {
+            emitLog(QtWarningMsg, QString("preload FAILED: %1 (err=%2)")
+                .arg(QFileInfo(e.name).fileName())
+                .arg(GetLastError()));
         }
     }
 
