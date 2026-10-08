@@ -27,6 +27,7 @@ Rectangle {
         function onCurrentChanged() {
             if (!library.hasCurrent) {
                 trackAnim.stop()
+                bar.opacity = 1
                 coverWrap.opacity = 1
                 textCol.opacity = 1
                 coverShift.y = 0
@@ -35,6 +36,7 @@ Rectangle {
                 return
             }
             trackAnim.stop()
+            bar.opacity = 1
             coverWrap.opacity = 1
             textCol.opacity = 1
             coverShift.y = 0
@@ -118,7 +120,6 @@ Rectangle {
                     asynchronous: true
                     cache: true
                     smooth: true
-                    mipmap: true
                     visible: false
                 }
 
@@ -270,45 +271,32 @@ Rectangle {
             }
         }
 
-        ColumnLayout {
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 2
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
-
-                Text {
-                    text: library.formatDuration(library.position)
-                    color: theme.outline
-                    font.pixelSize: 10
-                    font.family: "monospace"
-                }
-
-                Item { Layout.fillWidth: true }
-
-                Text {
-                    text: library.formatDuration(library.duration)
-                    color: theme.outline
-                    font.pixelSize: 10
-                    font.family: "monospace"
-                }
-            }
 
             Item {
                 id: progArea
-                Layout.fillWidth: true
-                Layout.fillHeight: true
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                height: 22
 
                 readonly property real progress: library.duration > 0
                                                  ? library.position / library.duration
                                                  : 0
 
+                readonly property bool hovering: progHover.hovered || progMouse.pressed
+
+                readonly property int barWidth: 2
+                readonly property int barSpacing: 1
+
                 Rectangle {
+                    id: progressBar
+                    anchors.left: parent.left
+                    anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width
-                    height: progHover.hovered ? 8 : 5
+                    height: progArea.hovering ? 8 : 5
                     radius: height / 2
                     color: theme.surfaceVariant
                     Behavior on height { NumberAnimation { duration: 180 } }
@@ -327,14 +315,12 @@ Rectangle {
                                                    && !library.isPlaying
                                                    && library.position > 0
 
-                    width: progHover.hovered || progMouse.pressed
-                           ? 14
-                           : (paused ? 10 : 0)
+                    width: progArea.hovering ? 14 : (paused ? 10 : 0)
                     height: width
                     radius: width / 2
                     color: theme.primary
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: parent.width * progArea.progress - width / 2
+                    x: progressBar.x + progressBar.width * progArea.progress - width / 2
+                    y: progressBar.y + progressBar.height / 2 - height / 2
 
                     Behavior on width {
                         NumberAnimation {
@@ -345,7 +331,7 @@ Rectangle {
                     }
 
                     SequentialAnimation on scale {
-                        running: progDot.paused && !progHover.hovered && !progMouse.pressed
+                        running: progDot.paused && !progArea.hovering
                         loops: Animation.Infinite
 
                         NumberAnimation {
@@ -361,7 +347,7 @@ Rectangle {
                     }
 
                     Behavior on scale {
-                        enabled: !(progDot.paused && !progHover.hovered && !progMouse.pressed)
+                        enabled: !(progDot.paused && !progArea.hovering)
                         NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
                     }
                 }
@@ -383,6 +369,30 @@ Rectangle {
                         if (pressed && library.duration > 0)
                             library.seek(library.duration * mouse.x / width)
                     }
+                }
+            }
+
+            RowLayout {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: progArea.bottom
+                anchors.topMargin: 3
+                spacing: 8
+
+                Text {
+                    text: library.formatDuration(library.position)
+                    color: theme.outline
+                    font.pixelSize: 10
+                    font.family: "monospace"
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Text {
+                    text: library.formatDuration(library.duration)
+                    color: theme.outline
+                    font.pixelSize: 10
+                    font.family: "monospace"
                 }
             }
         }
@@ -601,10 +611,74 @@ Rectangle {
                 Layout.fillHeight: true
 
                 readonly property real vol: library.volume / 100
+                readonly property int barWidth: 2
+                readonly property int barSpacing: 1
+
+                Row {
+                    id: volWave
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: volBar.top
+                    anchors.bottomMargin: 4
+                    height: 14
+                    spacing: volArea.barSpacing
+                    clip: true
+
+                    readonly property var spec: library.visualizer.spectrum
+                    readonly property int specLen: spec ? spec.length : 0
+                    readonly property int barSlotWidth: volArea.barWidth + volArea.barSpacing
+                    readonly property int visibleBars: Math.max(0,
+                        Math.floor((width + volArea.barSpacing) / barSlotWidth))
+                    readonly property int halfBars: Math.floor(visibleBars / 2)
+
+                    opacity: library.isPlaying ? 1.0 : 0.35
+                    Behavior on opacity { NumberAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+                    Repeater {
+                        model: volWave.visibleBars
+                        delegate: Item {
+                            required property int index
+                            width: volArea.barWidth
+                            height: volWave.height
+
+                            readonly property int mirrorIdx: {
+                                const hb = volWave.halfBars
+                                if (hb <= 0) return index
+                                if (index < hb) return index
+                                return volWave.visibleBars - 1 - index
+                            }
+                            readonly property int srcIdx: {
+                                const hb = volWave.halfBars
+                                if (hb <= 0 || volWave.specLen <= 0) return -1
+                                return Math.min(volWave.specLen - 1,
+                                                Math.floor(mirrorIdx * volWave.specLen / hb))
+                            }
+                            readonly property real level: {
+                                if (srcIdx < 0) return 0
+                                const s = volWave.spec[srcIdx]
+                                return s === undefined ? 0 : s
+                            }
+
+                            Rectangle {
+                                anchors.bottom: parent.bottom
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: parent.width
+                                height: Math.max(2, level * parent.height)
+                                radius: width / 2
+                                color: theme.onSurface
+                                Behavior on height {
+                                    NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                                }
+                            }
+                        }
+                    }
+                }
 
                 Rectangle {
+                    id: volBar
+                    anchors.left: parent.left
+                    anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width
                     height: volHover.hovered ? 8 : 5
                     radius: height / 2
                     color: theme.surfaceVariant
@@ -623,8 +697,8 @@ Rectangle {
                     height: width
                     radius: width / 2
                     color: theme.onSurface
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: parent.width * volArea.vol - width / 2
+                    x: volBar.x + volBar.width * volArea.vol - width / 2
+                    y: volBar.y + volBar.height / 2 - height / 2
                     Behavior on width {
                         NumberAnimation {
                             duration: 180

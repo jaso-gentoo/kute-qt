@@ -38,9 +38,9 @@ Item {
 
                 Repeater {
                     model: [
-                        { label: "Artists",   icon: "\ue7fd" },
+                        { label: "Playlists", icon: "\ue8ef" },
                         { label: "Albums",    icon: "\ue02b" },
-                        { label: "Playlists", icon: "\ue8ef" }
+                        { label: "Artists",   icon: "\ue7fd" }
                     ]
                     delegate: Item {
                         required property var modelData
@@ -99,16 +99,17 @@ Item {
             Layout.fillHeight: true
             clip: true
 
-            ArtistsView {
+            PlaylistsPage {
+                id: playlistsPage
                 anchors.fill: parent
                 visible: opacity > 0.01
                 opacity: root.currentTab === 0 ? 1 : 0
-                x: root.currentTab === 0 ? 0 : (root.currentTab > 0 ? -24 : 24)
+                x: root.currentTab === 0 ? 0 : 24
                 Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
                 Behavior on x       { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
 
-                onArtistSelected: (name) => root.artistSelected(name)
-                onArtistActivated: root.browseActivated()
+                onPlaylistActivated: root.browseActivated()
+                onContextChanged: root.contextChanged()
             }
 
             AlbumsView {
@@ -123,17 +124,16 @@ Item {
                 onAlbumActivated: root.browseActivated()
             }
 
-            PlaylistsPage {
-                id: playlistsPage
+            ArtistsView {
                 anchors.fill: parent
                 visible: opacity > 0.01
                 opacity: root.currentTab === 2 ? 1 : 0
-                x: root.currentTab === 2 ? 0 : 24
+                x: root.currentTab === 2 ? 0 : (root.currentTab > 2 ? -24 : 24)
                 Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
                 Behavior on x       { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
 
-                onPlaylistActivated: root.browseActivated()
-                onContextChanged: root.contextChanged()
+                onArtistSelected: (name) => root.artistSelected(name)
+                onArtistActivated: root.browseActivated()
             }
         }
     }

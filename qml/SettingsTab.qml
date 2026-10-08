@@ -14,9 +14,6 @@ FocusScope {
     readonly property bool lightLocked: theme.matugenEnabled
     readonly property bool matugenLocked: theme.lightTheme || !theme.matugenAvailable
 
-    function previousSubTab() {}
-    function nextSubTab() {}
-
     component ModalSection: ColumnLayout {
         id: secRoot
         property string title: ""

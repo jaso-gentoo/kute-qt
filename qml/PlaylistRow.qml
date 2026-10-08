@@ -136,10 +136,17 @@ Item {
         }
 
         RowLayout {
-            anchors.fill: parent
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
             anchors.leftMargin: 8
-            anchors.rightMargin: 8
+            anchors.rightMargin: library.editMode ? 46 : 8
             spacing: 10
+
+            Behavior on anchors.rightMargin {
+                NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
+            }
 
             Item {
                 Layout.preferredWidth: library.editMode ? 12 : 0
@@ -188,7 +195,6 @@ Item {
                     asynchronous: true
                     cache: false
                     smooth: true
-                    mipmap: true
                     visible: status === Image.Ready
                 }
             }
@@ -241,42 +247,41 @@ Item {
                 color: theme.outline
                 font.pixelSize: 10
             }
+        }
 
-            Item {
-                Layout.preferredWidth: library.editMode ? 26 : 0
-                Layout.preferredHeight: 26
-                Layout.alignment: Qt.AlignVCenter
-                clip: true
-                Behavior on Layout.preferredWidth { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+        Rectangle {
+            id: removeBtn
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: (library.editMode && !listView.dragActive) ? 46 : 0
+            radius: 10
+            clip: true
+            color: removeHov.containsMouse
+                ? Qt.rgba(0.9, 0.35, 0.35, 0.28)
+                : "transparent"
+            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on width { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
 
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 8
-                    color: deleteBtnHov.containsMouse
-                        ? Qt.rgba(0.9, 0.35, 0.35, 0.22)
-                        : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.08)
-                    Behavior on color { ColorAnimation { duration: 160 } }
-                }
+            MaterialIcon {
+                anchors.centerIn: parent
+                glyph: "\ue872"
+                iconSize: 16
+                iconColor: removeHov.containsMouse ? "#e57373" : theme.outline
+                Behavior on iconColor { ColorAnimation { duration: 150 } }
+            }
 
-                MaterialIcon {
-                    anchors.centerIn: parent
-                    glyph: "\ue872"
-                    iconSize: 14
-                    iconColor: deleteBtnHov.containsMouse ? "#e57373" : theme.onBackground
-                    Behavior on iconColor { ColorAnimation { duration: 150 } }
-                }
-
-                MouseArea {
-                    id: deleteBtnHov
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        library.requestCloseSearch()
-                        plRowWrap.deleteRequested(plRowWrap.playlistId,
-                                                  plRowWrap.playlistName,
-                                                  plRowWrap.index)
-                    }
+            MouseArea {
+                id: removeHov
+                anchors.fill: parent
+                enabled: library.editMode && !listView.dragActive
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    library.requestCloseSearch()
+                    plRowWrap.deleteRequested(plRowWrap.playlistId,
+                                              plRowWrap.playlistName,
+                                              plRowWrap.index)
                 }
             }
         }

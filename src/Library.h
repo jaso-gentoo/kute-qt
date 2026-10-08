@@ -14,6 +14,7 @@
 #include "PlaylistModel.h"
 #include "PlaylistFilterModel.h"
 #include "DiscordRPC.h"
+#include "AudioVisualizer.h"
 
 class Library : public QObject {
     Q_OBJECT
@@ -66,6 +67,7 @@ class Library : public QObject {
     Q_PROPERTY(QString      activePlaylistId   READ activePlaylistId   NOTIFY activePlaylistChanged)
     Q_PROPERTY(int          activePlaylistTrackCount READ activePlaylistTrackCount NOTIFY activePlaylistChanged)
     Q_PROPERTY(TrackModel*  playlistTracks     READ playlistTracks     CONSTANT)
+    Q_PROPERTY(AudioVisualizer* visualizer READ visualizer CONSTANT)
 
 public:
     explicit Library(QObject *parent = nullptr);
@@ -122,6 +124,8 @@ public:
     int likedRevision() const { return m_likedRevision; }
     bool showOnlyLiked() const { return m_showOnlyLiked; }
     void setShowOnlyLiked(bool v);
+
+    AudioVisualizer* visualizer() const { return m_visualizer; }
 
     bool discordRpcEnabled() const;
     void setDiscordRpcEnabled(bool v);
@@ -249,6 +253,7 @@ private:
     QString playlistCoverThumbPath(const QString &id) const;
 
     void    migrateLegacyPlaylists();
+    void    migratePlaylistCovers();
     void    migrateLegacyPlaylistOrder();
     void    migrateLegacyLiked();
     void    refreshPlaylistModel();
@@ -297,6 +302,7 @@ private:
     QTimer       *m_presenceTimer = nullptr;
     QTimer       *m_offsetSaveTimer = nullptr;
     QTimer       *m_likedSaveTimer = nullptr;
+    AudioVisualizer *m_visualizer = nullptr;
 
     QString m_sortField = "path";
     bool    m_sortAscending = true;

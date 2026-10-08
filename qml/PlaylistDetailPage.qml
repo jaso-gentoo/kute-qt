@@ -316,7 +316,6 @@ Item {
                     asynchronous: true
                     cache: false
                     smooth: true
-                    mipmap: true
                     visible: status === Image.Ready
                 }
 

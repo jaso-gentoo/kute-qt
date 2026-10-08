@@ -8,6 +8,7 @@ Item {
     id: panel
 
     signal editRequested
+    signal lyricsRequested
 
     readonly property int coverSize: {
         const availW = panel.width - 8
@@ -148,6 +149,69 @@ Item {
         }
     }
 
+    Rectangle {
+        id: lyricsBtn
+        anchors.right: parent.right
+        anchors.top: editBtn.bottom
+        anchors.rightMargin: 4
+        anchors.topMargin: 4
+        width: 30
+        height: 30
+        radius: 8
+        color: "transparent"
+        z: 100
+        visible: library.hasCurrent
+
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            color: theme.onBackground
+            opacity: lyricsHov.containsMouse ? 0.20 : 0.10
+            Behavior on opacity { NumberAnimation { duration: 150 } }
+        }
+
+        MaterialIcon {
+            anchors.centerIn: parent
+            glyph: "\ue405"
+            iconSize: 17
+            iconColor: theme.onBackground
+        }
+
+        MouseArea {
+            id: lyricsHov
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: panel.lyricsRequested()
+        }
+
+        Rectangle {
+            anchors.right: parent.right
+            anchors.top: parent.bottom
+            anchors.topMargin: 6
+            width: lyricsTip.implicitWidth + 20
+            height: 28
+            radius: 8
+            color: theme.surface
+            border.color: theme.outline
+            border.width: 1
+            opacity: lyricsHov.containsMouse ? 1 : 0
+            visible: opacity > 0
+            z: 9999
+
+            Behavior on opacity { NumberAnimation { duration: 150 } }
+
+            Text {
+                id: lyricsTip
+                anchors.centerIn: parent
+                text: "Show lyrics (Ctrl+D)"
+                color: theme.onBackground
+                font.pixelSize: 11
+                font.weight: Font.Medium
+            }
+        }
+    }
+
     Flickable {
         id: flick
         anchors.fill: parent
@@ -200,7 +264,7 @@ Item {
                     asynchronous: true
                     cache: true
                     smooth: true
-                    mipmap: true
+                    mipmap: false
                     visible: false
                 }
 

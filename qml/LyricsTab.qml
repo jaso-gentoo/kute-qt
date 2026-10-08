@@ -11,10 +11,6 @@ FocusScope {
     property var    lrcLines: []
     property int    activeIndex: -1
     property real   lrcOffset: 0.25
-
-    function previousSubTab() { isLrcMode = !isLrcMode; refresh() }
-    function nextSubTab()     { isLrcMode = !isLrcMode; refresh() }
-
     onIsActiveChanged: if (isActive) refresh()
 
     function parseLrc(raw) {

@@ -44,8 +44,27 @@ void Library::migrateLegacyPlaylists() {
 }
 
 QString Library::playlistCoverThumbPath(const QString &id) const {
-    return QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
-        + "/kute/playlist_covers/" + id + ".png";
+    return kuteConfigDir() + "/playlist_covers/" + id + ".png";
+}
+
+void Library::migratePlaylistCovers() {
+    const QString oldDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
+                           + "/kute/playlist_covers";
+    if (!QDir(oldDir).exists()) return;
+
+    const QString newDir = kuteConfigDir() + "/playlist_covers";
+    QDir().mkpath(newDir);
+
+    QDir src(oldDir);
+    const QStringList files = src.entryList({"*.png"}, QDir::Files);
+    for (const QString &name : files) {
+        const QString from = oldDir + "/" + name;
+        const QString to = newDir + "/" + name;
+        if (QFile::exists(to)) continue;
+        QFile::rename(from, to);
+    }
+
+    src.removeRecursively();
 }
 
 void Library::refreshPlaylistModel() {

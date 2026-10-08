@@ -22,16 +22,6 @@ FocusScope {
     signal closeRequested
     signal saved
 
-    function previousSubTab() {
-        if (subTab === 1) {
-            if (textIsLrc) lrcContent = textArea.text; else tagContent = textArea.text
-            subTab = 0
-        }
-    }
-    function nextSubTab() {
-        if (subTab === 0) subTab = 1
-    }
-
     component FieldGroup: ColumnLayout {
         id: fgRoot
         property string label: ""
@@ -328,7 +318,6 @@ FocusScope {
                                 asynchronous: true
                                 cache: true
                                 smooth: true
-                                mipmap: true
                                 visible: false
                             }
                             Item {

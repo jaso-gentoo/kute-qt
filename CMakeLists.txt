@@ -61,6 +61,7 @@ set(SOURCES
     src/LibrarySort.cpp
     src/LibraryPlaylist.cpp
     src/DiscordRPC.cpp
+    src/AudioVisualizer.cpp
 )
 if(UNIX AND NOT APPLE)
     list(APPEND SOURCES src/MprisController.cpp)

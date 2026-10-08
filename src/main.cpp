@@ -193,10 +193,10 @@ protected:
 
         if (!(mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier))) {
             if (!focusIsTextInput()) {
-                if (k == Qt::Key_Up)    { QMetaObject::invokeMethod(m_root, "prevTrack",       Qt::DirectConnection); return true; }
-                if (k == Qt::Key_Down)  { QMetaObject::invokeMethod(m_root, "nextTrack",       Qt::DirectConnection); return true; }
-                if (k == Qt::Key_Left)  { QMetaObject::invokeMethod(m_root, "modalPrevSubTab", Qt::DirectConnection); return true; }
-                if (k == Qt::Key_Right) { QMetaObject::invokeMethod(m_root, "modalNextSubTab", Qt::DirectConnection); return true; }
+                if (k == Qt::Key_Up)    { QMetaObject::invokeMethod(m_root, "prevTrack",     Qt::DirectConnection); return true; }
+                if (k == Qt::Key_Down)  { QMetaObject::invokeMethod(m_root, "nextTrack",     Qt::DirectConnection); return true; }
+                if (k == Qt::Key_Left)  { QMetaObject::invokeMethod(m_root, "seekBackward",  Qt::DirectConnection); return true; }
+                if (k == Qt::Key_Right) { QMetaObject::invokeMethod(m_root, "seekForward",   Qt::DirectConnection); return true; }
             }
         }
 

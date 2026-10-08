@@ -58,6 +58,10 @@ Library::Library(QObject *parent) : QObject(parent) {
 
     loadOffsets();
 
+    m_visualizer = new AudioVisualizer(m_player, this);
+
+    migratePlaylistCovers();
+
     m_playlistModel.setCoverResolver([this](const QString &id) {
         return playlistCover(id);
     });

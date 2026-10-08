@@ -27,15 +27,6 @@ Item {
 
     function performTrackSave() { trackTab.performSave() }
 
-    function previousSubTab() {
-        if (currentTab === tabTrack) trackTab.previousSubTab()
-        else if (currentTab === tabLyrics) lyricsTab.previousSubTab()
-    }
-    function nextSubTab() {
-        if (currentTab === tabTrack) trackTab.nextSubTab()
-        else if (currentTab === tabLyrics) lyricsTab.nextSubTab()
-    }
-
     Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
     HoverHandler { blocking: true }

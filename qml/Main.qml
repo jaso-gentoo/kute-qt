@@ -27,7 +27,7 @@ ApplicationWindow {
             return library.filterArtist === ""
                 && library.filterAlbum === ""
                 && !library.showOnlyLiked
-        if (currentPage === 2 && browseView.currentTab === 2)
+        if (currentPage === 2 && browseView.currentTab === 0)
             return true
         return false
     }
@@ -110,7 +110,7 @@ ApplicationWindow {
     }
 
     function toggleReorder() {
-        if (currentPage === 2 && browseView.currentTab !== 2) return
+        if (currentPage === 2 && browseView.currentTab !== 0) return
         if (currentPage !== 0 && currentPage !== 2) return
         if (currentPage === 0) {
             if (library.filterArtist !== "" || library.filterAlbum !== "") return
@@ -124,7 +124,7 @@ ApplicationWindow {
         if (currentPage === 0) {
             library.setPlaybackContext("library")
         } else if (currentPage === 2) {
-            if (browseView.currentTab === 2 && browseView.playlistsPageViewing !== "") {
+            if (browseView.currentTab === 0 && browseView.playlistsPageViewing !== "") {
                 library.setPlaybackContext("playlist")
             } else {
                 library.setPlaybackContext("library")
@@ -167,8 +167,15 @@ ApplicationWindow {
     function prevTrack() { library.prev() }
     function nextTrack() { library.next() }
 
-    function modalPrevSubTab() { if (settingsOpen) settingsModal.previousSubTab() }
-    function modalNextSubTab() { if (settingsOpen) settingsModal.nextSubTab() }
+    function seekBackward() {
+        if (!library.hasCurrent || library.duration <= 0) return
+        library.seek(Math.max(0, library.position - 3000))
+    }
+
+    function seekForward() {
+        if (!library.hasCurrent || library.duration <= 0) return
+        library.seek(Math.min(library.duration, library.position + 3000))
+    }
 
     function handleGlobalClick(gx, gy) {
         if (!floatingSearchOpen) return
@@ -283,6 +290,7 @@ ApplicationWindow {
             Behavior on Layout.preferredWidth { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
             Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
             onEditRequested: window.toggleMetadata()
+            onLyricsRequested: window.toggleLyrics()
         }
     }
 
@@ -461,7 +469,7 @@ ApplicationWindow {
               && (library.filterArtist.length > 0
                   || library.filterAlbum.length > 0
                   || (window.currentPage === 2
-                      && browseView.currentTab === 2
+                      && browseView.currentTab === 0
                       && browseView.playlistsPageViewing !== ""))
         onActivated: {
             if (library.filterArtist.length > 0 || library.filterAlbum.length > 0) {
