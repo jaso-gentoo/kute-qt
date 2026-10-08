@@ -318,6 +318,20 @@ jobs:
           echo "=== dist/multimedia count ==="
           ls dist/multimedia/ | wc -l
 
+      - name: Debug - avcodec dependencies
+        run: |
+          echo "=== avcodec-63.dll deps ==="
+          objdump -p dist/multimedia/avcodec-63.dll 2>/dev/null | grep "DLL Name" | sort -u
+          echo ""
+          echo "=== avformat-63.dll deps ==="
+          objdump -p dist/multimedia/avformat-63.dll 2>/dev/null | grep "DLL Name" | sort -u
+          echo ""
+          echo "=== avfilter-12.dll deps ==="
+          objdump -p dist/multimedia/avfilter-12.dll 2>/dev/null | grep "DLL Name" | sort -u
+          echo ""
+          echo "=== all files in dist/multimedia ==="
+          ls dist/multimedia/ | sort
+
       - name: Create qt.conf
         shell: bash
         run: |
