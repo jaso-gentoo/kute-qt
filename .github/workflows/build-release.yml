@@ -141,6 +141,7 @@ jobs:
           test -s appimagetool
           chmod +x appimagetool
 
+          rm -f AppDir/AppRun
           printf '%s\n' \
             '#!/bin/sh' \
             'HERE="$(dirname "$(readlink -f "$0")")"' \
