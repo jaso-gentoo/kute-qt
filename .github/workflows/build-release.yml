@@ -273,14 +273,15 @@ jobs:
 
       - name: Copy multimedia deps
         run: |
-          mkdir -p dist/multimedia
-          for lib in avcodec avformat avutil swresample swscale; do
-            cp -L /ucrt64/bin/${lib}-*.dll dist/multimedia/ 2>/dev/null || true
+          for lib in avcodec avformat avutil swresample swscale avdevice avfilter postproc; do
+            cp -L /ucrt64/bin/${lib}-*.dll dist/ 2>/dev/null || true
           done
-          cp -L /ucrt64/bin/libjxl*.dll dist/multimedia/ 2>/dev/null || true
-          cp -L /ucrt64/bin/libsoxr.dll dist/multimedia/ 2>/dev/null || true
-          cp -L /ucrt64/bin/libgomp-1.dll dist/multimedia/ 2>/dev/null || true
-          cp -L /ucrt64/bin/libssp-0.dll dist/multimedia/ 2>/dev/null || true
+          for dep in libjxl libsoxr libgomp-1 libssp-0 \
+                     libx264 libx265 libvpx libmp3lame libopus \
+                     libvorbis libvorbisenc libogg libflac libwebp \
+                     libzstd liblzma libbz2 libxml2 libssl-3-x64 libcrypto-3-x64; do
+            cp -L /ucrt64/bin/${dep}*.dll dist/ 2>/dev/null || true
+          done
 
       - name: Create qt.conf
         shell: bash
@@ -304,14 +305,12 @@ jobs:
             'SilentInstall silent' \
             'RequestExecutionLevel user' \
             'OutFile "kute-windows-x86_64.exe"' \
-            'InstallDir "$TEMP\kute"' \
             'Icon "packaging\kute.ico"' \
             '' \
             'Section' \
-            'InitPluginsDir' \
-            'SetOutPath $PLUGINSDIR' \
+            'SetOutPath "$LOCALAPPDATA\kute"' \
             'File /r "dist\*"' \
-            'ExecWait '"'"'"$PLUGINSDIR\kute.exe"'"'"'' \
+            'Exec '"'"'"$LOCALAPPDATA\kute\kute.exe"'"'"'' \
             'SectionEnd' \
             > kute.nsi
           "$NSIS" kute.nsi
