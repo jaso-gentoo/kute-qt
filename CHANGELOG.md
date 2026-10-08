@@ -1,3 +1,10 @@
+## v1.3-rc2 — 2026-10-08
+
+### Fixed
+- The track was not hidden after exiting the Artists / Album tab on Windows
+- The visualizer didn't work on Windows
+- Renderer selection didn't work correctly on restart stage
+
 ## v1.3-rc1 — 2026-10-08
 
 ### Added
