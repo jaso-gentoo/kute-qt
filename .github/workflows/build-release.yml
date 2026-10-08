@@ -209,6 +209,14 @@ jobs:
             convert "$IMG" -resize 256x256^ -gravity center -extent 256x256 -define icon:auto-resize=256,128,64,48,32,16 packaging/kute.ico
           fi
           ls -la packaging/kute.ico 2>/dev/null || true
+          
+      - name: Check multimedia plugins in MSYS2
+        run: |
+          echo "=== looking for multimedia plugins ==="
+          find /ucrt64 -name "*mediaplugin*" -o -name "*ffmpeg*plugin*" 2>/dev/null | head -20
+          echo "=== qt6 multimedia dirs ==="
+          ls -la /ucrt64/share/qt6/plugins/multimedia/ 2>/dev/null || echo "MISSING"
+          ls -la /ucrt64/lib/qt6/plugins/multimedia/ 2>/dev/null || echo "MISSING"
 
       - name: Configure
         run: |
@@ -282,11 +290,23 @@ jobs:
                      libzstd liblzma libbz2 libxml2 libssl-3-x64 libcrypto-3-x64; do
             cp -L /ucrt64/bin/${dep}*.dll dist/ 2>/dev/null || true
           done
-
       - name: Create qt.conf
         shell: bash
         run: |
           printf '%s\n' '[Paths]' 'Prefix=./' 'Plugins=./' 'Qml2Imports=./qml' > dist/qt.conf
+
+      - name: List dist contents
+        run: |
+          echo "=== multimedia ==="
+          ls -la dist/multimedia/ 2>/dev/null || echo "MISSING"
+          echo "=== root av*.dll ==="
+          ls -la dist/av*.dll 2>/dev/null || echo "MISSING"
+          echo "=== root sw*.dll ==="
+          ls -la dist/sw*.dll 2>/dev/null || echo "MISSING"
+          echo "=== root ffmpeg*.dll ==="
+          ls -la dist/*ffmpeg*.dll 2>/dev/null || echo "MISSING"
+          echo "=== full root listing ==="
+          ls -la dist/ | head -100
 
       - name: Copy OpenSSL legacy
         run: |
