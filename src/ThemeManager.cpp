@@ -8,7 +8,7 @@
 #include <QSettings>
 #include <QProcess>
 #include <QCoreApplication>
-#include <QTextStream>
+#include <QThread>
 
 ThemeManager::ThemeManager(QObject *parent) : QObject(parent) {
     const QString configDir =
@@ -90,27 +90,10 @@ void ThemeManager::restartApplication() {
     QStringList args = QCoreApplication::arguments();
     if (!args.isEmpty()) args.removeFirst();
 
-#ifdef Q_OS_WIN
-    QString escaped = program;
-    escaped.replace("'", "''");
-
-    QString argString;
-    for (const QString &a : args) {
-        QString e = a;
-        e.replace("'", "''");
-        argString += " '" + e + "'";
-    }
-
-    QString script =
-        "Start-Sleep -Milliseconds 900; "
-        "Start-Process -FilePath '" + escaped + "'";
-    if (!argString.isEmpty()) script += " -ArgumentList" + argString;
-
-    QProcess::startDetached("powershell.exe",
-        {"-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden",
-         "-Command", script});
-#else
     QProcess::startDetached(program, args);
+
+#ifdef Q_OS_WIN
+    QThread::msleep(3000);
 #endif
 
     QCoreApplication::exit(0);

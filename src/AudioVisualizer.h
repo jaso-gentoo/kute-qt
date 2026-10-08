@@ -3,10 +3,12 @@
 #include <QObject>
 #include <QList>
 #include <QVariantList>
+#include <QMap>
 
 class QMediaPlayer;
 class QAudioBufferOutput;
 class QAudioBuffer;
+class QAudioDecoder;
 class QTimer;
 
 class AudioVisualizer : public QObject {
@@ -24,6 +26,12 @@ signals:
 private:
     void onBufferReceived(const QAudioBuffer &buffer);
     void tick();
+    void computeSpectrum(const QAudioBuffer &buffer, QList<float> &out);
+
+#ifdef Q_OS_WIN
+    void onDecoderBuffer();
+    void resetDecoder(const QUrl &source);
+#endif
 
     QMediaPlayer *m_player = nullptr;
     QAudioBufferOutput *m_output = nullptr;
@@ -32,7 +40,12 @@ private:
     QVariantList m_spectrum;
     QList<float> m_target;
     QList<float> m_current;
-    bool m_active = false;
+
+#ifdef Q_OS_WIN
+    QAudioDecoder *m_decoder = nullptr;
+    QMap<qint64, QList<float>> m_frames;
+    qint64 m_lastDecodedEnd = 0;
+#endif
 
     static constexpr int kBars = 32;
 };
