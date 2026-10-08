@@ -200,12 +200,8 @@ jobs:
           find /ucrt64 -name "*mediaplugin*.dll" 2>/dev/null | head -20
           echo "=== /ucrt64/share/qt6/plugins/multimedia ==="
           ls -la /ucrt64/share/qt6/plugins/multimedia/ 2>/dev/null || echo "MISSING"
-          echo "=== /ucrt64/lib/qt6/plugins/multimedia ==="
-          ls -la /ucrt64/lib/qt6/plugins/multimedia/ 2>/dev/null || echo "MISSING"
           echo "=== dependencies of ffmpegmediaplugin.dll ==="
           objdump -p /ucrt64/share/qt6/plugins/multimedia/ffmpegmediaplugin.dll 2>/dev/null | grep "DLL Name" || echo "objdump failed"
-          echo "=== Qt symbols of ffmpegmediaplugin.dll ==="
-          objdump -p /ucrt64/share/qt6/plugins/multimedia/ffmpegmediaplugin.dll 2>/dev/null | grep -i "Qt6" | head -30 || true
 
       - name: Generate .ico from logo
         run: |
@@ -240,7 +236,7 @@ jobs:
           rm -f dist/ggml*.dll dist/libllama*.dll dist/libmtmd*.dll
           rm -f dist/libwhisper*.dll dist/libparakeet*.dll dist/libpython*.dll
           rm -f dist/libPyImath*.dll dist/libopenblas*.dll dist/libgfortran*.dll
-          rm -f dist/libquadmath*.dll dist/libgomp*.dll dist/tcl86.dll dist/tk86.dll
+          rm -f dist/libquadmath*.dll dist/tcl86.dll dist/tk86.dll
           rm -f dist/libhwy*.dll dist/libcaca*.dll dist/libImath*.dll dist/libIex*.dll
           rm -f dist/libIlmThread*.dll dist/libOpenEXR*.dll dist/libmenuw6.dll
           rm -f dist/libformw6.dll dist/libpanelw6.dll dist/libncurses*.dll
@@ -273,13 +269,6 @@ jobs:
             fi
           done
 
-      - name: Debug - after plugins copy
-        run: |
-          echo "=== dist/multimedia ==="
-          ls -la dist/multimedia/ 2>/dev/null || echo "MISSING"
-          echo "=== dist/platforms ==="
-          ls -la dist/platforms/ 2>/dev/null || echo "MISSING"
-
       - name: Copy imageformats deps
         run: |
           cp -L /ucrt64/bin/libjpeg*.dll dist/ 2>/dev/null || true
@@ -306,18 +295,28 @@ jobs:
             cp -L /ucrt64/bin/${dep}*.dll dist/multimedia/ 2>/dev/null || true
           done
 
-      - name: Debug - after multimedia deps copy
+      - name: Copy all runtime deps to multimedia dir
         run: |
-          echo "=== dist/multimedia (final) ==="
-          ls -la dist/multimedia/ 2>/dev/null || echo "MISSING"
-          echo "=== root av*.dll ==="
-          ls -la dist/av*.dll 2>/dev/null || echo "MISSING"
-          echo "=== root sw*.dll ==="
-          ls -la dist/sw*.dll 2>/dev/null || echo "MISSING"
-          echo "=== root Qt6Multimedia*.dll ==="
-          ls -la dist/Qt6Multimedia*.dll 2>/dev/null || echo "MISSING"
-          echo "=== count of files in dist root ==="
-          ls dist/ | wc -l
+          cp -L /ucrt64/bin/*.dll dist/multimedia/ 2>/dev/null || true
+          rm -f dist/multimedia/ggml*.dll dist/multimedia/libllama*.dll dist/multimedia/libmtmd*.dll
+          rm -f dist/multimedia/libwhisper*.dll dist/multimedia/libparakeet*.dll dist/multimedia/libpython*.dll
+          rm -f dist/multimedia/libPyImath*.dll dist/multimedia/libopenblas*.dll dist/multimedia/libgfortran*.dll
+          rm -f dist/multimedia/libquadmath*.dll dist/multimedia/tcl86.dll dist/multimedia/tk86.dll
+          rm -f dist/multimedia/libhwy*.dll dist/multimedia/libcaca*.dll dist/multimedia/libImath*.dll dist/multimedia/libIex*.dll
+          rm -f dist/multimedia/libIlmThread*.dll dist/multimedia/libOpenEXR*.dll dist/multimedia/libmenuw6.dll
+          rm -f dist/multimedia/libformw6.dll dist/multimedia/libpanelw6.dll dist/multimedia/libncurses*.dll
+          rm -f dist/multimedia/OpenCL.dll
+          rm -f dist/multimedia/Qt6Widgets*.dll dist/multimedia/Qt6Sql*.dll dist/multimedia/Qt6Test*.dll
+          rm -f dist/multimedia/Qt6Concurrent*.dll dist/multimedia/Qt6PrintSupport*.dll dist/multimedia/Qt6Designer*.dll
+
+      - name: Debug - check critical files in multimedia
+        run: |
+          echo "=== check critical deps in dist/multimedia ==="
+          for f in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll Qt6Core.dll Qt6Gui.dll Qt6Multimedia.dll avcodec-63.dll avformat-63.dll avutil-61.dll swresample-7.dll swscale-10.dll ffmpegmediaplugin.dll; do
+            if [ -f "dist/multimedia/$f" ]; then echo "OK:      $f"; else echo "MISSING: $f"; fi
+          done
+          echo "=== dist/multimedia count ==="
+          ls dist/multimedia/ | wc -l
 
       - name: Create qt.conf
         shell: bash
