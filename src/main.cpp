@@ -282,6 +282,21 @@ int main(int argc, char *argv[]) {
         QGuiApplication app(argc, argv);
         emitLog(QtInfoMsg, QString("platform=%1").arg(app.platformName()));
 
+#ifdef Q_OS_WIN
+        {
+            const QString appDir = QCoreApplication::applicationDirPath();
+            const QString mmDir = appDir + "/multimedia";
+            SetDefaultDllDirectories(
+                LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
+                LOAD_LIBRARY_SEARCH_SYSTEM32 |
+                LOAD_LIBRARY_SEARCH_USER_DIRS);
+            AddDllDirectory(reinterpret_cast<LPCWSTR>(
+                QDir::toNativeSeparators(appDir).utf16()));
+            AddDllDirectory(reinterpret_cast<LPCWSTR>(
+                QDir::toNativeSeparators(mmDir).utf16()));
+        }
+#endif
+
         const int fontId = QFontDatabase::addApplicationFont(":/fonts/MaterialSymbolsRounded.ttf");
         if (fontId < 0)
             emitLog(QtWarningMsg, "Material Symbols Rounded font not loaded");
