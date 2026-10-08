@@ -22,8 +22,8 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 ### Playback
 
 - `Space` - Play / pause
-- `Up arrow` - Previous track
-- `Down arrow` - Next track
+- `Up arrow ` / `Down arrow` - Previous track / Next track
+- `Left arrow` / `Right arrow` - 
 - `Ctrl` + `W` - Like / unlike the currently playing track
 - `Middle-click` On a track - like / unlike
 
@@ -43,7 +43,6 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 
 > Only active while the **Settings** / **Lyrics** / **Metadata editor** window is open:
 
-- `Left arrow` / `Right arrow` - Previous / next sub-tab. In Track: Metadata <-> Text. In Lyrics: TXT <-> LRC
 - `Ctrl` + `S` - Save current edits (in the **Metadata editor** window)
 
 ### Context-sensitive
