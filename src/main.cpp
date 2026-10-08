@@ -63,7 +63,6 @@ static void reexecWithEnv(char *argv[]) { Q_UNUSED(argv) }
 
 #ifdef Q_OS_WIN
 #include <windows.h>
-#include <string>
 static void enableVT() {
     HANDLE h = GetStdHandle(STD_ERROR_HANDLE);
     if (h == INVALID_HANDLE_VALUE) return;
@@ -241,41 +240,6 @@ private:
     QObject *m_root;
 };
 
-#ifdef Q_OS_WIN
-
-static void setupDllSearchPath() {
-    SetDefaultDllDirectories(
-        LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
-        LOAD_LIBRARY_SEARCH_SYSTEM32 |
-        LOAD_LIBRARY_SEARCH_USER_DIRS);
-
-    const QString appDir = QCoreApplication::applicationDirPath();
-    const QString mmDir = appDir + "/multimedia";
-
-    const std::wstring appW = QDir::toNativeSeparators(appDir).toStdWString();
-    const std::wstring mmW  = QDir::toNativeSeparators(mmDir).toStdWString();
-
-    SetCurrentDirectoryW(appW.c_str());
-
-    if (AddDllDirectory(appW.c_str())) {
-        emitLog(QtInfoMsg, QString("AddDllDirectory OK: %1").arg(appDir));
-    } else {
-        emitLog(QtWarningMsg, QString("AddDllDirectory FAILED: %1 (err=%2)")
-            .arg(appDir).arg(GetLastError()));
-    }
-
-    if (AddDllDirectory(mmW.c_str())) {
-        emitLog(QtInfoMsg, QString("AddDllDirectory OK: %1").arg(mmDir));
-    } else {
-        emitLog(QtWarningMsg, QString("AddDllDirectory FAILED: %1 (err=%2)")
-            .arg(mmDir).arg(GetLastError()));
-    }
-}
-
-#else
-static void setupDllSearchPath() {}
-#endif
-
 #include "main.moc"
 
 int main(int argc, char *argv[]) {
@@ -297,10 +261,8 @@ int main(int argc, char *argv[]) {
 
     try {
         reexecWithEnv(argv);
-        emitLog(QtInfoMsg, "after reexecWithEnv");
 
         qputenv("QT_MEDIA_BACKEND", "ffmpeg");
-        emitLog(QtInfoMsg, "media backend: ffmpeg");
 
         QSettings rhiSettings("kute", "kute");
 #ifdef Q_OS_WIN
@@ -311,63 +273,40 @@ int main(int argc, char *argv[]) {
         const QString rhiBackend = rhiSettings.value("ui/renderBackend", defaultBackend).toString();
         if (rhiBackend == "opengl") {
             qputenv("QSG_RHI_BACKEND", "opengl");
-            emitLog(QtInfoMsg, "RHI backend: opengl");
         } else if (rhiBackend == "d3d11") {
             qputenv("QSG_RHI_BACKEND", "d3d11");
-            emitLog(QtInfoMsg, "RHI backend: d3d11");
         } else {
             qputenv("QSG_RHI_BACKEND", "vulkan");
-            emitLog(QtInfoMsg, "RHI backend: vulkan");
         }
 
         QGuiApplication app(argc, argv);
-        emitLog(QtInfoMsg, "QGuiApplication constructed");
         emitLog(QtInfoMsg, QString("platform=%1").arg(app.platformName()));
 
-        emitLog(QtInfoMsg, "setting up DLL search path");
-        setupDllSearchPath();
-
         const int fontId = QFontDatabase::addApplicationFont(":/fonts/MaterialSymbolsRounded.ttf");
-        emitLog(QtInfoMsg, QString("addApplicationFont returned fontId=%1").arg(fontId));
-        if (fontId >= 0) {
-            const QStringList families = QFontDatabase::applicationFontFamilies(fontId);
-            emitLog(QtInfoMsg, QString("Material font loaded: %1").arg(families.join(", ")));
-        } else {
+        if (fontId < 0)
             emitLog(QtWarningMsg, "Material Symbols Rounded font not loaded");
-        }
 
         app.setApplicationName("kute");
         app.setApplicationVersion(QStringLiteral(KUTE_VERSION_STRING));
         app.setOrganizationName("kute");
 
-        emitLog(QtInfoMsg, QString("kute version: %1").arg(app.applicationVersion()));
-
-        emitLog(QtInfoMsg, "creating ThemeManager");
         ThemeManager theme;
-
-        emitLog(QtInfoMsg, "creating Library");
         Library library;
 
 #ifdef Q_OS_LINUX
-        emitLog(QtInfoMsg, "creating MprisController");
         MprisController mpris(&library);
 #endif
 
-        emitLog(QtInfoMsg, "creating QQmlApplicationEngine");
         QQmlApplicationEngine engine;
         engine.rootContext()->setContextProperty("theme", &theme);
         engine.rootContext()->setContextProperty("library", &library);
 
         QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
                          &app, []() {
-            emitLog(QtCriticalMsg, "QML objectCreationFailed signal");
             QCoreApplication::exit(-1);
         }, Qt::QueuedConnection);
 
-        emitLog(QtInfoMsg, "loading QML module Kute/Main");
         engine.loadFromModule("Kute", "Main");
-        emitLog(QtInfoMsg, QString("loadFromModule returned, rootObjects=%1")
-                  .arg(engine.rootObjects().size()));
 
         if (engine.rootObjects().isEmpty()) {
             emitLog(QtCriticalMsg, "FATAL: rootObjects is empty — QML did not load");
@@ -379,7 +318,6 @@ int main(int argc, char *argv[]) {
         if (auto *win = qobject_cast<QQuickWindow*>(root)) {
             win->setPersistentGraphics(false);
             win->setPersistentSceneGraph(false);
-            emitLog(QtInfoMsg, "persistent graphics disabled");
 
             auto tryUpdate = [win]() -> bool {
                 if (!win->property("activeRenderer").toString().isEmpty()) return true;
@@ -387,7 +325,6 @@ int main(int argc, char *argv[]) {
                     const QString name = apiNameFrom(ri->graphicsApi());
                     if (!name.isEmpty()) {
                         win->setProperty("activeRenderer", name);
-                        emitLog(QtInfoMsg, QString("Active renderer: %1").arg(name));
                         return true;
                     }
                 }
@@ -400,21 +337,15 @@ int main(int argc, char *argv[]) {
 
             QTimer::singleShot(300, win, [tryUpdate]() { tryUpdate(); });
             QTimer::singleShot(1000, win, [tryUpdate]() { tryUpdate(); });
-            QTimer::singleShot(2500, win, [tryUpdate]() { tryUpdate(); });
         }
 
-        emitLog(QtInfoMsg, "installing GlobalHotkeys");
         GlobalHotkeys *hk = new GlobalHotkeys(root, &app);
         app.installEventFilter(hk);
 
-        emitLog(QtInfoMsg, "installing GlobalClickMonitor");
         GlobalClickMonitor *cm = new GlobalClickMonitor(root, &app);
         app.installEventFilter(cm);
 
-        emitLog(QtInfoMsg, "entering event loop");
-        const int rc = app.exec();
-        emitLog(QtInfoMsg, QString("event loop exited with code %1").arg(rc));
-        return rc;
+        return app.exec();
 
     } catch (const std::exception &e) {
         emitLog(QtCriticalMsg, QString("EXCEPTION: %1").arg(e.what()));

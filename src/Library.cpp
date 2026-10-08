@@ -228,13 +228,21 @@ QString Library::formatSampleRate(int hz) const {
 }
 
 QString Library::coverCacheDir() const {
+#ifdef Q_OS_WIN
+    const QString dir = kuteConfigDir() + "/covers";
+#else
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/covers";
+#endif
     QDir().mkpath(dir);
     return dir;
 }
 
 QString Library::thumbCacheDir() const {
+#ifdef Q_OS_WIN
+    const QString dir = kuteConfigDir() + "/thumbs";
+#else
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/thumbs";
+#endif
     QDir().mkpath(dir);
     return dir;
 }

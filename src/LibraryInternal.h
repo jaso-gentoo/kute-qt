@@ -72,7 +72,14 @@ inline QString normalizeLocalPath(QString p) {
 }
 
 inline QString kuteConfigDir() {
+#ifdef Q_OS_WIN
+    const QString roaming = qEnvironmentVariable("APPDATA");
+    if (!roaming.isEmpty())
+        return QDir::toNativeSeparators(roaming) + "/kute";
+    return QDir::homePath() + "/AppData/Roaming/kute";
+#else
     return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/kute";
+#endif
 }
 
 inline QString safeFileName(const QString &s) {
