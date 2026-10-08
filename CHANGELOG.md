@@ -1,15 +1,15 @@
 ## v1.3-rc1 — 2026-10-08
 
 ### Added
-- Lyrics button(`Ctrl+D`) in Now Playing panel (`Ctrl+Q`)
+- Lyrics button (`Ctrl+D`) in Now Playing panel (`Ctrl+Q`)
 - Audio visualizer over the volume slider
 
 ### Changed
 - Browse tab options reordered: Playlists / Albums / Artists
 - Disabled mipmap filtering on thumbnails
+- Playlist delete button was redesigned
 
 ### Fixed
-- Playlist delete button was not redesigned
 - Playlist cover images were stored in cache and lost on cache cleanup
 
 ## v1.3-rc0 — 2026-10-08
