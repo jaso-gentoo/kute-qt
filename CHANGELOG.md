@@ -8,6 +8,10 @@
 - Browse tab options reordered: Playlists / Albums / Artists
 - Disabled mipmap filtering on thumbnails
 
+### Fixed
+- Playlist delete button was not redesigned
+- Playlist cover images were stored in cache and lost on cache cleanup
+
 ## v1.3-rc0 — 2026-10-08
 
 ### Added
@@ -15,6 +19,7 @@
 
 ### Changed
 - Performance improvements across library sort, track model, playlist handling
+- Redesigned track delete and add-to-playlist buttons
 
 ### Fixed
 - Track/playlist removal animation was not shown for the last item in the list
