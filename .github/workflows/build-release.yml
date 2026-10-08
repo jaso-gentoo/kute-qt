@@ -194,6 +194,15 @@ jobs:
             mingw-w64-ucrt-x86_64-ffmpeg
             mingw-w64-ucrt-x86_64-imagemagick
 
+      - name: Check multimedia plugins in MSYS2
+        run: |
+          echo "=== looking for media plugins ==="
+          find /ucrt64 -name "*mediaplugin*.dll" 2>/dev/null | head -20
+          echo "=== /ucrt64/share/qt6/plugins/multimedia ==="
+          ls -la /ucrt64/share/qt6/plugins/multimedia/ 2>/dev/null || echo "MISSING"
+          echo "=== /ucrt64/lib/qt6/plugins/multimedia ==="
+          ls -la /ucrt64/lib/qt6/plugins/multimedia/ 2>/dev/null || echo "MISSING"
+
       - name: Generate .ico from logo
         run: |
           mkdir -p packaging
@@ -209,14 +218,6 @@ jobs:
             convert "$IMG" -resize 256x256^ -gravity center -extent 256x256 -define icon:auto-resize=256,128,64,48,32,16 packaging/kute.ico
           fi
           ls -la packaging/kute.ico 2>/dev/null || true
-          
-      - name: Check multimedia plugins in MSYS2
-        run: |
-          echo "=== looking for multimedia plugins ==="
-          find /ucrt64 -name "*mediaplugin*" -o -name "*ffmpeg*plugin*" 2>/dev/null | head -20
-          echo "=== qt6 multimedia dirs ==="
-          ls -la /ucrt64/share/qt6/plugins/multimedia/ 2>/dev/null || echo "MISSING"
-          ls -la /ucrt64/lib/qt6/plugins/multimedia/ 2>/dev/null || echo "MISSING"
 
       - name: Configure
         run: |
@@ -268,6 +269,13 @@ jobs:
             fi
           done
 
+      - name: Debug - after plugins copy
+        run: |
+          echo "=== dist/multimedia ==="
+          ls -la dist/multimedia/ 2>/dev/null || echo "MISSING"
+          echo "=== dist/platforms ==="
+          ls -la dist/platforms/ 2>/dev/null || echo "MISSING"
+
       - name: Copy imageformats deps
         run: |
           cp -L /ucrt64/bin/libjpeg*.dll dist/ 2>/dev/null || true
@@ -281,32 +289,36 @@ jobs:
 
       - name: Copy multimedia deps
         run: |
+          mkdir -p dist/multimedia
           for lib in avcodec avformat avutil swresample swscale avdevice avfilter postproc; do
             cp -L /ucrt64/bin/${lib}-*.dll dist/ 2>/dev/null || true
+            cp -L /ucrt64/bin/${lib}-*.dll dist/multimedia/ 2>/dev/null || true
           done
           for dep in libjxl libsoxr libgomp-1 libssp-0 \
                      libx264 libx265 libvpx libmp3lame libopus \
                      libvorbis libvorbisenc libogg libflac libwebp \
                      libzstd liblzma libbz2 libxml2 libssl-3-x64 libcrypto-3-x64; do
             cp -L /ucrt64/bin/${dep}*.dll dist/ 2>/dev/null || true
+            cp -L /ucrt64/bin/${dep}*.dll dist/multimedia/ 2>/dev/null || true
           done
-      - name: Create qt.conf
-        shell: bash
-        run: |
-          printf '%s\n' '[Paths]' 'Prefix=./' 'Plugins=./' 'Qml2Imports=./qml' > dist/qt.conf
 
-      - name: List dist contents
+      - name: Debug - after multimedia deps copy
         run: |
-          echo "=== multimedia ==="
+          echo "=== dist/multimedia (final) ==="
           ls -la dist/multimedia/ 2>/dev/null || echo "MISSING"
           echo "=== root av*.dll ==="
           ls -la dist/av*.dll 2>/dev/null || echo "MISSING"
           echo "=== root sw*.dll ==="
           ls -la dist/sw*.dll 2>/dev/null || echo "MISSING"
-          echo "=== root ffmpeg*.dll ==="
-          ls -la dist/*ffmpeg*.dll 2>/dev/null || echo "MISSING"
-          echo "=== full root listing ==="
-          ls -la dist/ | head -100
+          echo "=== root Qt6Multimedia*.dll ==="
+          ls -la dist/Qt6Multimedia*.dll 2>/dev/null || echo "MISSING"
+          echo "=== count of files in dist root ==="
+          ls dist/ | wc -l
+
+      - name: Create qt.conf
+        shell: bash
+        run: |
+          printf '%s\n' '[Paths]' 'Prefix=./' 'Plugins=./' 'Qml2Imports=./qml' > dist/qt.conf
 
       - name: Copy OpenSSL legacy
         run: |
