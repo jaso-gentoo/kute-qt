@@ -233,13 +233,8 @@ jobs:
           mkdir -p dist
           cp build/kute.exe dist/
           cp -L /ucrt64/bin/*.dll dist/
-          rm -f dist/ggml*.dll dist/libllama*.dll dist/libmtmd*.dll
-          rm -f dist/libwhisper*.dll dist/libparakeet*.dll dist/libpython*.dll
-          rm -f dist/libPyImath*.dll dist/libopenblas*.dll dist/libgfortran*.dll
-          rm -f dist/libquadmath*.dll dist/tcl86.dll dist/tk86.dll
-          rm -f dist/libhwy*.dll dist/libcaca*.dll dist/libImath*.dll dist/libIex*.dll
-          rm -f dist/libIlmThread*.dll dist/libOpenEXR*.dll dist/libmenuw6.dll
-          rm -f dist/libformw6.dll dist/libpanelw6.dll dist/libncurses*.dll
+          rm -f dist/tcl86.dll dist/tk86.dll
+          rm -f dist/libpython*.dll dist/libPyImath*.dll
           rm -f dist/OpenCL.dll
           rm -f dist/Qt6Widgets*.dll dist/Qt6Sql*.dll dist/Qt6Test*.dll
           rm -f dist/Qt6Concurrent*.dll dist/Qt6PrintSupport*.dll dist/Qt6Designer*.dll
@@ -298,39 +293,11 @@ jobs:
       - name: Copy all runtime deps to multimedia dir
         run: |
           cp -L /ucrt64/bin/*.dll dist/multimedia/ 2>/dev/null || true
-          rm -f dist/multimedia/ggml*.dll dist/multimedia/libllama*.dll dist/multimedia/libmtmd*.dll
-          rm -f dist/multimedia/libwhisper*.dll dist/multimedia/libparakeet*.dll dist/multimedia/libpython*.dll
-          rm -f dist/multimedia/libPyImath*.dll dist/multimedia/libopenblas*.dll dist/multimedia/libgfortran*.dll
-          rm -f dist/multimedia/libquadmath*.dll dist/multimedia/tcl86.dll dist/multimedia/tk86.dll
-          rm -f dist/multimedia/libhwy*.dll dist/multimedia/libcaca*.dll dist/multimedia/libImath*.dll dist/multimedia/libIex*.dll
-          rm -f dist/multimedia/libIlmThread*.dll dist/multimedia/libOpenEXR*.dll dist/multimedia/libmenuw6.dll
-          rm -f dist/multimedia/libformw6.dll dist/multimedia/libpanelw6.dll dist/multimedia/libncurses*.dll
+          rm -f dist/multimedia/tcl86.dll dist/multimedia/tk86.dll
+          rm -f dist/multimedia/libpython*.dll dist/multimedia/libPyImath*.dll
           rm -f dist/multimedia/OpenCL.dll
           rm -f dist/multimedia/Qt6Widgets*.dll dist/multimedia/Qt6Sql*.dll dist/multimedia/Qt6Test*.dll
           rm -f dist/multimedia/Qt6Concurrent*.dll dist/multimedia/Qt6PrintSupport*.dll dist/multimedia/Qt6Designer*.dll
-
-      - name: Debug - check critical files in multimedia
-        run: |
-          echo "=== check critical deps in dist/multimedia ==="
-          for f in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll Qt6Core.dll Qt6Gui.dll Qt6Multimedia.dll avcodec-63.dll avformat-63.dll avutil-61.dll swresample-7.dll swscale-10.dll ffmpegmediaplugin.dll; do
-            if [ -f "dist/multimedia/$f" ]; then echo "OK:      $f"; else echo "MISSING: $f"; fi
-          done
-          echo "=== dist/multimedia count ==="
-          ls dist/multimedia/ | wc -l
-
-      - name: Debug - avcodec dependencies
-        run: |
-          echo "=== avcodec-63.dll deps ==="
-          objdump -p dist/multimedia/avcodec-63.dll 2>/dev/null | grep "DLL Name" | sort -u
-          echo ""
-          echo "=== avformat-63.dll deps ==="
-          objdump -p dist/multimedia/avformat-63.dll 2>/dev/null | grep "DLL Name" | sort -u
-          echo ""
-          echo "=== avfilter-12.dll deps ==="
-          objdump -p dist/multimedia/avfilter-12.dll 2>/dev/null | grep "DLL Name" | sort -u
-          echo ""
-          echo "=== all files in dist/multimedia ==="
-          ls dist/multimedia/ | sort
 
       - name: Create qt.conf
         shell: bash
