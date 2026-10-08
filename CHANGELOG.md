@@ -1,15 +1,31 @@
 ## v1.3-rc1 — 2026-10-08
+
 ### Added
-- Render backend selection in settings
-- Perfomance improvements
+- Lyrics button(`Ctrl+D`) in Now Playing panel (`Ctrl+Q`)
+- Audio visualizer over the volume slider
+
+### Changed
+- Browse tab options reordered: Playlists / Albums / Artists
+- Disabled mipmap filtering on thumbnails
+
+## v1.3-rc0 — 2026-10-08
+
+### Added
+- Renderer backend selection in settings (OpenGL / Vulkan on Linux, Vulkan / D3D11 on Windows)
+
+### Changed
+- Performance improvements across library sort, track model, playlist handling
 
 ### Fixed
-- Track/playlist animation wes not shown if it is the last song in the list
-- Track metadata was not saving on windows 11
+- Track/playlist removal animation was not shown for the last item in the list
+- Track metadata was not saving on Windows 11
+- Renderer indicator was stuck on "initializing" on Windows
+- Renderer button in settings required two clicks
 
-## v1.2-rc1 — 2026-10-06
+## v1.2-rc0 — 2026-10-06
+
 ### Added
-- Playlists thing
+- Playlists support
 
 ### Fixed
-- a lot of things...
+- A lot of things...
