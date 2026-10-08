@@ -243,17 +243,6 @@ private:
 
 #ifdef Q_OS_WIN
 
-static std::wstring shortPathW(const QString &path) {
-    const std::wstring longW = QDir::toNativeSeparators(path).toStdWString();
-    DWORD needed = GetShortPathNameW(longW.c_str(), nullptr, 0);
-    if (needed == 0) return longW;
-    std::wstring out(needed, L'\0');
-    DWORD written = GetShortPathNameW(longW.c_str(), &out[0], needed);
-    if (written == 0 || written >= needed) return longW;
-    out.resize(written);
-    return out;
-}
-
 static void setupDllSearchPath() {
     SetDefaultDllDirectories(
         LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
@@ -263,11 +252,10 @@ static void setupDllSearchPath() {
     const QString appDir = QCoreApplication::applicationDirPath();
     const QString mmDir = appDir + "/multimedia";
 
-    const std::wstring appW = shortPathW(appDir);
-    const std::wstring mmW  = shortPathW(mmDir);
+    const std::wstring appW = QDir::toNativeSeparators(appDir).toStdWString();
+    const std::wstring mmW  = QDir::toNativeSeparators(mmDir).toStdWString();
 
     SetCurrentDirectoryW(appW.c_str());
-    SetDllDirectoryW(mmW.c_str());
 
     if (AddDllDirectory(appW.c_str())) {
         emitLog(QtInfoMsg, QString("AddDllDirectory OK: %1").arg(appDir));
@@ -284,60 +272,8 @@ static void setupDllSearchPath() {
     }
 }
 
-struct DllEntry {
-    QString name;
-    qint64 size;
-};
-
-static void preloadMultimediaDeps() {
-    const QString appDir = QCoreApplication::applicationDirPath();
-    const QString mmDir = appDir + "/multimedia";
-
-    QStringList searchDirs;
-    searchDirs << mmDir << appDir;
-
-    QList<DllEntry> files;
-    for (const QString &dirPath : searchDirs) {
-        QDir dir(dirPath);
-        if (!dir.exists()) continue;
-        const QFileInfoList infos = dir.entryInfoList({"*.dll"}, QDir::Files, QDir::Name);
-        for (const QFileInfo &fi : infos) {
-            const QString name = fi.fileName();
-            if (name.startsWith("Qt6", Qt::CaseInsensitive)) continue;
-            if (name.compare("ffmpegmediaplugin.dll", Qt::CaseInsensitive) == 0) continue;
-            if (name.compare("vulkan-1.dll", Qt::CaseInsensitive) == 0) continue;
-            if (name.compare("kute.exe", Qt::CaseInsensitive) == 0) continue;
-            files.append({fi.absoluteFilePath(), fi.size()});
-        }
-    }
-
-    std::sort(files.begin(), files.end(), [](const DllEntry &a, const DllEntry &b) {
-        return a.size < b.size;
-    });
-
-    for (const DllEntry &e : files) {
-        const std::wstring fullW = QDir::toNativeSeparators(e.name).toStdWString();
-        HMODULE h = LoadLibraryW(fullW.c_str());
-        if (!h) {
-            emitLog(QtWarningMsg, QString("preload FAILED: %1 (err=%2)")
-                .arg(QFileInfo(e.name).fileName())
-                .arg(GetLastError()));
-        }
-    }
-
-    const std::wstring pluginW =
-        QDir::toNativeSeparators(mmDir + "/ffmpegmediaplugin.dll").toStdWString();
-    HMODULE hp = LoadLibraryW(pluginW.c_str());
-    if (!hp) {
-        emitLog(QtCriticalMsg, QString("preload plugin FAILED (err=%1)").arg(GetLastError()));
-    } else {
-        emitLog(QtInfoMsg, "preload plugin OK");
-    }
-}
-
 #else
 static void setupDllSearchPath() {}
-static void preloadMultimediaDeps() {}
 #endif
 
 #include "main.moc"
@@ -390,9 +326,6 @@ int main(int argc, char *argv[]) {
 
         emitLog(QtInfoMsg, "setting up DLL search path");
         setupDllSearchPath();
-
-        emitLog(QtInfoMsg, "preloading multimedia deps");
-        preloadMultimediaDeps();
 
         const int fontId = QFontDatabase::addApplicationFont(":/fonts/MaterialSymbolsRounded.ttf");
         emitLog(QtInfoMsg, QString("addApplicationFont returned fontId=%1").arg(fontId));
