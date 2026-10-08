@@ -202,6 +202,10 @@ jobs:
           ls -la /ucrt64/share/qt6/plugins/multimedia/ 2>/dev/null || echo "MISSING"
           echo "=== /ucrt64/lib/qt6/plugins/multimedia ==="
           ls -la /ucrt64/lib/qt6/plugins/multimedia/ 2>/dev/null || echo "MISSING"
+          echo "=== dependencies of ffmpegmediaplugin.dll ==="
+          objdump -p /ucrt64/share/qt6/plugins/multimedia/ffmpegmediaplugin.dll 2>/dev/null | grep "DLL Name" || echo "objdump failed"
+          echo "=== Qt symbols of ffmpegmediaplugin.dll ==="
+          objdump -p /ucrt64/share/qt6/plugins/multimedia/ffmpegmediaplugin.dll 2>/dev/null | grep -i "Qt6" | head -30 || true
 
       - name: Generate .ico from logo
         run: |
