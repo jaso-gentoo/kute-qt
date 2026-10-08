@@ -10,6 +10,7 @@ Rectangle {
     required property string artist
     required property string thumb
     required property real duration
+    required property string path
 
     property ListView listView
     property var autoScrollTimer
@@ -18,7 +19,7 @@ Rectangle {
     signal addMenuRequested(string path, real rightX, real anchorContentY, real btnHeight)
     signal trackRemovalRequested(var removalFn)
 
-    readonly property string rowPath: library.tracks.pathAt(row.index)
+    readonly property string rowPath: path
 
     readonly property bool canDrag: library.editMode
         && library.filterArtist === ""
@@ -85,11 +86,7 @@ Rectangle {
             if (mouse.button === Qt.MiddleButton) {
                 mouse.accepted = true
                 row.trackRemovalRequested(function() {
-                    if (library.showOnlyLiked && row.liked) {
-                        library.toggleLikeByPath(row.rowPath)
-                    } else {
-                        library.toggleLike(row.index)
-                    }
+                    library.toggleLikeByPath(row.path)
                 })
                 return
             }
@@ -391,7 +388,7 @@ Rectangle {
                 library.requestCloseSearch()
                 const pOverlay = addBtnHov.mapToItem(Overlay.overlay, 0, 0)
                 const pContent = addBtnHov.mapToItem(row.listView.contentItem, 0, 0)
-                row.addMenuRequested(library.tracks.pathAt(row.index),
+                row.addMenuRequested(row.path,
                                      pOverlay.x + addBtnHov.width,
                                      pContent.y,
                                      addBtnHov.height)

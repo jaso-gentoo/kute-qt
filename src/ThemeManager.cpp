@@ -85,7 +85,22 @@ void ThemeManager::setRenderBackend(const QString &v) {
 }
 
 void ThemeManager::restartApplication() {
-    QProcess::startDetached(QCoreApplication::applicationFilePath(), {});
+    const QString program = QCoreApplication::applicationFilePath();
+    QStringList args = QCoreApplication::arguments();
+    if (!args.isEmpty()) args.removeFirst();
+
+#ifdef Q_OS_WIN
+    QString cmd = "ping -n 2 127.0.0.1 >nul & start \"\" \"" + program + "\"";
+    for (const QString &a : args) {
+        QString escaped = a;
+        escaped.replace("\"", "\\\"");
+        cmd += " \"" + escaped + "\"";
+    }
+    QProcess::startDetached("cmd.exe", {"/c", cmd});
+#else
+    QProcess::startDetached(program, args);
+#endif
+
     QCoreApplication::exit(0);
 }
 

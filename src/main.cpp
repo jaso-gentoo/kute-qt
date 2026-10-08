@@ -263,10 +263,8 @@ int main(int argc, char *argv[]) {
         reexecWithEnv(argv);
         emitLog(QtInfoMsg, "after reexecWithEnv");
 
-#ifndef Q_OS_WIN
         qputenv("QT_MEDIA_BACKEND", "ffmpeg");
         emitLog(QtInfoMsg, "media backend: ffmpeg");
-#endif
 
         QSettings rhiSettings("kute", "kute");
 #ifdef Q_OS_WIN

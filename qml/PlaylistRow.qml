@@ -141,7 +141,7 @@ Item {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.leftMargin: 8
-            anchors.rightMargin: library.editMode ? 46 : 8
+            anchors.rightMargin: library.editMode ? 56 : 8
             spacing: 10
 
             Behavior on anchors.rightMargin {
