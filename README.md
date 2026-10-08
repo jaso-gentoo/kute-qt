@@ -23,7 +23,7 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 
 - `Space` - Play / pause
 - `Up arrow ` / `Down arrow` - Previous track / Next track
-- `Left arrow` / `Right arrow` - 
+- `Left arrow` / `Right arrow` - Seek backward / forward 3 seconds
 - `Ctrl` + `W` - Like / unlike the currently playing track
 - `Middle-click` On a track - like / unlike
 
