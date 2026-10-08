@@ -194,15 +194,6 @@ jobs:
             mingw-w64-ucrt-x86_64-ffmpeg
             mingw-w64-ucrt-x86_64-imagemagick
 
-      - name: Check multimedia plugins in MSYS2
-        run: |
-          echo "=== looking for media plugins ==="
-          find /ucrt64 -name "*mediaplugin*.dll" 2>/dev/null | head -20
-          echo "=== /ucrt64/share/qt6/plugins/multimedia ==="
-          ls -la /ucrt64/share/qt6/plugins/multimedia/ 2>/dev/null || echo "MISSING"
-          echo "=== dependencies of ffmpegmediaplugin.dll ==="
-          objdump -p /ucrt64/share/qt6/plugins/multimedia/ffmpegmediaplugin.dll 2>/dev/null | grep "DLL Name" || echo "objdump failed"
-
       - name: Generate .ico from logo
         run: |
           mkdir -p packaging
@@ -290,7 +281,7 @@ jobs:
             cp -L /ucrt64/bin/${dep}*.dll dist/multimedia/ 2>/dev/null || true
           done
 
-      - name: Copy all runtime deps to multimedia dir
+      - name: Copy full runtime deps to multimedia dir
         run: |
           cp -L /ucrt64/bin/*.dll dist/multimedia/ 2>/dev/null || true
           rm -f dist/multimedia/tcl86.dll dist/multimedia/tk86.dll
