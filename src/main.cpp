@@ -63,6 +63,7 @@ static void reexecWithEnv(char *argv[]) { Q_UNUSED(argv) }
 
 #ifdef Q_OS_WIN
 #include <windows.h>
+#include <string>
 static void enableVT() {
     HANDLE h = GetStdHandle(STD_ERROR_HANDLE);
     if (h == INVALID_HANDLE_VALUE) return;
@@ -240,6 +241,103 @@ private:
     QObject *m_root;
 };
 
+#ifdef Q_OS_WIN
+
+static void setupDllSearchPath() {
+    SetDefaultDllDirectories(
+        LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
+        LOAD_LIBRARY_SEARCH_SYSTEM32 |
+        LOAD_LIBRARY_SEARCH_USER_DIRS);
+
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QString mmDir = appDir + "/multimedia";
+
+    const std::wstring appW = QDir::toNativeSeparators(appDir).toStdWString();
+    const std::wstring mmW  = QDir::toNativeSeparators(mmDir).toStdWString();
+
+    SetCurrentDirectoryW(appW.c_str());
+
+    if (AddDllDirectory(appW.c_str())) {
+        emitLog(QtInfoMsg, QString("AddDllDirectory OK: %1").arg(appDir));
+    } else {
+        emitLog(QtWarningMsg, QString("AddDllDirectory FAILED: %1 (err=%2)")
+            .arg(appDir).arg(GetLastError()));
+    }
+
+    if (AddDllDirectory(mmW.c_str())) {
+        emitLog(QtInfoMsg, QString("AddDllDirectory OK: %1").arg(mmDir));
+    } else {
+        emitLog(QtWarningMsg, QString("AddDllDirectory FAILED: %1 (err=%2)")
+            .arg(mmDir).arg(GetLastError()));
+    }
+}
+
+static void preloadMultimediaDeps() {
+    const QString mmDir = QCoreApplication::applicationDirPath() + "/multimedia";
+    const QStringList names = {
+        "libgcc_s_seh-1.dll",
+        "libstdc++-6.dll",
+        "libwinpthread-1.dll",
+        "libiconv-2.dll",
+        "liblzma-5.dll",
+        "libzstd.dll",
+        "libbz2-1.dll",
+        "libxml2-16.dll",
+        "libssl-3-x64.dll",
+        "libcrypto-3-x64.dll",
+        "libgomp-1.dll",
+        "libogg-0.dll",
+        "libvorbis-0.dll",
+        "libvorbisenc-2.dll",
+        "libopus-0.dll",
+        "libmp3lame-0.dll",
+        "libsoxr.dll",
+        "libvpx-1.dll",
+        "libx264-165.dll",
+        "libx265-217.dll",
+        "libdav1d-7.dll",
+        "avutil-61.dll",
+        "swresample-7.dll",
+        "swscale-10.dll",
+        "avcodec-63.dll",
+        "avformat-63.dll",
+        "avfilter-12.dll",
+        "avdevice-63.dll"
+    };
+
+    for (const QString &name : names) {
+        const std::wstring fullW = QDir::toNativeSeparators(mmDir + "/" + name).toStdWString();
+        HMODULE h = LoadLibraryW(fullW.c_str());
+        if (!h) {
+            const DWORD err1 = GetLastError();
+            const std::wstring justW = name.toStdWString();
+            h = LoadLibraryW(justW.c_str());
+            if (!h) {
+                emitLog(QtWarningMsg, QString("preload FAILED: %1 (abs=%2 name=%3)")
+                    .arg(name).arg(err1).arg(GetLastError()));
+            } else {
+                emitLog(QtInfoMsg, QString("preload OK (name): %1").arg(name));
+            }
+        } else {
+            emitLog(QtInfoMsg, QString("preload OK (abs): %1").arg(name));
+        }
+    }
+
+    const std::wstring pluginW =
+        QDir::toNativeSeparators(mmDir + "/ffmpegmediaplugin.dll").toStdWString();
+    HMODULE hp = LoadLibraryW(pluginW.c_str());
+    if (!hp) {
+        emitLog(QtCriticalMsg, QString("preload plugin FAILED (err=%1)").arg(GetLastError()));
+    } else {
+        emitLog(QtInfoMsg, "preload plugin OK");
+    }
+}
+
+#else
+static void setupDllSearchPath() {}
+static void preloadMultimediaDeps() {}
+#endif
+
 #include "main.moc"
 
 int main(int argc, char *argv[]) {
@@ -263,7 +361,6 @@ int main(int argc, char *argv[]) {
         reexecWithEnv(argv);
         emitLog(QtInfoMsg, "after reexecWithEnv");
 
-        qputenv("QT_DEBUG_PLUGINS", "1");
         qputenv("QT_MEDIA_BACKEND", "ffmpeg");
         emitLog(QtInfoMsg, "media backend: ffmpeg");
 
@@ -288,6 +385,12 @@ int main(int argc, char *argv[]) {
         QGuiApplication app(argc, argv);
         emitLog(QtInfoMsg, "QGuiApplication constructed");
         emitLog(QtInfoMsg, QString("platform=%1").arg(app.platformName()));
+
+        emitLog(QtInfoMsg, "setting up DLL search path");
+        setupDllSearchPath();
+
+        emitLog(QtInfoMsg, "preloading multimedia deps");
+        preloadMultimediaDeps();
 
         const int fontId = QFontDatabase::addApplicationFont(":/fonts/MaterialSymbolsRounded.ttf");
         emitLog(QtInfoMsg, QString("addApplicationFont returned fontId=%1").arg(fontId));
