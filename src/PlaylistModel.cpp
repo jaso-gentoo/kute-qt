@@ -77,3 +77,14 @@ void PlaylistModel::refreshCover(int index) {
     const QModelIndex idx = createIndex(index, 0);
     emit dataChanged(idx, idx, { CoverRole });
 }
+
+QString PlaylistModel::playlistIdAt(int index) const {
+    if (index < 0 || index >= m_playlists.size()) return QString();
+    return m_playlists[index].id;
+}
+
+void PlaylistModel::forceRelayout() {
+    beginResetModel();
+    endResetModel();
+    emit countChanged();
+}

@@ -11,8 +11,8 @@ Item {
     signal lyricsRequested
 
     readonly property int coverSize: {
-        const availW = panel.width - 8
-        const availH = panel.height * 0.34
+        const availW = panel.width - 12
+        const availH = panel.height * 0.32
         return Math.max(80, Math.min(220, Math.min(availW, availH)))
     }
 
@@ -86,128 +86,118 @@ Item {
         }
     }
 
-    Rectangle {
-        id: editBtn
+    Item {
+        id: topActions
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.rightMargin: 4
+        anchors.rightMargin: 2
         anchors.topMargin: 2
-        width: 30
-        height: 30
-        radius: 8
-        color: "transparent"
-        z: 100
+        width: 34
+        height: 34
         visible: library.hasCurrent
+        z: 100
 
         Rectangle {
+            id: editBtn
             anchors.fill: parent
-            radius: parent.radius
-            color: theme.onBackground
-            opacity: editHov.containsMouse ? 0.20 : 0.10
-            Behavior on opacity { NumberAnimation { duration: 150 } }
-        }
+            radius: 10
+            color: editHov.containsMouse
+                ? Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.18)
+                : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06)
+            Behavior on color { ColorAnimation { duration: 150 } }
 
-        MaterialIcon {
-            anchors.centerIn: parent
-            glyph: "\ue3c9"
-            iconSize: 17
-            iconColor: theme.onBackground
-        }
-
-        MouseArea {
-            id: editHov
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: panel.editRequested()
-        }
-
-        Rectangle {
-            anchors.right: parent.right
-            anchors.top: parent.bottom
-            anchors.topMargin: 6
-            width: editTip.implicitWidth + 20
-            height: 28
-            radius: 8
-            color: theme.surface
-            border.color: theme.outline
-            border.width: 1
-            opacity: editHov.containsMouse ? 1 : 0
-            visible: opacity > 0
-            z: 9999
-
-            Behavior on opacity { NumberAnimation { duration: 150 } }
-
-            Text {
-                id: editTip
+            MaterialIcon {
                 anchors.centerIn: parent
-                text: "Edit metadata (Ctrl+X)"
-                color: theme.onBackground
-                font.pixelSize: 11
-                font.weight: Font.Medium
+                glyph: "\ue3c9"
+                iconSize: 17
+                iconColor: theme.onBackground
+            }
+
+            MouseArea {
+                id: editHov
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: panel.editRequested()
+            }
+
+            Rectangle {
+                anchors.right: parent.right
+                anchors.top: parent.bottom
+                anchors.topMargin: 6
+                width: editTip.implicitWidth + 20
+                height: 26
+                radius: 8
+                color: Qt.rgba(theme.surface.r, theme.surface.g, theme.surface.b, 1.0)
+                border.color: theme.outline
+                border.width: 1
+                opacity: editHov.containsMouse ? 1 : 0
+                visible: opacity > 0
+                z: 9999
+                Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                Text {
+                    id: editTip
+                    anchors.centerIn: parent
+                    text: "Edit metadata (Ctrl+X)"
+                    color: theme.onBackground
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
+                }
             }
         }
-    }
-
-    Rectangle {
-        id: lyricsBtn
-        anchors.right: parent.right
-        anchors.top: editBtn.bottom
-        anchors.rightMargin: 4
-        anchors.topMargin: 4
-        width: 30
-        height: 30
-        radius: 8
-        color: "transparent"
-        z: 100
-        visible: library.hasCurrent
 
         Rectangle {
-            anchors.fill: parent
-            radius: parent.radius
-            color: theme.onBackground
-            opacity: lyricsHov.containsMouse ? 0.20 : 0.10
-            Behavior on opacity { NumberAnimation { duration: 150 } }
-        }
-
-        MaterialIcon {
-            anchors.centerIn: parent
-            glyph: "\ue405"
-            iconSize: 17
-            iconColor: theme.onBackground
-        }
-
-        MouseArea {
-            id: lyricsHov
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: panel.lyricsRequested()
-        }
-
-        Rectangle {
+            id: lyricsBtn
             anchors.right: parent.right
-            anchors.top: parent.bottom
+            anchors.top: editBtn.bottom
             anchors.topMargin: 6
-            width: lyricsTip.implicitWidth + 20
-            height: 28
-            radius: 8
-            color: theme.surface
-            border.color: theme.outline
-            border.width: 1
-            opacity: lyricsHov.containsMouse ? 1 : 0
-            visible: opacity > 0
-            z: 9999
+            width: 34
+            height: 34
+            radius: 10
+            color: lyricsHov.containsMouse
+                ? Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.18)
+                : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06)
+            Behavior on color { ColorAnimation { duration: 150 } }
 
-            Behavior on opacity { NumberAnimation { duration: 150 } }
-
-            Text {
-                id: lyricsTip
+            MaterialIcon {
                 anchors.centerIn: parent
-                text: "Show lyrics (Ctrl+D)"
-                color: theme.onBackground
-                font.pixelSize: 11
-                font.weight: Font.Medium
+                glyph: "\ue405"
+                iconSize: 17
+                iconColor: theme.onBackground
+            }
+
+            MouseArea {
+                id: lyricsHov
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: panel.lyricsRequested()
+            }
+
+            Rectangle {
+                anchors.right: parent.right
+                anchors.top: parent.bottom
+                anchors.topMargin: 6
+                width: lyricsTip.implicitWidth + 20
+                height: 26
+                radius: 8
+                color: Qt.rgba(theme.surface.r, theme.surface.g, theme.surface.b, 1.0)
+                border.color: theme.outline
+                border.width: 1
+                opacity: lyricsHov.containsMouse ? 1 : 0
+                visible: opacity > 0
+                z: 9999
+                Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                Text {
+                    id: lyricsTip
+                    anchors.centerIn: parent
+                    text: "Show lyrics (Ctrl+D)"
+                    color: theme.onBackground
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
+                }
             }
         }
     }
@@ -225,7 +215,7 @@ Item {
         ColumnLayout {
             id: content
             width: flick.width
-            spacing: 8
+            spacing: 10
 
             Item {
                 Layout.alignment: Qt.AlignHCenter
@@ -235,7 +225,7 @@ Item {
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 16
+                    radius: 14
                     color: theme.surfaceVariant
                 }
 
@@ -276,7 +266,7 @@ Item {
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: 16
+                        radius: 14
                         color: "white"
                     }
                 }
@@ -333,7 +323,7 @@ Item {
                 ColumnLayout {
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    spacing: 8
+                    spacing: 10
 
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -343,7 +333,7 @@ Item {
                             Layout.fillWidth: true
                             text: panel.dHasCurrent ? panel.dTitle : "Nothing playing"
                             color: theme.onBackground
-                            font.pixelSize: 17
+                            font.pixelSize: 16
                             font.weight: Font.DemiBold
                             elide: Text.ElideRight
                             horizontalAlignment: Text.AlignHCenter

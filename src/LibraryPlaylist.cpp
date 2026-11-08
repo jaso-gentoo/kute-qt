@@ -321,11 +321,12 @@ void Library::addTrackToPlaylist(const QString &playlistId, const QString &track
     }
 }
 
-void Library::removeTrackFromPlaylist(const QString &playlistId, int index) {
+void Library::removeTrackFromPlaylist(const QString &playlistId, const QString &trackPath) {
     Playlist *p = findPlaylistMutable(playlistId);
     if (!p) return;
-    if (index < 0 || index >= p->tracks.size()) return;
-    p->tracks.removeAt(index);
+    int idx = p->tracks.indexOf(trackPath);
+    if (idx < 0) return;
+    p->tracks.removeAt(idx);
     savePlaylists();
     refreshPlaylistModel();
     emit playlistsChanged();

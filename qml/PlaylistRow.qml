@@ -15,52 +15,28 @@ Item {
 
     signal opened(string id, string name)
     signal renameRequested(string id, string name, real px, real py)
-    signal deleteRequested(string id, string name, int idx)
+    signal deleteRequested(string id, string name)
+    signal reorderFinished()
 
     width: listView ? listView.width : 0
-    height: 46
+    height: 48
     clip: true
 
     Item {
         id: contentItem
         width: parent.width
-        height: 46
+        height: 48
         anchors.top: parent.top
-
-        readonly property bool dropAbove: listView.dragActive
-                       && listView.dragFrom >= 0 && listView.dragTo >= 0
-                       && listView.dragTo === plRowWrap.index
-                       && listView.dragFrom > plRowWrap.index
-        readonly property bool dropBelow: listView.dragActive
-                       && listView.dragFrom >= 0 && listView.dragTo >= 0
-                       && listView.dragTo === plRowWrap.index
-                       && listView.dragFrom < plRowWrap.index
 
         HoverHandler { id: plHov }
 
         Rectangle {
             anchors.fill: parent
-            anchors.margins: 1
+            anchors.margins: 2
             radius: 10
             color: theme.onSurface
             opacity: plHov.hovered ? 0.08 : 0
             Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-        }
-
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-            height: 2
-            radius: 1
-            color: theme.primary
-            y: contentItem.dropAbove ? 0
-               : contentItem.dropBelow ? parent.height - 2
-               : 0
-            visible: contentItem.dropAbove || contentItem.dropBelow
-            opacity: visible ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: 120 } }
         }
 
         MouseArea {
@@ -72,60 +48,62 @@ Item {
             cursorShape: library.editMode
                 ? (pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
                 : Qt.PointingHandCursor
-            preventStealing: true
+            preventStealing: library.editMode
 
             property real pressY: 0
             property bool didDrag: false
 
+            function updateDrop(mx, my) {
+                if (!plRowWrap.listView) return
+                const gp = plArea.mapToItem(null, mx, my)
+                const lp = plRowWrap.listView.mapFromItem(null, gp.x, gp.y)
+                const vx = Math.max(0, Math.min(plRowWrap.listView.width  - 1, lp.x))
+                const vy = Math.max(0, Math.min(plRowWrap.listView.height - 1, lp.y))
+                plRowWrap.listView.lastViewportX = vx
+                plRowWrap.listView.lastViewportY = vy
+                plRowWrap.listView.computeDropFromCursor()
+            }
+
             onPressed: (mouse) => {
                 pressY = mouse.y
                 didDrag = false
-                if (library.editMode && library.filterText.length === 0) {
-                    listView.dragFrom = plRowWrap.index
-                    listView.dragTo = plRowWrap.index
-                }
             }
 
             onPositionChanged: (mouse) => {
                 if (!pressed) return
-                if (!library.editMode || library.filterText.length > 0) return
-                if (listView.dragFrom < 0) return
-                const dy = mouse.y - pressY
-                if (!listView.dragActive && Math.abs(dy) < 6) return
-                listView.dragActive = true
-                didDrag = true
-                const pt = mapToItem(listView, mouse.x, mouse.y)
-                const stride = plRowWrap.height + listView.spacing
-                let idx = Math.floor((pt.y + listView.contentY) / stride)
-                idx = Math.max(0, Math.min(listView.count - 1, idx))
-                listView.dragTo = idx
+                if (!library.editMode) return
+                if (library.filterText.length > 0) return
+                if (!didDrag) {
+                    if (Math.abs(mouse.y - pressY) < 6) return
+                    didDrag = true
+                    plRowWrap.listView.dragIndex = plRowWrap.index
+                    plRowWrap.listView.dropIndex = plRowWrap.index
+                }
+                updateDrop(mouse.x, mouse.y)
             }
 
-            onReleased: {
-                if (listView.dragActive && listView.dragFrom >= 0 && listView.dragTo >= 0
-                    && listView.dragFrom !== listView.dragTo) {
-                    const savedY = listView.contentY
-                    library.movePlaylist(listView.dragFrom, listView.dragTo)
-                    Qt.callLater(function() { listView.contentY = savedY })
+            onReleased: (mouse) => {
+                if (didDrag) updateDrop(mouse.x, mouse.y)
+                const from = plRowWrap.listView.dragIndex
+                const slot = plRowWrap.listView.dropIndex
+                let to = -1
+                if (from >= 0 && slot >= 0) {
+                    if (from < slot)      to = slot - 1
+                    else if (from > slot) to = slot
                 }
-                listView.dragFrom = -1
-                listView.dragTo = -1
-                listView.dragActive = false
+                const moved = from >= 0 && to >= 0 && to !== from
+                plRowWrap.listView.dragIndex = -1
+                plRowWrap.listView.dropIndex = -1
+                if (moved) {
+                    library.movePlaylist(from, to)
+                    plRowWrap.reorderFinished()
+                }
             }
 
             onCanceled: {
-                listView.dragFrom = -1
-                listView.dragTo = -1
-                listView.dragActive = false
+                plRowWrap.listView.dragIndex = -1
+                plRowWrap.listView.dropIndex = -1
                 didDrag = false
-            }
-
-            onExited: {
-                if (!pressed) {
-                    listView.dragFrom = -1
-                    listView.dragTo = -1
-                    listView.dragActive = false
-                }
             }
 
             onClicked: {
@@ -140,8 +118,8 @@ Item {
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 8
-            anchors.rightMargin: library.editMode ? 56 : 8
+            anchors.leftMargin: 10
+            anchors.rightMargin: library.editMode ? 56 : 10
             spacing: 10
 
             Behavior on anchors.rightMargin {
@@ -179,7 +157,7 @@ Item {
                 MaterialIcon {
                     anchors.centerIn: parent
                     glyph: "\ue8ef"
-                    iconSize: 18
+                    iconSize: 17
                     iconColor: theme.outline
                     opacity: 0.5
                     visible: coverImg.status !== Image.Ready
@@ -191,7 +169,7 @@ Item {
                     source: plRowWrap.playlistCover || ""
                     sourceSize.width: 68
                     sourceSize.height: 68
-                    fillMode: Image.PreserveAspectFit
+                    fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     cache: false
                     smooth: true
@@ -222,7 +200,7 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
                 text: plRowWrap.playlistName
                 color: plHov.hovered ? theme.primary : theme.onSurface
-                font.pixelSize: 13
+                font.pixelSize: 12
                 font.weight: Font.Medium
                 elide: Text.ElideRight
                 Behavior on color { ColorAnimation { duration: 220 } }
@@ -254,7 +232,8 @@ Item {
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            width: (library.editMode && !listView.dragActive) ? 46 : 0
+            anchors.margins: 2
+            width: (library.editMode && !listView.dragActive) ? 42 : 0
             radius: 10
             clip: true
             color: removeHov.containsMouse
@@ -280,8 +259,7 @@ Item {
                 onClicked: {
                     library.requestCloseSearch()
                     plRowWrap.deleteRequested(plRowWrap.playlistId,
-                                              plRowWrap.playlistName,
-                                              plRowWrap.index)
+                                              plRowWrap.playlistName)
                 }
             }
         }

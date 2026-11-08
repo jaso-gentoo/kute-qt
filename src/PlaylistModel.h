@@ -31,6 +31,9 @@ public:
     void clear();
     int count() const { return m_playlists.size(); }
 
+    Q_INVOKABLE QString playlistIdAt(int index) const;
+    Q_INVOKABLE void forceRelayout();
+
     void setCoverResolver(std::function<QString(const QString&)> r) { m_coverResolver = r; }
     void refreshCover(int index);
 

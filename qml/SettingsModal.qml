@@ -25,6 +25,8 @@ Item {
     signal saved
     signal folderRequested
 
+    property alias trackSubTab: trackTab.subTab
+
     function performTrackSave() { trackTab.performSave() }
 
     Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
@@ -52,12 +54,12 @@ Item {
         id: panel
         focus: true
         anchors.centerIn: parent
-        width: Math.min(760, parent.width - 80)
+        width: Math.min(600, parent.width - 80)
 
         readonly property int preferredHeight: {
             switch (modal.currentTab) {
-                case modal.tabSettings: return 400
-                case modal.tabTrack:    return 370
+                case modal.tabSettings: return 510
+                case modal.tabTrack:    return modal.trackSubTab === 0 ? 370 : 500
                 case modal.tabLyrics:   return 640
             }
             return 560

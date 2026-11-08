@@ -7,10 +7,13 @@ import QtQuick.Layouts
 FocusScope {
     id: tab
     property bool isActive: false
-    visible: isActive
+    visible: opacity > 0.01
+    opacity: isActive ? 1 : 0
+    enabled: isActive
+    Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
     property int    subTab: 0
-    property bool   textIsLrc: false
+    property bool   textIsLrc: true
     property string statusText: ""
     property string newCoverPath: ""
     property string tagContent: ""
@@ -22,7 +25,7 @@ FocusScope {
     signal closeRequested
     signal saved
 
-    component FieldGroup: ColumnLayout {
+    component FieldGroup: Rectangle {
         id: fgRoot
         property string label: ""
         property string placeholder: ""
@@ -30,51 +33,83 @@ FocusScope {
         property alias  input: fgField
 
         Layout.fillWidth: true
-        spacing: 3
+        Layout.preferredHeight: 54
+        radius: 10
+        color: Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.04)
+        border.color: fgField.activeFocus
+            ? theme.primary
+            : Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.15)
+        border.width: 1
+        Behavior on border.color { ColorAnimation { duration: 180 } }
 
-        Text {
-            text: fgRoot.label
-            color: theme.outline
-            font.pixelSize: 11
-            font.weight: Font.Medium
+        HoverHandler { cursorShape: Qt.IBeamCursor }
+
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.IBeamCursor
+            acceptedButtons: Qt.NoButton
+            onPressed: fgField.forceActiveFocus()
         }
-        TextInput {
-            id: fgField
-            Layout.fillWidth: true
-            Layout.preferredHeight: 30
-            verticalAlignment: TextInput.AlignVCenter
-            color: theme.onBackground
-            font.pixelSize: 14
-            selectByMouse: true
-            clip: true
-            selectionColor: theme.primary
-            selectedTextColor: theme.background
 
-            HoverHandler { cursorShape: Qt.IBeamCursor }
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 14
+            anchors.rightMargin: 14
+            anchors.topMargin: 7
+            anchors.bottomMargin: 7
+            spacing: 1
 
             Text {
-                anchors.fill: parent
-                verticalAlignment: Text.AlignVCenter
-                text: fgRoot.placeholder
+                text: fgRoot.label
                 color: theme.outline
-                opacity: 0.5
-                font.pixelSize: 14
-                visible: fgField.text.length === 0 && !fgField.activeFocus
-                enabled: false
+                font.pixelSize: 10
+                font.weight: Font.Medium
+                font.letterSpacing: 0.6
             }
-        }
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 2
-            radius: 1
-            color: fgField.activeFocus ? theme.primary : theme.outline
-            opacity: fgField.activeFocus ? 1 : 0.18
-            Behavior on color { ColorAnimation { duration: 200 } }
-            Behavior on opacity { NumberAnimation { duration: 200 } }
+
+            TextInput {
+                id: fgField
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                verticalAlignment: TextInput.AlignVCenter
+                color: theme.onBackground
+                font.pixelSize: 13
+                selectByMouse: true
+                clip: true
+                selectionColor: theme.primary
+                selectedTextColor: theme.background
+
+                onTextChanged: {
+                    if (!activeFocus) cursorPosition = 0
+                }
+
+                Text {
+                    anchors.fill: parent
+                    verticalAlignment: Text.AlignVCenter
+                    text: fgRoot.placeholder
+                    color: theme.outline
+                    opacity: 0.5
+                    font.pixelSize: 13
+                    visible: fgField.text.length === 0 && !fgField.activeFocus
+                    enabled: false
+                }
+            }
         }
     }
 
     onIsActiveChanged: if (isActive) refresh()
+
+    onTextIsLrcChanged: {
+        if (savingInProgress) return
+        if (textIsLrc) {
+            tagContent = textArea.text
+            textArea.text = lrcContent
+        } else {
+            lrcContent = textArea.text
+            textArea.text = tagContent
+        }
+        textFlick.contentY = 0
+    }
 
     function refresh() {
         newCoverPath = ""
@@ -82,19 +117,10 @@ FocusScope {
         titleField.text  = library.currentTitle
         artistField.text = library.currentArtist
         albumField.text  = library.currentAlbum
-        textIsLrc = false
         tagContent = String(library.loadTrackText(library.currentIndex, false) ?? "")
         lrcContent = String(library.loadTrackText(library.currentIndex, true)  ?? "")
-        textArea.text = tagContent
-        offsetField.text = library.getLrcOffset(library.currentIndex).toFixed(2)
-        statusText = ""
-    }
-
-    function switchTextMode(useLrc) {
-        if (textIsLrc === useLrc) return
-        if (textIsLrc) lrcContent = textArea.text; else tagContent = textArea.text
-        textIsLrc = useLrc
         textArea.text = textIsLrc ? lrcContent : tagContent
+        textFlick.contentY = 0
         statusText = ""
     }
 
@@ -113,7 +139,10 @@ FocusScope {
                     const data = JSON.parse(xhr.responseText)
                     if (data.syncedLyrics) {
                         lrcContent = data.syncedLyrics
-                        if (tab.textIsLrc) textArea.text = lrcContent
+                        if (tab.textIsLrc) {
+                            textArea.text = lrcContent
+                            textFlick.contentY = 0
+                        }
                         statusText = "LRC loaded"
                     } else if (data.plainLyrics) {
                         tagContent = data.plainLyrics
@@ -181,7 +210,7 @@ FocusScope {
 
         readonly property string suggestedName: {
             const s = String(library.currentTitle || "cover")
-            return s.replace(/[\\/:*?"<>|]/g, "_") + ".jpg"
+            return s.replace(/[\/:*?"<>|]/g, "_") + ".jpg"
         }
 
         onVisibleChanged: {
@@ -201,64 +230,18 @@ FocusScope {
 
         Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: 44
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 24
-                anchors.rightMargin: 24
-                spacing: 0
-                Repeater {
-                    model: [ { idx: 0, label: "Metadata" }, { idx: 1, label: "Text" } ]
-                    delegate: Item {
-                        required property var modelData
-                        readonly property bool active: tab.subTab === modelData.idx
-                        Layout.preferredWidth: subLbl.implicitWidth + 24
-                        Layout.preferredHeight: 36
-                        Text {
-                            id: subLbl
-                            anchors.centerIn: parent
-                            text: modelData.label
-                            color: active ? theme.primary : theme.onBackground
-                            opacity: active ? 1.0 : 0.55
-                            font.pixelSize: 12
-                            font.weight: active ? Font.DemiBold : Font.Medium
-                            Behavior on color { ColorAnimation { duration: 180 } }
-                            Behavior on opacity { NumberAnimation { duration: 180 } }
-                        }
-                        Rectangle {
-                            anchors.bottom: parent.bottom
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: active ? subLbl.implicitWidth + 12 : 0
-                            height: 2; radius: 1
-                            color: theme.primary
-                            Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (tab.subTab === 1 && modelData.idx === 0) {
-                                    if (tab.textIsLrc) tab.lrcContent = textArea.text
-                                    else tab.tagContent = textArea.text
-                                }
-                                tab.subTab = modelData.idx
-                            }
-                        }
-                    }
-                }
-                Item { Layout.fillWidth: true }
-            }
-        }
-
-        Item {
-            Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
 
             Flickable {
                 id: metaFlick
                 anchors.fill: parent
-                visible: tab.subTab === 0
+                visible: true
+                enabled: tab.subTab === 0
+                opacity: tab.subTab === 0 ? 1 : 0
+                x: tab.subTab === 0 ? 0 : -24
+                Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                Behavior on x       { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
                 contentWidth: width
                 contentHeight: metaRow.implicitHeight + 24
                 clip: true
@@ -396,31 +379,6 @@ FocusScope {
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: coverDialog.open()
                                 }
-
-                                Rectangle {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.bottom: parent.top
-                                    anchors.bottomMargin: 6
-                                    width: replaceCoverTipTxt.implicitWidth + 16
-                                    height: 24
-                                    radius: 8
-                                    color: theme.surface
-                                    border.color: theme.outline
-                                    border.width: 1
-                                    opacity: replaceCoverHov.containsMouse ? 1 : 0
-                                    visible: opacity > 0
-                                    z: 9999
-                                    Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                                    Text {
-                                        id: replaceCoverTipTxt
-                                        anchors.centerIn: parent
-                                        text: "Replace cover"
-                                        color: theme.onSurface
-                                        font.pixelSize: 10
-                                        font.weight: Font.Medium
-                                    }
-                                }
                             }
 
                             Rectangle {
@@ -450,31 +408,6 @@ FocusScope {
                                     cursorShape: saveCoverBtn.btnActive ? Qt.PointingHandCursor : Qt.ArrowCursor
                                     enabled: saveCoverBtn.btnActive
                                     onClicked: saveCoverDialog.open()
-                                }
-
-                                Rectangle {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.bottom: parent.top
-                                    anchors.bottomMargin: 6
-                                    width: saveCoverTipTxt.implicitWidth + 16
-                                    height: 24
-                                    radius: 8
-                                    color: theme.surface
-                                    border.color: theme.outline
-                                    border.width: 1
-                                    opacity: (saveCoverHov.containsMouse && saveCoverBtn.btnActive) ? 1 : 0
-                                    visible: opacity > 0
-                                    z: 9999
-                                    Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                                    Text {
-                                        id: saveCoverTipTxt
-                                        anchors.centerIn: parent
-                                        text: "Save cover to file"
-                                        color: theme.onSurface
-                                        font.pixelSize: 10
-                                        font.weight: Font.Medium
-                                    }
                                 }
                             }
 
@@ -517,33 +450,6 @@ FocusScope {
                                         if (tab.removeCoverRequested) tab.newCoverPath = ""
                                     }
                                 }
-
-                                Rectangle {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.bottom: parent.top
-                                    anchors.bottomMargin: 6
-                                    width: removeCoverTipTxt.implicitWidth + 16
-                                    height: 24
-                                    radius: 8
-                                    color: theme.surface
-                                    border.color: theme.outline
-                                    border.width: 1
-                                    opacity: (removeCoverHov.containsMouse && removeCoverBtn.btnActive) ? 1 : 0
-                                    visible: opacity > 0
-                                    z: 9999
-                                    Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                                    Text {
-                                        id: removeCoverTipTxt
-                                        anchors.centerIn: parent
-                                        text: removeCoverBtn.confirming
-                                              ? "Click again to cancel"
-                                              : "Remove cover"
-                                        color: theme.onSurface
-                                        font.pixelSize: 10
-                                        font.weight: Font.Medium
-                                    }
-                                }
                             }
                         }
                     }
@@ -561,216 +467,95 @@ FocusScope {
             }
 
             Item {
+                id: textPage
                 anchors.fill: parent
-                visible: tab.subTab === 1
+                visible: true
+                enabled: tab.subTab === 1
+                opacity: tab.subTab === 1 ? 1 : 0
+                x: tab.subTab === 1 ? 0 : 24
+                Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                Behavior on x       { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
 
-                ColumnLayout {
+                Rectangle {
                     anchors.fill: parent
-                    anchors.leftMargin: 24
-                    anchors.rightMargin: 24
-                    anchors.topMargin: 12
-                    anchors.bottomMargin: 12
-                    spacing: 10
+                    anchors.margins: 8
+                    radius: 12
+                    color: Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b,
+                                   textArea.activeFocus ? 0.06 : 0.03)
+                    border.color: textArea.activeFocus
+                        ? theme.primary
+                        : Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.10)
+                    border.width: 1
+                    Behavior on color { ColorAnimation { duration: 200 } }
+                    Behavior on border.color { ColorAnimation { duration: 200 } }
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 6
-                        Repeater {
-                            model: [ { isLrc: false, label: "TAG" }, { isLrc: true, label: "LRC" } ]
-                            delegate: Item {
-                                required property var modelData
-                                readonly property bool active: tab.textIsLrc === modelData.isLrc
-                                Layout.preferredWidth: fmtLbl.implicitWidth + 22
-                                Layout.preferredHeight: 30
-                                Text {
-                                    id: fmtLbl
-                                    anchors.centerIn: parent
-                                    text: modelData.label
-                                    color: active ? theme.primary : theme.onBackground
-                                    opacity: active ? 1.0 : 0.5
-                                    font.pixelSize: 11; font.weight: Font.DemiBold
-                                    font.family: "monospace"
-                                    Behavior on color { ColorAnimation { duration: 180 } }
-                                    Behavior on opacity { NumberAnimation { duration: 180 } }
-                                }
-                                Rectangle {
-                                    anchors.bottom: parent.bottom
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    width: active ? fmtLbl.implicitWidth + 12 : 0
-                                    height: 2; radius: 1
-                                    color: theme.primary
-                                    Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                                }
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: tab.switchTextMode(modelData.isLrc)
-                                }
+                    Flickable {
+                        id: textFlick
+                        anchors.fill: parent
+                        anchors.margins: 14
+                        contentWidth: width
+                        contentHeight: textArea.implicitHeight
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        flickDeceleration: 300
+                        maximumFlickVelocity: 8000
+
+                        NumberAnimation {
+                            id: textWheelAnim
+                            target: textFlick
+                            property: "contentY"
+                            duration: 260
+                            easing.type: Easing.OutCubic
+                        }
+
+                        WheelHandler {
+                            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                            blocking: true
+                            onWheel: (event) => {
+                                const maxY = Math.max(0, textFlick.contentHeight - textFlick.height)
+                                let dy = 0
+                                if (Math.abs(event.pixelDelta.y) > 0) dy = event.pixelDelta.y * 3.5
+                                else dy = (event.angleDelta.y / 120.0) * 140
+                                const currentTarget = textWheelAnim.running ? textWheelAnim.to : textFlick.contentY
+                                const target = Math.max(0, Math.min(maxY, currentTarget - dy))
+                                textWheelAnim.stop()
+                                textWheelAnim.from = textFlick.contentY
+                                textWheelAnim.to = target
+                                textWheelAnim.duration = Math.min(550, Math.max(240, Math.abs(target - textFlick.contentY) * 1.2))
+                                textWheelAnim.start()
+                                event.accepted = true
                             }
                         }
 
-                        Item {
-                            id: dlSlot
-                            Layout.preferredWidth: tab.textIsLrc ? 28 : 0
-                            Layout.preferredHeight: 30
-                            Behavior on Layout.preferredWidth { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-
-                            Rectangle {
-                                id: dlBtn
-                                anchors.fill: parent
-                                visible: tab.textIsLrc
-                                radius: 8
-                                color: dlHov.containsMouse
-                                    ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.24)
-                                    : Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.12)
-                                Behavior on color { ColorAnimation { duration: 200 } }
-
-                                MaterialIcon {
-                                    anchors.centerIn: parent
-                                    glyph: "\ue2c4"
-                                    iconSize: 14
-                                    iconColor: theme.primary
-                                }
-
-                                MouseArea {
-                                    id: dlHov
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    enabled: tab.textIsLrc
-                                    onClicked: tab.downloadLrc()
-                                }
-                            }
-
-                            Rectangle {
-                                anchors.left: parent.left
-                                anchors.top: parent.bottom
-                                anchors.topMargin: 6
-                                width: dlTipTxt.implicitWidth + 16
-                                height: 26
-                                radius: 8
-                                color: theme.surface
-                                border.color: theme.outline
-                                border.width: 1
-                                opacity: (dlHov.containsMouse && tab.textIsLrc) ? 1 : 0
-                                visible: opacity > 0
-                                z: 9999
-
-                                Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                                Text {
-                                    id: dlTipTxt
-                                    anchors.centerIn: parent
-                                    text: "Download LRC from lrclib.net"
-                                    color: theme.onBackground
-                                    font.pixelSize: 11
-                                    font.weight: Font.Medium
-                                }
+                        TapHandler {
+                            onTapped: {
+                                const w = tab.Window.window
+                                if (w && w.activeFocusItem) w.activeFocusItem.focus = false
                             }
                         }
 
-                        Item { Layout.fillWidth: true }
+                        TextEdit {
+                            id: textArea
+                            width: textFlick.width
+                            color: theme.onBackground
+                            font.pixelSize: 17
+                            wrapMode: TextEdit.Wrap
+                            selectByMouse: true
+                            selectionColor: theme.primary
+                            selectedTextColor: theme.background
+                            textFormat: TextEdit.PlainText
+                            horizontalAlignment: TextEdit.AlignHCenter
 
-                        Rectangle {
-                            Layout.preferredWidth: tab.textIsLrc ? 120 : 0
-                            Layout.preferredHeight: 28
-                            clip: true
-                            color: "transparent"
-                            Behavior on Layout.preferredWidth { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-
-                            RowLayout {
-                                anchors.fill: parent
-                                spacing: 6
-                                opacity: tab.textIsLrc ? 1 : 0
-                                Behavior on opacity { NumberAnimation { duration: 200 } }
-                                Item { Layout.fillWidth: true }
-                                Text {
-                                    text: "Offset"
-                                    color: theme.outline
-                                    font.pixelSize: 11; font.weight: Font.Medium
-                                }
-                                TextInput {
-                                    id: offsetField
-                                    Layout.preferredWidth: 50
-                                    Layout.preferredHeight: 28
-                                    verticalAlignment: TextInput.AlignVCenter
-                                    horizontalAlignment: TextInput.AlignHCenter
-                                    color: theme.onBackground
-                                    font.pixelSize: 12; font.family: "monospace"
-                                    selectByMouse: true; clip: true
-                                    selectionColor: theme.primary
-                                    selectedTextColor: theme.background
-                                    validator: DoubleValidator { bottom: -60.0; top: 60.0; decimals: 2 }
-                                    HoverHandler { cursorShape: Qt.IBeamCursor }
-                                    onTextEdited: {
-                                        const v = parseFloat(text)
-                                        if (!isNaN(v)) library.setLrcOffset(library.currentIndex, v)
-                                    }
-                                    onEditingFinished: {
-                                        const v = parseFloat(text)
-                                        if (!isNaN(v)) {
-                                            library.setLrcOffset(library.currentIndex, v)
-                                            text = v.toFixed(2)
-                                        } else text = library.getLrcOffset(library.currentIndex).toFixed(2)
-                                    }
-                                }
-                            }
+                            HoverHandler { cursorShape: Qt.IBeamCursor }
                         }
-                    }
 
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        radius: 12
-                        color: Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b,
-                                       textArea.activeFocus ? 0.06 : 0.03)
-                        border.color: textArea.activeFocus
-                            ? theme.primary
-                            : Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.10)
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 200 } }
-                        Behavior on border.color { ColorAnimation { duration: 200 } }
-
-                        Flickable {
-                            id: textFlick
-                            anchors.fill: parent
-                            anchors.margins: 14
-                            contentWidth: width
-                            contentHeight: textArea.implicitHeight
-                            clip: true
-                            boundsBehavior: Flickable.StopAtBounds
-                            flickDeceleration: 300
-                            maximumFlickVelocity: 8000
-
-                            TapHandler {
-                                onTapped: {
-                                    const w = tab.Window.window
-                                    if (w && w.activeFocusItem) w.activeFocusItem.focus = false
-                                }
-                            }
-
-                            TextEdit {
-                                id: textArea
-                                width: textFlick.width
-                                color: theme.onBackground
-                                font.pixelSize: 13
-                                wrapMode: TextEdit.Wrap
-                                selectByMouse: true
-                                selectionColor: theme.primary
-                                selectedTextColor: theme.background
-                                textFormat: TextEdit.PlainText
-                            }
+                        Text {
+                            anchors.centerIn: parent
+                            text: "No lyrics found"
+                            color: theme.outline; opacity: 0.4
+                            font.pixelSize: 13
+                            visible: textArea.text.length === 0
                         }
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: tab.statusText.length > 0
-                            ? tab.statusText
-                            : (tab.textIsLrc ? "Saves to ~/.config/kute/txts/" : "Saves to track tag")
-                        color: theme.outline
-                        font.pixelSize: 10
-                        elide: Text.ElideRight
                     }
                 }
             }
@@ -791,11 +576,52 @@ FocusScope {
                 anchors.leftMargin: 24
                 anchors.rightMargin: 24
                 spacing: 8
-                Item { Layout.fillWidth: true }
+
+                Rectangle {
+                    id: dlFooterBtn
+                    Layout.preferredWidth: 30
+                    Layout.preferredHeight: 30
+                    Layout.alignment: Qt.AlignVCenter
+                    radius: 8
+                    visible: tab.subTab === 1 && tab.textIsLrc
+                    color: dlFooterHov.containsMouse
+                        ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.24)
+                        : Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.12)
+                    Behavior on color { ColorAnimation { duration: 200 } }
+
+                    MaterialIcon {
+                        anchors.centerIn: parent
+                        glyph: "\ue2c4"
+                        iconSize: 14
+                        iconColor: theme.primary
+                    }
+
+                    MouseArea {
+                        id: dlFooterHov
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: tab.downloadLrc()
+                    }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
+                    text: tab.statusText.length > 0
+                        ? tab.statusText
+                        : (tab.subTab === 1
+                            ? (tab.textIsLrc ? "Saves to ~/.config/kute/txts/" : "Saves to track tag")
+                            : "")
+                    color: theme.outline
+                    font.pixelSize: 10
+                    elide: Text.ElideRight
+                }
 
                 Rectangle {
                     Layout.preferredHeight: 32
                     Layout.preferredWidth: cancelTxt.implicitWidth + 28
+                    Layout.alignment: Qt.AlignVCenter
                     radius: 10
                     color: cancelHov.containsMouse
                         ? Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.12)
@@ -820,6 +646,7 @@ FocusScope {
                 Rectangle {
                     Layout.preferredHeight: 32
                     Layout.preferredWidth: saveTxt.implicitWidth + 28
+                    Layout.alignment: Qt.AlignVCenter
                     radius: 10
                     color: theme.primary
                     opacity: saveHov.containsMouse ? 1.0 : 0.92

@@ -187,3 +187,9 @@ QString TrackModel::thumbAt(int index) const {
     if (index < 0 || index >= m_tracks.size()) return {};
     return m_tracks[index].thumb;
 }
+
+void TrackModel::forceRelayout() {
+    beginResetModel();
+    endResetModel();
+    emit countChanged();
+}

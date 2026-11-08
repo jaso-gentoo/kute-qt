@@ -90,6 +90,7 @@ qt_add_qml_module(kute
         qml/AlbumsView.qml
         qml/BrowseView.qml
         qml/SettingsModal.qml
+        qml/NowPlayingOverlay.qml
         qml/SettingsTab.qml
         qml/TrackTab.qml
         qml/LyricsTab.qml

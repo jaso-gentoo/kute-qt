@@ -26,11 +26,11 @@ Item {
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottomMargin: 100
-        width: Math.min(540, parent.width - 80)
-        height: 44
-        radius: 14
+        width: Math.min(520, parent.width - 80)
+        height: 42
+        radius: 12
         color: theme.surface
-        border.color: Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.6)
+        border.color: Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.55)
         border.width: 1
 
         y: root.open ? 0 : 24
@@ -44,7 +44,7 @@ Item {
 
             MaterialIcon {
                 glyph: "\ue8b6"
-                iconSize: 17
+                iconSize: 16
                 iconColor: theme.primary
             }
 
@@ -54,7 +54,7 @@ Item {
                 placeholderText: "Search in current list…"
                 placeholderTextColor: theme.outline
                 color: theme.onBackground
-                font.pixelSize: 13
+                font.pixelSize: 12
                 background: Item {}
                 selectByMouse: true
                 onTextChanged: library.setFilterText(text)

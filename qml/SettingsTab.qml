@@ -5,7 +5,10 @@ import QtQuick.Layouts
 FocusScope {
     id: tab
     property bool isActive: false
-    visible: isActive
+    visible: opacity > 0.01
+    opacity: isActive ? 1 : 0
+    enabled: isActive
+    Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
     signal folderRequested
 
@@ -297,6 +300,69 @@ FocusScope {
             spacing: 18
 
             ModalSection {
+                title: "Application"
+                icon: "\ue8b8"
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 58
+                    radius: 10
+                    color: restartHov.containsMouse
+                        ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.08)
+                        : "transparent"
+                    Behavior on color { ColorAnimation { duration: 200 } }
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 14
+                        spacing: 12
+
+                        MaterialIcon {
+                            glyph: "\ue5d5"
+                            iconSize: 18
+                            iconColor: theme.onBackground
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "Restart player"
+                                color: theme.onBackground
+                                font.pixelSize: 13
+                                font.weight: Font.Medium
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "Close and relaunch the application"
+                                color: theme.outline
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        MaterialIcon {
+                            glyph: "\ue5cc"
+                            iconSize: 16
+                            iconColor: theme.outline
+                        }
+                    }
+
+                    MouseArea {
+                        id: restartHov
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: theme.restartApplication()
+                    }
+                }
+            }
+
+            ModalSection {
                 title: "Library"
                 icon: "\ue2c7"
 
@@ -382,6 +448,21 @@ FocusScope {
                     font.pixelSize: 10
                     wrapMode: Text.Wrap
                     opacity: 0.8
+                }
+            }
+
+            ModalSection {
+                title: "Integrations"
+                icon: ""
+
+                GroupedList {
+                    SettingRow {
+                        icon: ""
+                        label: "Discord Rich Presence"
+                        description: "Show current track in Discord status"
+                        rowChecked: library.discordRpcEnabled
+                        onToggled: library.discordRpcEnabled = !library.discordRpcEnabled
+                    }
                 }
             }
 
@@ -557,9 +638,9 @@ FocusScope {
                     Layout.preferredWidth: restartTxt.implicitWidth + 22
                     Layout.preferredHeight: 30
                     radius: 8
-                    color: restartHov.pressed
+                    color: restartHov2.pressed
                         ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.30)
-                        : (restartHov.containsMouse
+                        : (restartHov2.containsMouse
                             ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.24)
                             : Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.16))
                     Behavior on color { ColorAnimation { duration: 150 } }
@@ -574,7 +655,7 @@ FocusScope {
                     }
 
                     MouseArea {
-                        id: restartHov
+                        id: restartHov2
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor

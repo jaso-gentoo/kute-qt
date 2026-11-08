@@ -13,11 +13,11 @@ Rectangle {
     required property string path
 
     property ListView listView
-    property var autoScrollTimer
 
     signal activated()
     signal addMenuRequested(string path, real rightX, real anchorContentY, real btnHeight)
     signal trackRemovalRequested(var removalFn)
+    signal reorderFinished()
 
     readonly property string rowPath: path
 
@@ -29,126 +29,120 @@ Rectangle {
 
     readonly property bool isCurrent: library.currentFilePath === rowPath
     readonly property bool isDragging: listView && listView.dragIndex === row.index
-    readonly property bool isDropTargetAbove: listView
-        && listView.dropIndex === row.index
-        && listView.dragIndex > row.index
-        && listView.dragIndex !== row.index
-    readonly property bool isDropTargetBelow: listView
-        && listView.dropIndex === row.index
-        && listView.dragIndex < row.index
-        && listView.dragIndex !== row.index
 
     readonly property bool liked: {
         library.likedRevision
         return library.isLiked(row.index)
     }
 
-    HoverHandler { id: rowHover }
+    HoverHandler {
+        id: rowHover
+        enabled: !row.canDrag
+        cursorShape: Qt.PointingHandCursor
+    }
 
-    width: listView ? listView.width : 0
+    width: listView ? (listView.width - 12) : 0
     height: 42
-    radius: 10
     color: "transparent"
-    opacity: isDragging ? 0.35 : 1.0
+    opacity: isDragging ? 0.5 : 1.0
 
     Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
     Rectangle {
         id: rowBg
         anchors.fill: parent
-        anchors.leftMargin: 8
-        anchors.rightMargin: 20
+        anchors.margins: 2
         radius: 10
-        color: theme.onSurface
-        opacity: (rowHover.hovered && !row.canDrag) ? 0.06 : 0
-        Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
-    }
-
-    Rectangle {
-        anchors.fill: rowBg
-        radius: 10
-        color: theme.primary
-        opacity: row.isCurrent ? 0.10 : 0
-        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+        color: row.isCurrent
+            ? theme.primary
+            : (rowHover.hovered && !row.canDrag ? theme.onSurface : "transparent")
+        opacity: row.isCurrent
+            ? 0.14
+            : (rowHover.hovered && !row.canDrag ? 0.07 : 0)
+        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+        Behavior on color { ColorAnimation { duration: 180 } }
     }
 
     MouseArea {
-        id: hov4
+        id: ma
         anchors.fill: rowBg
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-        cursorShape: row.canDrag
-            ? (pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
-            : Qt.PointingHandCursor
         preventStealing: row.canDrag
+        cursorShape: row.canDrag
+            ? (ma.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
+            : Qt.PointingHandCursor
+
+        property bool dragging: false
+
+        function updateDrop(mx, my) {
+            if (!row.listView) return
+            const gp = ma.mapToItem(null, mx, my)
+            const lp = row.listView.mapFromItem(null, gp.x, gp.y)
+            const vx = Math.max(0, Math.min(row.listView.width  - 1, lp.x))
+            const vy = Math.max(0, Math.min(row.listView.height - 1, lp.y))
+            row.listView.lastViewportX = vx
+            row.listView.lastViewportY = vy
+            row.listView.computeDropFromCursor()
+        }
 
         onPressed: (mouse) => {
             if (mouse.button === Qt.MiddleButton) {
                 mouse.accepted = true
-                row.trackRemovalRequested(function() {
-                    library.toggleLikeByPath(row.path)
-                })
+                if (!row.canDrag) {
+                    row.trackRemovalRequested(function() {
+                        library.toggleLikeByPath(row.path)
+                    })
+                }
                 return
             }
             if (mouse.button !== Qt.LeftButton) return
-            if (!row.canDrag) return
-            const pt = hov4.mapToItem(row.listView, mouse.x, mouse.y)
-            row.listView.dragIndex = row.index
-            row.listView.dropIndex = row.index
-            row.listView.lastMouseY = pt.y
-            if (row.autoScrollTimer) row.autoScrollTimer.start()
+
+            if (row.canDrag) {
+                dragging = true
+                row.listView.dragIndex = row.index
+                updateDrop(mouse.x, mouse.y)
+            }
         }
 
         onPositionChanged: (mouse) => {
-            if (!row.canDrag || row.listView.dragIndex < 0) return
-            const pt = hov4.mapToItem(row.listView, mouse.x, mouse.y)
-            row.listView.lastMouseY = pt.y
-            const contentY = pt.y + row.listView.contentY
-            const stride = row.height + row.listView.spacing
-            let idx = Math.floor(contentY / stride)
-            idx = Math.max(0, Math.min(library.tracks.count - 1, idx))
-            if (idx !== row.listView.dropIndex) row.listView.dropIndex = idx
+            if (!dragging) return
+            updateDrop(mouse.x, mouse.y)
         }
 
         onReleased: (mouse) => {
-            if (row.autoScrollTimer) row.autoScrollTimer.stop()
             if (mouse.button === Qt.MiddleButton) return
-            if (!row.canDrag) {
-                if (row.isCurrent) library.togglePlayPause()
-                else               library.playIndex(row.index)
-                row.activated()
+
+            if (dragging) {
+                updateDrop(mouse.x, mouse.y)
+                const lv = row.listView
+                const from = lv.dragIndex
+                const slot = lv.dropIndex
+                let to = -1
+                if (from < slot)      to = slot - 1
+                else if (from > slot) to = slot
+                lv.dragIndex = -1
+                lv.dropIndex = -1
+                dragging = false
+
+                if (from >= 0 && to >= 0 && to !== from) {
+                    library.moveTrack(from, to)
+                    row.reorderFinished()
+                }
                 return
             }
-            if (row.listView.dragIndex >= 0
-                && row.listView.dropIndex >= 0
-                && row.listView.dragIndex !== row.listView.dropIndex) {
-                library.moveTrack(row.listView.dragIndex, row.listView.dropIndex)
-            }
-            row.listView.dragIndex = -1
-            row.listView.dropIndex = -1
+
+            if (row.canDrag) return
+            if (mouse.button !== Qt.LeftButton) return
+
+            if (row.isCurrent) library.togglePlayPause()
+            else               library.playIndex(row.index)
+            row.activated()
         }
 
         onCanceled: {
-            if (row.autoScrollTimer) row.autoScrollTimer.stop()
-            row.listView.dragIndex = -1
-            row.listView.dropIndex = -1
+            dragging = false
         }
-    }
-
-    Rectangle {
-        anchors.left: rowBg.left
-        anchors.right: rowBg.right
-        anchors.leftMargin: 4
-        anchors.rightMargin: 4
-        height: 2
-        radius: 1
-        color: theme.primary
-        y: row.isDropTargetAbove ? rowBg.y
-           : row.isDropTargetBelow ? rowBg.y + rowBg.height - 2
-           : rowBg.y
-        visible: row.isDropTargetAbove || row.isDropTargetBelow
-        opacity: visible ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: 120 } }
     }
 
     Rectangle {
@@ -156,7 +150,7 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         anchors.leftMargin: 2
         width: 3
-        height: row.isCurrent ? 18 : 0
+        height: row.isCurrent ? 16 : 0
         radius: 2
         color: theme.primary
         Behavior on height {
@@ -174,7 +168,7 @@ Rectangle {
         anchors.top: rowBg.top
         anchors.bottom: rowBg.bottom
         anchors.leftMargin: 10
-        anchors.rightMargin: (rowHover.hovered && !row.canDrag) ? 46 : 10
+        anchors.rightMargin: (rowHover.hovered && !row.canDrag) ? 44 : 10
         spacing: 10
 
         Behavior on anchors.rightMargin {
@@ -182,8 +176,8 @@ Rectangle {
         }
 
         Item {
-            Layout.preferredWidth: row.canDrag ? 18 : 0
-            Layout.preferredHeight: 18
+            Layout.preferredWidth: row.canDrag ? 16 : 0
+            Layout.preferredHeight: 16
             clip: true
             Behavior on Layout.preferredWidth {
                 NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
@@ -191,7 +185,7 @@ Rectangle {
             MaterialIcon {
                 anchors.centerIn: parent
                 glyph: "\ue25d"
-                iconSize: 16
+                iconSize: 15
                 iconColor: theme.outline
                 opacity: row.canDrag ? 1 : 0
                 scale: row.canDrag ? 1.0 : 0.6
@@ -212,7 +206,7 @@ Rectangle {
 
             Rectangle {
                 anchors.fill: parent
-                radius: 6
+                radius: 7
                 color: theme.surfaceVariant
             }
 
@@ -220,9 +214,9 @@ Rectangle {
                 id: thumbImg
                 anchors.fill: parent
                 source: row.thumb ? library.toFileUrl(row.thumb) + "?v=" + library.coverVersion : ""
-                sourceSize.width: 30
-                sourceSize.height: 30
-                fillMode: Image.PreserveAspectFit
+                sourceSize.width: 60
+                sourceSize.height: 60
+                fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: true
                 smooth: false
@@ -239,7 +233,7 @@ Rectangle {
 
             Rectangle {
                 anchors.fill: parent
-                radius: 6
+                radius: 7
                 color: "#000"
                 opacity: (rowHover.hovered && !row.canDrag) ? 0.5 : 0
                 Behavior on opacity { NumberAnimation { duration: 150 } }
@@ -356,7 +350,7 @@ Rectangle {
         anchors.right: rowBg.right
         anchors.top: rowBg.top
         anchors.bottom: rowBg.bottom
-        width: (rowHover.hovered && !row.canDrag) ? 42 : 0
+        width: (rowHover.hovered && !row.canDrag) ? 40 : 0
         clip: true
         Behavior on width {
             NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
@@ -364,7 +358,8 @@ Rectangle {
 
         Rectangle {
             anchors.fill: parent
-            radius: 10
+            anchors.margins: 3
+            radius: 8
             color: addBtnHov.containsMouse
                 ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.28)
                 : "transparent"
@@ -374,7 +369,7 @@ Rectangle {
         MaterialIcon {
             anchors.centerIn: parent
             glyph: "\ue03b"
-            iconSize: 16
+            iconSize: 15
             iconColor: addBtnHov.containsMouse ? theme.primary : theme.outline
             Behavior on iconColor { ColorAnimation { duration: 150 } }
         }

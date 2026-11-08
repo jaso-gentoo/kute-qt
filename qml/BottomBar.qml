@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: bar
-    radius: 20
+    radius: 16
     color: theme.surface
 
     signal coverClicked
@@ -68,23 +68,23 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 14
-        anchors.rightMargin: 14
-        anchors.topMargin: 10
-        anchors.bottomMargin: 10
-        spacing: 16
+        anchors.leftMargin: 12
+        anchors.rightMargin: 12
+        anchors.topMargin: 4
+        anchors.bottomMargin: 4
+        spacing: 12
 
         RowLayout {
-            Layout.preferredWidth: 230
-            Layout.minimumWidth: 80
+            Layout.fillWidth: true
+            Layout.minimumWidth: 120
             Layout.maximumWidth: 250
             Layout.fillHeight: true
             spacing: 10
 
             Item {
                 id: coverWrap
-                Layout.preferredWidth: 46
-                Layout.preferredHeight: 46
+                Layout.preferredWidth: 48
+                Layout.preferredHeight: 48
                 Layout.alignment: Qt.AlignVCenter
                 transformOrigin: Item.Center
 
@@ -92,7 +92,7 @@ Rectangle {
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 11
+                    radius: 10
                     color: theme.surfaceVariant
                 }
 
@@ -107,11 +107,9 @@ Rectangle {
 
                 Image {
                     id: coverImg
-
                     readonly property real dpr: Screen.devicePixelRatio > 0
                                                     ? Screen.devicePixelRatio : 1
-                    readonly property int decodeSize: Math.ceil(46 * dpr)
-
+                    readonly property int decodeSize: Math.ceil(48 * dpr)
                     anchors.fill: parent
                     source: bar.sCover ? library.toFileUrl(bar.sCover) + "?v=" + library.coverVersion : ""
                     sourceSize.width: decodeSize
@@ -128,10 +126,9 @@ Rectangle {
                     anchors.fill: parent
                     visible: false
                     layer.enabled: true
-
                     Rectangle {
                         anchors.fill: parent
-                        radius: 11
+                        radius: 10
                         color: "white"
                     }
                 }
@@ -146,7 +143,7 @@ Rectangle {
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 11
+                    radius: 10
                     color: "#000"
                     opacity: hovCover.containsMouse ? 0.45 : 0
                     Behavior on opacity { NumberAnimation { duration: 180 } }
@@ -204,18 +201,199 @@ Rectangle {
                     elide: Text.ElideRight
                 }
             }
+        }
+
+        Item {
+            id: progArea
+            Layout.fillWidth: true
+            Layout.minimumWidth: 160
+            Layout.fillHeight: true
+
+            Canvas {
+                id: progressBar
+                anchors.fill: parent
+                anchors.bottomMargin: 14
+                property real progress: library.duration > 0 ? library.position / library.duration : 0
+                property real wavePhase: 0
+                property bool hovering: progHover.hovered || progMouse.pressed
+
+                property real lineW: 3
+                property real maxAmp: 3
+                property real phH: 12
+                property real phW: 4
+
+                onProgressChanged: requestPaint()
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+                onLineWChanged: requestPaint()
+                onMaxAmpChanged: requestPaint()
+                onPhHChanged: requestPaint()
+                onPhWChanged: requestPaint()
+
+                onHoveringChanged: {
+                    lineWAnim.to  = hovering ? 4 : 3
+                    maxAmpAnim.to = hovering ? 4 : 3
+                    phHAnim.to    = hovering ? 16 : 12
+                    phWAnim.to    = hovering ? 6 : 4
+                    lineWAnim.restart()
+                    maxAmpAnim.restart()
+                    phHAnim.restart()
+                    phWAnim.restart()
+                }
+
+                NumberAnimation { id: lineWAnim;  target: progressBar; property: "lineW";  duration: 180; easing.type: Easing.OutCubic }
+                NumberAnimation { id: maxAmpAnim; target: progressBar; property: "maxAmp"; duration: 180; easing.type: Easing.OutCubic }
+                NumberAnimation { id: phHAnim;    target: progressBar; property: "phH";    duration: 180; easing.type: Easing.OutCubic }
+                NumberAnimation { id: phWAnim;    target: progressBar; property: "phW";    duration: 180; easing.type: Easing.OutCubic }
+
+                Timer {
+                    interval: 50
+                    running: library.isPlaying
+                    repeat: true
+                    onTriggered: {
+                        progressBar.wavePhase += 0.12
+                        progressBar.requestPaint()
+                    }
+                }
+
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.reset()
+                    var cy = height / 2
+                    var waveLen = 30
+
+                    ctx.beginPath()
+                    ctx.strokeStyle = theme.surfaceVariant
+                    ctx.lineWidth = progressBar.lineW
+                    ctx.lineCap = "round"
+                    ctx.moveTo(0, cy)
+                    ctx.lineTo(width, cy)
+                    ctx.stroke()
+
+                    if (progress > 0) {
+                        var endX = width * progress
+                        var steps = Math.max(30, Math.floor(endX / 2))
+
+                        ctx.beginPath()
+                        ctx.strokeStyle = theme.primary
+                        ctx.lineWidth = progressBar.lineW
+                        ctx.lineCap = "round"
+
+                        for (var i = 0; i <= steps; i++) {
+                            var x = (i / steps) * endX
+                            var fadeIn = Math.min(1, x / 30)
+                            var wave = Math.sin(x / waveLen * Math.PI * 2 + wavePhase) * progressBar.maxAmp * fadeIn
+                            var y = cy + wave
+                            if (i === 0) ctx.moveTo(x, y)
+                            else ctx.lineTo(x, y)
+                        }
+                        ctx.stroke()
+
+                        var phX = endX - progressBar.phW / 2 + 2
+                        if (phX < 5) phX = 5
+                        var phY = cy - progressBar.phH / 2
+                        var phR = progressBar.phW / 2
+                        ctx.beginPath()
+                        ctx.fillStyle = theme.primary
+                        ctx.moveTo(phX + phR, phY)
+                        ctx.lineTo(phX + progressBar.phW - phR, phY)
+                        ctx.arcTo(phX + progressBar.phW, phY, phX + progressBar.phW, phY + phR, phR)
+                        ctx.lineTo(phX + progressBar.phW, phY + progressBar.phH - phR)
+                        ctx.arcTo(phX + progressBar.phW, phY + progressBar.phH, phX + progressBar.phW - phR, phY + progressBar.phH, phR)
+                        ctx.lineTo(phX + phR, phY + progressBar.phH)
+                        ctx.arcTo(phX, phY + progressBar.phH, phX, phY + progressBar.phH - phR, phR)
+                        ctx.lineTo(phX, phY + phR)
+                        ctx.arcTo(phX, phY, phX + phR, phY, phR)
+                        ctx.closePath()
+                        ctx.fill()
+                    }
+
+                    var smH = 12
+                    var smW = 4
+                    var smX = 0
+                    var smY = cy - smH / 2
+                    var smR = smW / 2
+                    ctx.beginPath()
+                    ctx.fillStyle = theme.primary
+                    ctx.moveTo(smX + smR, smY)
+                    ctx.lineTo(smX + smW - smR, smY)
+                    ctx.arcTo(smX + smW, smY, smX + smW, smY + smR, smR)
+                    ctx.lineTo(smX + smW, smY + smH - smR)
+                    ctx.arcTo(smX + smW, smY + smH, smX + smW - smR, smY + smH, smR)
+                    ctx.lineTo(smX + smR, smY + smH)
+                    ctx.arcTo(smX, smY + smH, smX, smY + smH - smR, smR)
+                    ctx.lineTo(smX, smY + smR)
+                    ctx.arcTo(smX, smY, smX + smR, smY, smR)
+                    ctx.closePath()
+                    ctx.fill()
+                }
+            }
+
+            RowLayout {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 12
+
+                Text {
+                    text: library.formatDuration(library.position)
+                    color: theme.outline
+                    font.pixelSize: 10
+                    font.family: "monospace"
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Text {
+                    text: library.formatDuration(library.duration)
+                    color: theme.outline
+                    font.pixelSize: 10
+                    font.family: "monospace"
+                }
+            }
+
+            HoverHandler {
+                id: progHover
+                cursorShape: Qt.PointingHandCursor
+            }
+
+            MouseArea {
+                id: progMouse
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 14
+                cursorShape: Qt.PointingHandCursor
+                onClicked: (mouse) => {
+                    if (library.duration > 0)
+                        library.seek(library.duration * mouse.x / width)
+                }
+                onPositionChanged: (mouse) => {
+                    if (pressed && library.duration > 0)
+                        library.seek(library.duration * mouse.x / width)
+                }
+            }
+        }
+
+        RowLayout {
+            Layout.preferredWidth: 200
+            Layout.minimumWidth: 200
+            Layout.maximumWidth: 220
+            Layout.fillHeight: true
+            spacing: 4
 
             Item {
-                Layout.preferredWidth: 28
-                Layout.preferredHeight: 28
+                id: likeBtn
+                Layout.preferredWidth: 26
+                Layout.preferredHeight: 26
                 Layout.alignment: Qt.AlignVCenter
                 visible: library.hasCurrent
 
                 Item {
-                    id: heartIconWrap
                     anchors.fill: parent
                     opacity: bar.currentLiked ? 1.0 : 0.45
-                    scale: hovLike.pressed ? 0.8 : (hovLike.containsMouse ? 1.15 : 1.0)
+                    scale: likeHov.pressed ? 0.8 : (likeHov.containsMouse ? 1.15 : 1.0)
 
                     Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
                     Behavior on scale {
@@ -237,194 +415,38 @@ Rectangle {
                 }
 
                 MouseArea {
-                    id: hovLike
+                    id: likeHov
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: bar.likeClicked()
                 }
-
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottom: parent.top
-                    anchors.bottomMargin: 4
-                    width: likeTipTxt.implicitWidth + 16
-                    height: 24
-                    radius: 8
-                    color: theme.surface
-                    border.color: theme.outline
-                    border.width: 1
-                    opacity: hovLike.containsMouse ? 1 : 0
-                    visible: opacity > 0
-                    z: 9999
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                    Text {
-                        id: likeTipTxt
-                        anchors.centerIn: parent
-                        text: bar.currentLiked ? "Remove from Liked (Ctrl+W)" : "Add to Liked (Ctrl+W)"
-                        color: theme.onSurface
-                        font.pixelSize: 11
-                        font.weight: Font.Medium
-                    }
-                }
             }
-        }
-
-        Item {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-
-            Item {
-                id: progArea
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                height: 22
-
-                readonly property real progress: library.duration > 0
-                                                 ? library.position / library.duration
-                                                 : 0
-
-                readonly property bool hovering: progHover.hovered || progMouse.pressed
-
-                readonly property int barWidth: 2
-                readonly property int barSpacing: 1
-
-                Rectangle {
-                    id: progressBar
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    height: progArea.hovering ? 8 : 5
-                    radius: height / 2
-                    color: theme.surfaceVariant
-                    Behavior on height { NumberAnimation { duration: 180 } }
-
-                    Rectangle {
-                        width: parent.width * progArea.progress
-                        height: parent.height
-                        radius: parent.radius
-                        color: theme.primary
-                    }
-                }
-
-                Rectangle {
-                    id: progDot
-                    readonly property bool paused: library.hasCurrent
-                                                   && !library.isPlaying
-                                                   && library.position > 0
-
-                    width: progArea.hovering ? 14 : (paused ? 10 : 0)
-                    height: width
-                    radius: width / 2
-                    color: theme.primary
-                    x: progressBar.x + progressBar.width * progArea.progress - width / 2
-                    y: progressBar.y + progressBar.height / 2 - height / 2
-
-                    Behavior on width {
-                        NumberAnimation {
-                            duration: 260
-                            easing.type: Easing.OutBack
-                            easing.overshoot: 2.0
-                        }
-                    }
-
-                    SequentialAnimation on scale {
-                        running: progDot.paused && !progArea.hovering
-                        loops: Animation.Infinite
-
-                        NumberAnimation {
-                            to: 1.25
-                            duration: 900
-                            easing.type: Easing.InOutSine
-                        }
-                        NumberAnimation {
-                            to: 0.85
-                            duration: 900
-                            easing.type: Easing.InOutSine
-                        }
-                    }
-
-                    Behavior on scale {
-                        enabled: !(progDot.paused && !progArea.hovering)
-                        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-                    }
-                }
-
-                HoverHandler {
-                    id: progHover
-                    cursorShape: Qt.PointingHandCursor
-                }
-
-                MouseArea {
-                    id: progMouse
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: (mouse) => {
-                        if (library.duration > 0)
-                            library.seek(library.duration * mouse.x / width)
-                    }
-                    onPositionChanged: (mouse) => {
-                        if (pressed && library.duration > 0)
-                            library.seek(library.duration * mouse.x / width)
-                    }
-                }
-            }
-
-            RowLayout {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: progArea.bottom
-                anchors.topMargin: 3
-                spacing: 8
-
-                Text {
-                    text: library.formatDuration(library.position)
-                    color: theme.outline
-                    font.pixelSize: 10
-                    font.family: "monospace"
-                }
-
-                Item { Layout.fillWidth: true }
-
-                Text {
-                    text: library.formatDuration(library.duration)
-                    color: theme.outline
-                    font.pixelSize: 10
-                    font.family: "monospace"
-                }
-            }
-        }
-
-        RowLayout {
-            Layout.preferredWidth: 210
-            Layout.minimumWidth: 210
-            Layout.maximumWidth: 210
-            Layout.fillHeight: true
-            spacing: 6
 
             Rectangle {
-                Layout.preferredWidth: 38
-                Layout.preferredHeight: 38
+                Layout.preferredWidth: 34
+                Layout.preferredHeight: 34
                 Layout.alignment: Qt.AlignVCenter
-                radius: 19
-                color: theme.surfaceVariant
+                radius: 17
+                color: hovPrev.containsMouse
+                    ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.16)
+                    : "transparent"
+                Behavior on color { ColorAnimation { duration: 180 } }
 
-                MaterialIcon {
-                    anchors.centerIn: parent
-                    glyph: "\ue045"
-                    iconSize: 20
-                    iconColor: theme.onSurface
-                }
-
-                scale: hovPrev.pressed ? 0.9 : (hovPrev.containsMouse ? 1.06 : 1.0)
+                scale: hovPrev.pressed ? 0.9 : 1.0
                 Behavior on scale {
                     NumberAnimation {
                         duration: 180
                         easing.type: Easing.OutBack
                         easing.overshoot: 3.0
                     }
+                }
+
+                MaterialIcon {
+                    anchors.centerIn: parent
+                    glyph: "\ue045"
+                    iconSize: 18
+                    iconColor: theme.onSurface
                 }
 
                 MouseArea {
@@ -437,13 +459,13 @@ Rectangle {
             }
 
             Rectangle {
-                Layout.preferredWidth: 46
-                Layout.preferredHeight: 46
+                Layout.preferredWidth: 44
+                Layout.preferredHeight: 44
                 Layout.alignment: Qt.AlignVCenter
-                radius: 23
+                radius: 14
                 color: theme.primary
 
-                scale: hovPlay.pressed ? 0.88 : (hovPlay.containsMouse ? 1.06 : 1.0)
+                scale: hovPlay.pressed ? 0.9 : (hovPlay.containsMouse ? 1.04 : 1.0)
                 Behavior on scale {
                     NumberAnimation {
                         duration: 220
@@ -460,7 +482,7 @@ Rectangle {
                     MaterialIcon {
                         anchors.centerIn: parent
                         glyph: "\ue037"
-                        iconSize: 24
+                        iconSize: 22
                         iconColor: theme.background
                         opacity: library.isPlaying ? 0 : 1
                         scale: library.isPlaying ? 0.6 : 1.0
@@ -477,7 +499,7 @@ Rectangle {
                     MaterialIcon {
                         anchors.centerIn: parent
                         glyph: "\ue034"
-                        iconSize: 24
+                        iconSize: 22
                         iconColor: theme.background
                         opacity: library.isPlaying ? 1 : 0
                         scale: library.isPlaying ? 1.0 : 0.6
@@ -502,26 +524,29 @@ Rectangle {
             }
 
             Rectangle {
-                Layout.preferredWidth: 38
-                Layout.preferredHeight: 38
+                Layout.preferredWidth: 34
+                Layout.preferredHeight: 34
                 Layout.alignment: Qt.AlignVCenter
-                radius: 19
-                color: theme.surfaceVariant
+                radius: 17
+                color: hovNext.containsMouse
+                    ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.16)
+                    : "transparent"
+                Behavior on color { ColorAnimation { duration: 180 } }
 
-                MaterialIcon {
-                    anchors.centerIn: parent
-                    glyph: "\ue044"
-                    iconSize: 20
-                    iconColor: theme.onSurface
-                }
-
-                scale: hovNext.pressed ? 0.9 : (hovNext.containsMouse ? 1.06 : 1.0)
+                scale: hovNext.pressed ? 0.9 : 1.0
                 Behavior on scale {
                     NumberAnimation {
                         duration: 180
                         easing.type: Easing.OutBack
                         easing.overshoot: 3.0
                     }
+                }
+
+                MaterialIcon {
+                    anchors.centerIn: parent
+                    glyph: "\ue044"
+                    iconSize: 18
+                    iconColor: theme.onSurface
                 }
 
                 MouseArea {
@@ -535,29 +560,32 @@ Rectangle {
 
             Rectangle {
                 id: repeatBtn
-                Layout.preferredWidth: 38
-                Layout.preferredHeight: 38
+                Layout.preferredWidth: 34
+                Layout.preferredHeight: 34
                 Layout.alignment: Qt.AlignVCenter
-                radius: 19
-                color: library.repeatMode > 0 ? theme.primary : theme.surfaceVariant
-
+                radius: 17
+                color: library.repeatMode > 0
+                    ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.18)
+                    : (hovRepeat.containsMouse
+                        ? Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.08)
+                        : "transparent")
                 Behavior on color { ColorAnimation { duration: 220 } }
 
-                MaterialIcon {
-                    anchors.centerIn: parent
-                    glyph: library.repeatMode === 2 ? "\ue041" : "\ue040"
-                    iconSize: 18
-                    iconColor: library.repeatMode > 0 ? theme.background : theme.onSurface
-                    Behavior on iconColor { ColorAnimation { duration: 220 } }
-                }
-
-                scale: hovRepeat.pressed ? 0.9 : (hovRepeat.containsMouse ? 1.06 : 1.0)
+                scale: hovRepeat.pressed ? 0.9 : 1.0
                 Behavior on scale {
                     NumberAnimation {
                         duration: 180
                         easing.type: Easing.OutBack
                         easing.overshoot: 3.0
                     }
+                }
+
+                MaterialIcon {
+                    anchors.centerIn: parent
+                    glyph: library.repeatMode === 2 ? "\ue041" : "\ue040"
+                    iconSize: 17
+                    iconColor: library.repeatMode > 0 ? theme.primary : theme.onSurface
+                    Behavior on iconColor { ColorAnimation { duration: 220 } }
                 }
 
                 MouseArea {
@@ -571,9 +599,9 @@ Rectangle {
         }
 
         RowLayout {
-            Layout.preferredWidth: 140
-            Layout.minimumWidth: 100
-            Layout.maximumWidth: 140
+            Layout.preferredWidth: 128
+            Layout.minimumWidth: 128
+            Layout.maximumWidth: 128
             Layout.fillHeight: true
             spacing: 8
 
@@ -619,8 +647,8 @@ Rectangle {
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: -14
-                    height: 14
+                    anchors.verticalCenterOffset: -13
+                    height: 12
                     spacing: volArea.barSpacing
                     clip: true
 
@@ -679,7 +707,7 @@ Rectangle {
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    height: volHover.hovered ? 8 : 5
+                    height: volHover.hovered ? 6 : 4
                     radius: height / 2
                     color: theme.surfaceVariant
                     Behavior on height { NumberAnimation { duration: 180 } }
@@ -693,7 +721,7 @@ Rectangle {
                 }
 
                 Rectangle {
-                    width: volHover.hovered || volMouse.pressed ? 12 : 0
+                    width: volHover.hovered || volMouse.pressed ? 10 : 0
                     height: width
                     radius: width / 2
                     color: theme.onSurface

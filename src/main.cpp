@@ -186,9 +186,17 @@ protected:
             if (k == Qt::Key_O) { QMetaObject::invokeMethod(m_root, "openFolderDialog", Qt::DirectConnection); return true; }
             if (k == Qt::Key_D) { QMetaObject::invokeMethod(m_root, "toggleLyrics",     Qt::DirectConnection); return true; }
             if (k == Qt::Key_Q) { QMetaObject::invokeMethod(m_root, "toggleInfoPanel",  Qt::DirectConnection); return true; }
+            if (k == Qt::Key_R) { QMetaObject::invokeMethod(m_root, "refreshLibrary",   Qt::DirectConnection); return true; }
             if (k == Qt::Key_1) { QMetaObject::invokeMethod(m_root, "goToHome",         Qt::DirectConnection); return true; }
             if (k == Qt::Key_2) { QMetaObject::invokeMethod(m_root, "goToArtists",      Qt::DirectConnection); return true; }
             if (k == Qt::Key_W) { QMetaObject::invokeMethod(m_root, "toggleCurrentLike",Qt::DirectConnection); return true; }
+            if (k == Qt::Key_R) {
+                if (auto *ctx = QQmlEngine::contextForObject(m_root)) {
+                    QObject *lib = ctx->contextProperty("library").value<QObject*>();
+                    if (lib) QMetaObject::invokeMethod(lib, "refreshLibrary", Qt::DirectConnection);
+                }
+                return true;
+            }
         }
 
         if (!(mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier))) {

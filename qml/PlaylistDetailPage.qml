@@ -39,7 +39,7 @@ Item {
 
         readonly property string suggestedName: {
             const s = String(page.playlistName || "playlist")
-            return s.replace(/[\\/:*?"<>|]/g, "_") + ".jpg"
+            return s.replace(/[\/:*?"<>|]/g, "_") + ".jpg"
         }
 
         onVisibleChanged: if (visible) currentFile = suggestedName
@@ -53,8 +53,8 @@ Item {
 
     component CoverBtn: Item {
         id: cb
-        width: 40
-        height: 30
+        width: 32
+        height: 28
 
         property string glyph: ""
         property string tip: ""
@@ -65,7 +65,7 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            radius: 9
+            radius: 8
             color: cb.confirming
                 ? Qt.rgba(0.75, 0.22, 0.17, 0.28)
                 : cb.active
@@ -155,12 +155,12 @@ Item {
 
     component CoverButtonsRow: Row {
         id: cbr
-        spacing: 6
+        spacing: 5
 
         Item {
             id: editGroup
             width: library.editMode ? innerRow.implicitWidth : 0
-            height: 30
+            height: 28
             clip: true
             Behavior on width {
                 NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
@@ -170,7 +170,7 @@ Item {
                 id: innerRow
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 6
+                spacing: 5
 
                 CoverBtn {
                     glyph: "\ue3f4"
@@ -199,14 +199,6 @@ Item {
                     visible: page.hasCover
                     onClicked: page.pendingRemoveCover = !page.pendingRemoveCover
                 }
-
-                Rectangle {
-                    width: 1
-                    height: 18
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: theme.outline
-                    opacity: 0.3
-                }
             }
         }
 
@@ -225,13 +217,13 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 28
+            Layout.preferredHeight: 30
             spacing: 10
 
             Rectangle {
-                Layout.preferredWidth: 26
-                Layout.preferredHeight: 26
-                radius: 8
+                Layout.preferredWidth: 30
+                Layout.preferredHeight: 30
+                radius: 9
                 color: backHov.containsMouse
                     ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.20)
                     : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06)
@@ -245,8 +237,8 @@ Item {
                 MaterialIcon {
                     anchors.centerIn: parent
                     glyph: "\ue5c4"
-                    iconSize: 15
-                    iconColor: "white"
+                    iconSize: 16
+                    iconColor: theme.onBackground
                     x: backHov.containsMouse ? -1 : 0
                     Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                 }
@@ -272,8 +264,8 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.topMargin: 6
-            Layout.bottomMargin: 4
+            Layout.topMargin: 8
+            Layout.bottomMargin: 6
             spacing: 14
 
             Item {
@@ -312,7 +304,7 @@ Item {
                     }
                     sourceSize.width: 220
                     sourceSize.height: 220
-                    fillMode: Image.PreserveAspectFit
+                    fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     cache: false
                     smooth: true
@@ -352,17 +344,13 @@ Item {
                 id: headerBlock
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignTop
-                Layout.preferredHeight: page.showCover
-                    ? (nameCol.implicitHeight + 10 + buttonsRow.height + 4)
-                    : Math.max(nameCol.implicitHeight, buttonsRow.height)
+                Layout.preferredHeight: Math.max(nameCol.implicitHeight, buttonsRow.height)
 
                 ColumnLayout {
                     id: nameCol
                     anchors.left: parent.left
                     anchors.top: parent.top
-                    width: page.showCover
-                        ? parent.width
-                        : Math.max(0, parent.width - buttonsRow.width - 12)
+                    width: Math.max(0, parent.width - buttonsRow.width - 12)
                     spacing: 2
 
                     Text {
@@ -389,10 +377,7 @@ Item {
                 CoverButtonsRow {
                     id: buttonsRow
                     x: headerBlock.width - width
-                    y: page.showCover
-                        ? (nameCol.implicitHeight + 10)
-                        : Math.round((nameCol.implicitHeight - height) / 2)
-                    Behavior on y { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                    y: 0
                 }
             }
         }
@@ -406,113 +391,230 @@ Item {
             opacity: 0.15
         }
 
-        ListView {
-            id: trackList
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            spacing: 2
-            boundsBehavior: Flickable.DragOverBounds
-            boundsMovement: Flickable.StopAtBounds
-            cacheBuffer: 300
-            reuseItems: false
-            model: library.playlistTracks
 
-            property int dragIndex: -1
-            property int dropIndex: -1
-            property real _bottomComp: 0
+            ListView {
+                id: trackList
+                anchors.fill: parent
+                clip: true
+                spacing: 2
+                boundsBehavior: Flickable.DragOverBounds
+                boundsMovement: Flickable.StopAtBounds
+                cacheBuffer: 2000
+                reuseItems: false
+                model: library.playlistTracks
 
-            bottomMargin: _bottomComp
+                property int  dragIndex: -1
+                property int  dropIndex: -1
+                property real lastViewportX: 0
+                property real lastViewportY: 0
+                property real _bottomComp: 0
 
-            NumberAnimation {
-                id: bottomCompAnim
-                target: trackList
-                property: "_bottomComp"
-                to: 0
-                duration: 320
-                easing.type: Easing.OutCubic
-            }
+                bottomMargin: _bottomComp
 
-            function removeWithSmoothScroll(removalFn) {
-                const yBefore = contentY
-                const hBefore = contentHeight
-                const stride  = 42 + spacing
-                const nearBot = (yBefore + height >= hBefore - stride - 0.5)
+                function computeDropFromCursor() {
+                    if (dragIndex < 0) return
+                    if (count === 0) { dropIndex = 0; return }
 
-                if (!nearBot) {
+                    const vy = Math.max(0, Math.min(height - 1, lastViewportY))
+                    const stride = 42 + spacing
+
+                    if (vy < 14) {
+                        const s = Math.floor((contentY - originY) / stride)
+                        dropIndex = Math.max(0, Math.min(count, s))
+                        return
+                    }
+                    if (vy > height - 14) {
+                        const s = Math.ceil((contentY - originY + height) / stride)
+                        dropIndex = Math.max(0, Math.min(count, s))
+                        return
+                    }
+
+                    const cpt = vy + contentY - originY
+                    const idx = Math.floor(cpt / stride)
+                    const ly = cpt - idx * stride
+                    let slot = (ly < 21) ? idx : idx + 1
+
+                    if (slot < 0) slot = 0
+                    if (slot > count) slot = count
+                    if (slot !== dropIndex) dropIndex = slot
+                }
+
+                function removeWithSmoothScroll(removalFn) {
+                    const stride = 42 + spacing
+                    const yBefore = contentY
+                    const hBefore = contentHeight
+                    const nearBot = (yBefore + height >= hBefore - stride - 0.5)
+
+                    if (!nearBot) {
+                        removalFn()
+                        return
+                    }
+
+                    bottomCompAnim.stop()
+                    scrollCompAnim.stop()
+
+                    trackList._bottomComp = trackList._bottomComp + stride
                     removalFn()
-                    return
+
+                    const targetY = Math.max(0, hBefore - stride - height)
+
+                    if (Math.abs(trackList.contentY - targetY) > 0.5) {
+                        scrollCompAnim.from = trackList.contentY
+                        scrollCompAnim.to = targetY
+                        scrollCompAnim.start()
+                    }
+
+                    bottomCompAnim.from = trackList._bottomComp
+                    bottomCompAnim.to   = 0
+                    bottomCompAnim.restart()
                 }
 
-                bottomCompAnim.stop()
-                trackList._bottomComp = trackList._bottomComp + stride
+                NumberAnimation {
+                    id: bottomCompAnim
+                    target: trackList
+                    property: "_bottomComp"
+                    to: 0
+                    duration: 320
+                    easing.type: Easing.OutCubic
+                }
 
-                removalFn()
+                NumberAnimation {
+                    id: scrollCompAnim
+                    target: trackList
+                    property: "contentY"
+                    duration: 320
+                    easing.type: Easing.OutCubic
+                }
 
-                bottomCompAnim.from = trackList._bottomComp
-                bottomCompAnim.to   = 0
-                bottomCompAnim.restart()
-            }
+                onContentYChanged: {
+                    if (dragIndex >= 0) computeDropFromCursor()
+                }
 
-            NumberAnimation {
-                id: trackWheel
-                target: trackList
-                property: "contentY"
-                duration: 260
-                easing.type: Easing.OutCubic
-            }
+                NumberAnimation {
+                    id: trackWheel
+                    target: trackList
+                    property: "contentY"
+                    duration: 260
+                    easing.type: Easing.OutCubic
+                }
 
-            WheelHandler {
-                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                blocking: true
-                onWheel: (event) => {
-                    const maxY = Math.max(0, trackList.contentHeight - trackList.height)
-                    let dy = 0
-                    if (Math.abs(event.pixelDelta.y) > 0) dy = event.pixelDelta.y * 3.5
-                    else dy = (event.angleDelta.y / 120.0) * 140
-                    const currentTarget = trackWheel.running ? trackWheel.to : trackList.contentY
-                    const target = Math.max(0, Math.min(maxY, currentTarget - dy))
-                    trackWheel.stop()
-                    trackWheel.from = trackList.contentY
-                    trackWheel.to = target
-                    trackWheel.duration = Math.min(550, Math.max(240, Math.abs(target - trackList.contentY) * 1.2))
-                    trackWheel.start()
-                    event.accepted = true
+                WheelHandler {
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    blocking: true
+                    onWheel: (event) => {
+                        let dy = 0
+                        if (Math.abs(event.pixelDelta.y) > 0) dy = event.pixelDelta.y * 3.5
+                        else dy = (event.angleDelta.y / 120.0) * 140
+
+                        const maxY = Math.max(0, trackList.originY + trackList.contentHeight - trackList.height)
+                        const minY = trackList.originY
+
+                        if (trackList.contentY > maxY) trackList.contentY = maxY
+                        if (trackList.contentY < minY) trackList.contentY = minY
+
+                        const currentTarget = trackWheel.running ? trackWheel.to : trackList.contentY
+                        let target = currentTarget - dy
+                        if (target > maxY) target = maxY
+                        if (target < minY) target = minY
+
+                        if (Math.abs(target - trackList.contentY) < 0.5) {
+                            event.accepted = true
+                            return
+                        }
+
+                        trackWheel.stop()
+                        trackWheel.from = trackList.contentY
+                        trackWheel.to = target
+                        trackWheel.duration = Math.min(550, Math.max(240, Math.abs(target - trackList.contentY) * 1.2))
+                        trackWheel.start()
+                        event.accepted = true
+                    }
+                }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: library.filterText.length > 0
+                        ? "No matches"
+                        : "Empty playlist\nClick + on tracks in Home to add them"
+                    color: theme.outline
+                    opacity: 0.5
+                    font.pixelSize: 12
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: trackList.count === 0
+                }
+
+                add: Transition {
+                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 300; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "x"; from: -60; to: 0; duration: 360; easing.type: Easing.OutCubic }
+                }
+                remove: Transition {
+                    NumberAnimation { property: "opacity"; to: 0; duration: 320; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "x"; to: -60; duration: 360; easing.type: Easing.OutCubic }
+                }
+                displaced: Transition {
+                    NumberAnimation { properties: "x,y"; duration: 320; easing.type: Easing.OutCubic }
+                }
+                move: Transition {
+                    NumberAnimation { properties: "x,y"; duration: 320; easing.type: Easing.OutCubic }
+                }
+
+                delegate: PlaylistTrackRow {
+                    listView: trackList
+                    onActivated: page.playlistActivated()
+                    onTrackRemovalRequested: (removalFn) => {
+                        trackList.removeWithSmoothScroll(removalFn)
+                    }
                 }
             }
 
-            Text {
-                anchors.centerIn: parent
-                text: library.filterText.length > 0
-                    ? "No matches"
-                    : "Empty playlist\nClick + on tracks in Home to add them"
-                color: theme.outline
-                opacity: 0.5
-                font.pixelSize: 12
-                horizontalAlignment: Text.AlignHCenter
-                visible: trackList.count === 0
-            }
+            Rectangle {
+                id: dropOverlay
+                z: 300
+                x: 20
+                width: trackList.width - 40
+                height: 2
+                radius: 1
+                color: theme.primary
 
-            add: Transition {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 300; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "x"; from: -60; to: 0; duration: 360; easing.type: Easing.OutCubic }
-            }
-            remove: Transition {
-                NumberAnimation { property: "opacity"; to: 0; duration: 320; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "x"; to: -60; duration: 360; easing.type: Easing.OutCubic }
-            }
-            displaced: Transition {
-                NumberAnimation { properties: "x,y"; duration: 420; easing.type: Easing.OutCubic }
-            }
-            move: Transition {
-                NumberAnimation { properties: "x,y"; duration: 320; easing.type: Easing.OutCubic }
-            }
+                readonly property bool active: trackList.dragIndex >= 0 && trackList.dropIndex >= 0
+                readonly property real rawY: active
+                    ? trackList.dropIndex * (42 + trackList.spacing) - (trackList.contentY - trackList.originY) - 1
+                    : 0
 
-            delegate: PlaylistTrackRow {
-                listView: trackList
-                onActivated: page.playlistActivated()
-                onTrackRemovalRequested: (removalFn) => {
-                    trackList.removeWithSmoothScroll(removalFn)
+                property real lastY: 0
+                property bool yArmed: false
+
+                y: {
+                    if (!active) return lastY
+                    if (rawY < 0) return 0
+                    if (rawY > trackList.height - 2) return trackList.height - 2
+                    return rawY
+                }
+
+                onYChanged: if (active && yArmed) lastY = y
+
+                opacity: active ? 1 : 0
+
+                onActiveChanged: {
+                    if (active) {
+                        dropOverlay.yArmed = false
+                        Qt.callLater(function() {
+                            dropOverlay.lastY = dropOverlay.y
+                            dropOverlay.yArmed = true
+                        })
+                    } else {
+                        dropOverlay.yArmed = false
+                    }
+                }
+
+                Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                Behavior on y {
+                    enabled: dropOverlay.yArmed
+                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
                 }
             }
         }

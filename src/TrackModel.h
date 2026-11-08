@@ -70,6 +70,7 @@ public:
     Q_INVOKABLE QString titleAt(int index) const;
     Q_INVOKABLE QString artistAt(int index) const;
     Q_INVOKABLE QString thumbAt(int index) const;
+    Q_INVOKABLE void forceRelayout();
 
 signals:
     void countChanged();

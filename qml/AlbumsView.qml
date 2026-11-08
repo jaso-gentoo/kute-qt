@@ -17,6 +17,7 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
+            Layout.preferredHeight: 30
             spacing: 6
 
             Text {
@@ -30,20 +31,20 @@ Item {
 
             Rectangle {
                 id: sortChip
-                Layout.preferredWidth: sortRow.implicitWidth + 22
+                Layout.preferredWidth: sortRow.implicitWidth + 20
                 Layout.preferredHeight: 26
-                radius: 8
+                radius: 9
                 color: sortChipHov.containsMouse
                     ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.20)
                     : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06)
                 Behavior on color { ColorAnimation { duration: 200 } }
 
-                scale: sortChipHov.pressed ? 0.93 : (sortChipHov.containsMouse ? 1.05 : 1.0)
+                scale: sortChipHov.pressed ? 0.94 : 1.0
                 Behavior on scale {
                     NumberAnimation {
-                        duration: 220
+                        duration: 200
                         easing.type: Easing.OutBack
-                        easing.overshoot: 2.8
+                        easing.overshoot: 2.4
                     }
                 }
 
@@ -185,13 +186,14 @@ Item {
                 required property int index
 
                 width: list.width
-                height: 42
+                height: 46
                 radius: 10
                 color: "transparent"
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: parent.radius
+                    anchors.margins: 2
+                    radius: 10
                     color: theme.onSurface
                     opacity: hov.containsMouse ? 0.08 : 0
                     Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
@@ -201,15 +203,15 @@ Item {
                     anchors.fill: parent
                     anchors.leftMargin: 10
                     anchors.rightMargin: 10
-                    spacing: 10
+                    spacing: 12
 
                     Item {
-                        Layout.preferredWidth: 30
-                        Layout.preferredHeight: 30
+                        Layout.preferredWidth: 34
+                        Layout.preferredHeight: 34
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: 6
+                            radius: 8
                             color: theme.surfaceVariant
                             visible: !row.modelData.thumb || coverImg.status !== Image.Ready
                         }
@@ -217,7 +219,7 @@ Item {
                         MaterialIcon {
                             anchors.centerIn: parent
                             glyph: "\ue02b"
-                            iconSize: 14
+                            iconSize: 16
                             iconColor: theme.outline
                             opacity: 0.5
                             visible: !row.modelData.thumb || coverImg.status !== Image.Ready
@@ -229,9 +231,9 @@ Item {
                             source: row.modelData.thumb
                                 ? library.toFileUrl(row.modelData.thumb) + "?v=" + library.coverVersion
                                 : ""
-                            sourceSize.width: 60
-                            sourceSize.height: 60
-                            fillMode: Image.PreserveAspectFit
+                            sourceSize.width: 68
+                            sourceSize.height: 68
+                            fillMode: Image.PreserveAspectCrop
                             asynchronous: true
                             cache: true
                             smooth: true

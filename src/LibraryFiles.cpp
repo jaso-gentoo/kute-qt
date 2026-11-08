@@ -645,3 +645,105 @@ bool Library::saveTrackText(int index, const QString &content, bool isLrc) {
     }
     return writeTextToTags(t->path, content);
 }
+
+void Library::refreshLibrary() {
+    if (m_folder.isEmpty()) return;
+
+    emit refreshStarted();
+
+    const QString curPath = m_currentTrack.path;
+    const bool wasPlaying = isPlaying();
+    const qint64 curPos = m_player->position();
+    const bool wasCurrent = !curPath.isEmpty();
+
+    const QStringList filters = {
+        "*.mp3", "*.flac", "*.ogg", "*.opus",
+        "*.wav", "*.m4a", "*.aac"
+    };
+
+    QSet<QString> existingPaths;
+    existingPaths.reserve(m_allTracks.size());
+    for (const Track &t : m_allTracks) existingPaths.insert(t.path);
+
+    QSet<QString> foundPaths;
+    int addedCount = 0;
+
+    QDirIterator it(m_folder, filters, QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const QString filePath = it.next();
+        foundPaths.insert(filePath);
+        if (existingPaths.contains(filePath)) continue;
+
+        Track t;
+        t.path = filePath;
+        const QFileInfo info(filePath);
+        t.fileSize = info.size();
+        t.format = info.suffix().toUpper();
+
+        {
+            StderrSilencer silencer;
+            TagLib::FileRef f = makeFileRef(filePath);
+            if (!f.isNull() && f.tag()) {
+                TagLib::Tag *tag = f.tag();
+                const QString tagTitle  = QString::fromUtf8(tag->title().to8Bit(true).c_str());
+                const QString tagArtist = QString::fromUtf8(tag->artist().to8Bit(true).c_str());
+                const QString tagAlbum  = QString::fromUtf8(tag->album().to8Bit(true).c_str());
+                t.title  = tagTitle.isEmpty()  ? info.completeBaseName() : tagTitle.trimmed();
+                t.artist = tagArtist.isEmpty() ? "Unknown Artist" : tagArtist.trimmed();
+                t.album  = tagAlbum.isEmpty()  ? "Unknown Album"  : tagAlbum.trimmed();
+                t.year   = tag->year();
+                if (f.audioProperties()) {
+                    t.durationMs = f.audioProperties()->lengthInMilliseconds();
+                    t.bitrate    = f.audioProperties()->bitrate();
+                    t.sampleRate = f.audioProperties()->sampleRate();
+                    t.channels   = f.audioProperties()->channels();
+                }
+            } else {
+                t.title  = info.completeBaseName();
+                t.artist = "Unknown Artist";
+                t.album  = "Unknown Album";
+            }
+        }
+
+        extractImages(filePath, t.cover, t.thumb);
+        m_allTracks.append(t);
+        addedCount++;
+    }
+
+    int removedCount = 0;
+    bool currentRemoved = false;
+    for (int i = m_allTracks.size() - 1; i >= 0; --i) {
+        if (!foundPaths.contains(m_allTracks[i].path)) {
+            if (m_allTracks[i].path == curPath) currentRemoved = true;
+            m_allTracks.removeAt(i);
+            removedCount++;
+        }
+    }
+
+    rebuildArtists();
+    rebuildAlbums();
+
+    if (wasCurrent && currentRemoved) {
+        m_player->stop();
+        m_intentPlaying = false;
+        m_pendingPlay = false;
+        m_currentTrack = Track();
+        m_currentIndex = -1;
+        emit currentChanged();
+    }
+
+    sortAndApply(addedCount + removedCount <= 60);
+
+    if (wasCurrent && !currentRemoved) {
+        refreshCurrentIndexFromPath(curPath);
+        if (wasPlaying && !isPlaying()) {
+            restorePlayer(curPath, curPos, true);
+        }
+    }
+
+    if (!m_activePlaylistId.isEmpty()) rebuildPlaylistTracks();
+
+    emit trackCountChanged();
+    emit currentChanged();
+    emit refreshFinished();
+}

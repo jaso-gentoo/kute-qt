@@ -9,6 +9,7 @@ Item {
     signal trackActivated
 
     readonly property color tipText: theme.onBackground
+    readonly property bool filtered: library.filterArtist.length > 0 || library.filterAlbum.length > 0
 
     function openAddMenu(path, rightX, anchorContentY, btnHeight) {
         addMenu.open(path, rightX, anchorContentY, btnHeight, list)
@@ -17,286 +18,160 @@ Item {
     function closeSort()    { sortMenu.close() }
 
     function deleteCurrentLikedTrack() {
-        list.deleteCurrentLikedTrack()
+        const path = library.currentFilePath
+        if (path.length === 0) return
+        for (let i = 0; i < library.tracks.count; ++i) {
+            if (library.tracks.pathAt(i) === path) {
+                list.removeWithSmoothScroll(function() {
+                    library.toggleLikeByPath(path)
+                })
+                return
+            }
+        }
+        library.toggleCurrentLike()
     }
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 12
 
-        Item {
+        RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 34
+            Layout.preferredHeight: 42
+            spacing: 10
+            z: 100
 
-            RowLayout {
-                id: headerRow
-                anchors.fill: parent
-                spacing: 10
+            Rectangle {
+                Layout.preferredWidth: 36
+                Layout.preferredHeight: 36
+                Layout.alignment: Qt.AlignVCenter
+                radius: 11
+                color: Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.16)
+                Behavior on color { ColorAnimation { duration: 180 } }
 
-                Rectangle {
-                    visible: library.filterArtist.length > 0 || library.filterAlbum.length > 0
-                    Layout.preferredWidth: 26
-                    Layout.preferredHeight: 26
-                    Layout.alignment: Qt.AlignVCenter
-                    radius: 8
-                    color: Qt.rgba(1, 1, 1, backHov.containsMouse ? 0.20 : 0.10)
-                    Behavior on color { ColorAnimation { duration: 150 } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "\ue5c4"
-                        font.family: "Material Symbols Rounded"
-                        font.pixelSize: 16
-                        color: "white"
-                        renderType: Text.NativeRendering
-                        font.variableAxes: ({ "FILL": 0, "wght": 400, "GRAD": 0, "opsz": 24 })
-                        x: backHov.containsMouse ? -2 : 0
-                        Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                    }
-
-                    MouseArea {
-                        id: backHov
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            library.clearFilter()
-                            page.backRequested()
-                        }
+                scale: headerHov.pressed && page.filtered ? 0.92 : 1.0
+                Behavior on scale {
+                    NumberAnimation {
+                        duration: 150
+                        easing.type: Easing.OutBack
+                        easing.overshoot: 2.5
                     }
                 }
 
-                Text {
-                    visible: library.filterArtist.length > 0 || library.filterAlbum.length > 0
-                    Layout.alignment: Qt.AlignVCenter
-                    text: library.filterAlbum.length > 0
-                        ? library.filterAlbum.toUpperCase()
-                        : library.filterArtist.toUpperCase()
-                    color: theme.primary
-                    font.pixelSize: 10
-                    font.letterSpacing: 1.4
-                    elide: Text.ElideRight
-                    Layout.maximumWidth: 260
+                MaterialIcon {
+                    anchors.centerIn: parent
+                    glyph: page.filtered ? "\ue5c4" : "\ue8f7"
+                    iconSize: 19
+                    iconColor: theme.primary
+                    filled: !page.filtered
                 }
 
-                Item { Layout.fillWidth: true }
-
-                Item {
-                    id: reorderBtnSlot
-                    Layout.preferredWidth: (library.filterArtist === "" && library.filterAlbum === "") ? 30 : 0
-                    Layout.preferredHeight: 30
-                    Layout.alignment: Qt.AlignVCenter
-                    visible: library.filterArtist === "" && library.filterAlbum === ""
-                    opacity: (library.trackCount > 0
-                              && library.sortField === "custom"
-                              && !library.showOnlyLiked
-                              && library.filterText === "") ? 1 : 0
-                    scale: opacity
-                    Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-                    Behavior on scale {
-                        NumberAnimation { duration: 320; easing.type: Easing.OutBack; easing.overshoot: 1.8 }
-                    }
-
-                    Rectangle {
-                        id: reorderBtn
-                        anchors.fill: parent
-                        radius: 8
-                        color: "transparent"
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: parent.radius
-                            color: library.editMode ? theme.primary : theme.onSurface
-                            opacity: library.editMode ? 0.22 : (reorderHov.containsMouse ? 0.22 : 0.10)
-                            border.color: library.editMode ? theme.primary : "transparent"
-                            border.width: 1
-                            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                            Behavior on color { ColorAnimation { duration: 200 } }
-                        }
-
-                        MaterialIcon {
-                            anchors.centerIn: parent
-                            glyph: "\ue25d"
-                            iconSize: 18
-                            iconColor: library.editMode ? theme.primary : theme.onBackground
-                            scale: reorderHov.containsMouse ? 1.1 : 1.0
-                            Behavior on scale {
-                                NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 2.5 }
-                            }
-                        }
-
-                        MouseArea {
-                            id: reorderHov
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: library.toggleReorderMode()
-                        }
-                    }
-
-                    Rectangle {
-                        anchors.right: parent.right
-                        anchors.top: parent.bottom
-                        anchors.topMargin: 6
-                        width: reorderTipText.implicitWidth + 20
-                        height: 28
-                        radius: 8
-                        color: theme.surface
-                        border.color: theme.outline
-                        border.width: 1
-                        opacity: reorderHov.containsMouse ? 1 : 0
-                        visible: opacity > 0
-                        z: 9999
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                        Text {
-                            id: reorderTipText
-                            anchors.centerIn: parent
-                            text: library.editMode
-                                ? "Exit edit mode (Ctrl+Shift+E)"
-                                : "Edit mode (Ctrl+Shift+E)"
-                            color: page.tipText
-                            font.pixelSize: 11
-                            font.weight: Font.Medium
-                        }
-                    }
-                }
-
-                Item {
-                    id: sortBtnSlot
-                    Layout.preferredWidth: (library.filterArtist === "" && library.filterAlbum === "") ? 30 : 0
-                    Layout.preferredHeight: 30
-                    Layout.alignment: Qt.AlignVCenter
-                    visible: library.filterArtist === "" && library.filterAlbum === ""
-                    opacity: library.trackCount > 0 ? 1 : 0
-                    Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-
-                    Rectangle {
-                        id: sortBtn
-                        anchors.fill: parent
-                        radius: 8
-                        color: "transparent"
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: parent.radius
-                            color: sortMenu.shown ? theme.primary : theme.onSurface
-                            opacity: sortMenu.shown ? 0.22 : (sortHov.containsMouse ? 0.22 : 0.10)
-                            border.color: sortMenu.shown ? theme.primary : "transparent"
-                            border.width: 1
-                            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                            Behavior on color { ColorAnimation { duration: 200 } }
-                        }
-
-                        MaterialIcon {
-                            anchors.centerIn: parent
-                            glyph: "\ue8d5"
-                            iconSize: 18
-                            iconColor: sortMenu.shown ? theme.primary : theme.onBackground
-                            scale: sortHov.containsMouse ? 1.1 : 1.0
-                            Behavior on scale {
-                                NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 2.5 }
-                            }
-                        }
-
-                        MouseArea {
-                            id: sortHov
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (sortMenu.shown) sortMenu.close()
-                                else sortMenu.show(sortBtnSlot)
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        anchors.right: parent.right
-                        anchors.top: parent.bottom
-                        anchors.topMargin: 6
-                        width: sortTipText.implicitWidth + 20
-                        height: 28
-                        radius: 8
-                        color: theme.surface
-                        border.color: theme.outline
-                        border.width: 1
-                        opacity: sortHov.containsMouse && !sortMenu.shown ? 1 : 0
-                        visible: opacity > 0
-                        z: 9999
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                        Text {
-                            id: sortTipText
-                            anchors.centerIn: parent
-                            text: "Sort options"
-                            color: page.tipText
-                            font.pixelSize: 11
-                            font.weight: Font.Medium
-                        }
+                MouseArea {
+                    id: headerHov
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    enabled: page.filtered
+                    cursorShape: page.filtered ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: {
+                        library.clearFilter()
+                        page.backRequested()
                     }
                 }
             }
 
-            Row {
-                id: chipsRow
-                anchors.centerIn: parent
-                spacing: 8
-                z: 50
-                visible: library.filterArtist.length === 0
-                      && library.filterAlbum.length === 0
-                      && (library.trackCount > 0 || library.likedCount > 0 || library.showOnlyLiked)
+            ColumnLayout {
+                Layout.alignment: Qt.AlignVCenter
+                spacing: 0
 
-                Item {
+                Text {
+                    text: page.filtered
+                        ? (library.filterAlbum.length > 0 ? "Album" : "Artist")
+                        : "Library"
+                    color: theme.onBackground
+                    font.pixelSize: 15
+                    font.weight: Font.DemiBold
+                }
+
+                Text {
+                    text: page.filtered
+                        ? (library.filterAlbum.length > 0 ? library.filterAlbum : library.filterArtist)
+                        : (library.trackCount + (library.trackCount === 1 ? " track" : " tracks"))
+                    color: theme.outline
+                    font.pixelSize: 10
+                    elide: Text.ElideRight
+                    Layout.maximumWidth: 320
+                }
+            }
+
+            Item { Layout.preferredWidth: 8 }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignVCenter
+                visible: !page.filtered && (library.trackCount > 0 || library.likedCount > 0 || library.showOnlyLiked)
+                spacing: 6
+
+                Rectangle {
                     id: allChip
                     readonly property bool active: !library.showOnlyLiked
-                    width: allLabel.implicitWidth + 16
-                    height: 34
+                    property real chipW: allLabel.implicitWidth + 24
+                    Layout.preferredWidth: chipW
+                    Layout.preferredHeight: 30
+                    radius: 9
+                    Behavior on chipW {
+                        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                    }
+                    color: active
+                        ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.18)
+                        : (allHov.containsMouse
+                            ? Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.08)
+                            : "transparent")
+                    Behavior on color { ColorAnimation { duration: 180 } }
 
                     Text {
                         id: allLabel
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.verticalCenterOffset: -2
+                        anchors.centerIn: parent
                         text: "All"
                         color: allChip.active ? theme.primary : theme.onBackground
-                        opacity: allChip.active ? 1.0 : 0.6
-                        font.pixelSize: 12
+                        font.pixelSize: 11
                         font.weight: allChip.active ? Font.DemiBold : Font.Medium
                         Behavior on color { ColorAnimation { duration: 180 } }
-                        Behavior on opacity { NumberAnimation { duration: 180 } }
                     }
 
-                    Rectangle {
-                        anchors.bottom: parent.bottom
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        width: allChip.active ? allLabel.implicitWidth + 12 : 0
-                        height: 2
-                        radius: 1
-                        color: theme.primary
-                        Behavior on width { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+                    MouseArea {
+                        id: allHov
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: library.showOnlyLiked = false
                     }
-
-                    HoverHandler { cursorShape: Qt.PointingHandCursor }
-                    TapHandler { onTapped: library.showOnlyLiked = false }
                 }
 
-                Item {
+                Rectangle {
                     id: likedChip
                     readonly property bool active: library.showOnlyLiked
-                    width: likedTabRow.implicitWidth + 20
-                    height: 34
+                    property real chipW: likedRow.implicitWidth + 22
+                    Layout.preferredWidth: chipW
+                    Layout.preferredHeight: 30
+                    radius: 9
+                    Behavior on chipW {
+                        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                    }
+                    color: active
+                        ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.18)
+                        : (likedHov.containsMouse
+                            ? Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.08)
+                            : "transparent")
+                    Behavior on color { ColorAnimation { duration: 180 } }
 
                     Row {
-                        id: likedTabRow
+                        id: likedRow
                         anchors.centerIn: parent
-                        anchors.verticalCenterOffset: -2
-                        spacing: 7
+                        spacing: 5
 
                         MaterialIcon {
                             anchors.verticalCenter: parent.verticalCenter
                             glyph: "\ue87d"
-                            iconSize: 15
+                            iconSize: 13
                             filled: likedChip.active
                             iconColor: likedChip.active ? theme.primary : theme.outline
                             Behavior on iconColor { ColorAnimation { duration: 180 } }
@@ -306,26 +181,156 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             text: "Liked"
                             color: likedChip.active ? theme.primary : theme.onBackground
-                            opacity: likedChip.active ? 1.0 : 0.6
-                            font.pixelSize: 12
+                            font.pixelSize: 11
                             font.weight: likedChip.active ? Font.DemiBold : Font.Medium
                             Behavior on color { ColorAnimation { duration: 180 } }
-                            Behavior on opacity { NumberAnimation { duration: 180 } }
                         }
                     }
 
-                    Rectangle {
-                        anchors.bottom: parent.bottom
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        width: likedChip.active ? likedTabRow.implicitWidth + 12 : 0
-                        height: 2
-                        radius: 1
-                        color: theme.primary
-                        Behavior on width { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+                    MouseArea {
+                        id: likedHov
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: library.showOnlyLiked = true
+                    }
+                }
+            }
+
+            Item { Layout.fillWidth: true }
+
+            Item {
+                id: reorderBtnSlot
+                readonly property bool reorderAvailable: library.trackCount > 0
+                    && library.sortField === "custom"
+                    && !library.showOnlyLiked
+                    && library.filterText === ""
+                    && library.filterArtist === ""
+                    && library.filterAlbum === ""
+
+                Layout.preferredWidth: reorderAvailable ? 32 : 0
+                Layout.preferredHeight: 32
+                Layout.alignment: Qt.AlignVCenter
+                visible: Layout.preferredWidth > 0.5
+                opacity: reorderAvailable ? 1 : 0
+                Behavior on Layout.preferredWidth { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+
+                Rectangle {
+                    id: reorderBtn
+                    anchors.fill: parent
+                    radius: 10
+                    color: library.editMode
+                        ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.22)
+                        : (reorderHov.containsMouse
+                            ? Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.10)
+                            : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.05))
+                    Behavior on color { ColorAnimation { duration: 180 } }
+
+                    MaterialIcon {
+                        anchors.centerIn: parent
+                        glyph: "\ue25d"
+                        iconSize: 16
+                        iconColor: library.editMode ? theme.primary : theme.onBackground
                     }
 
-                    HoverHandler { cursorShape: Qt.PointingHandCursor }
-                    TapHandler { onTapped: library.showOnlyLiked = true }
+                    MouseArea {
+                        id: reorderHov
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: library.toggleReorderMode()
+                    }
+                }
+
+                Rectangle {
+                    anchors.right: parent.right
+                    anchors.top: parent.bottom
+                    anchors.topMargin: 6
+                    width: reorderTipText.implicitWidth + 20
+                    height: 26
+                    radius: 8
+                    color: Qt.rgba(theme.surface.r, theme.surface.g, theme.surface.b, 1.0)
+                    border.color: theme.outline
+                    border.width: 1
+                    opacity: reorderHov.containsMouse ? 1 : 0
+                    visible: opacity > 0
+                    z: 9999
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                    Text {
+                        id: reorderTipText
+                        anchors.centerIn: parent
+                        text: library.editMode ? "Exit edit mode" : "Edit mode"
+                        color: page.tipText
+                        font.pixelSize: 10
+                        font.weight: Font.Medium
+                    }
+                }
+            }
+
+            Item {
+                id: sortBtnSlot
+                readonly property bool shown: library.filterArtist === "" && library.filterAlbum === "" && library.trackCount > 0
+                Layout.preferredWidth: shown ? 32 : 0
+                Layout.preferredHeight: 32
+                Layout.alignment: Qt.AlignVCenter
+                visible: Layout.preferredWidth > 0.5
+                Behavior on Layout.preferredWidth { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+
+                Rectangle {
+                    id: sortBtn
+                    anchors.fill: parent
+                    radius: 10
+                    color: sortMenu.shown
+                        ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.22)
+                        : (sortHov.containsMouse
+                            ? Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.10)
+                            : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.05))
+                    Behavior on color { ColorAnimation { duration: 180 } }
+
+                    MaterialIcon {
+                        anchors.centerIn: parent
+                        glyph: "\ue8d5"
+                        iconSize: 16
+                        iconColor: sortMenu.shown ? theme.primary : theme.onBackground
+                    }
+
+                    MouseArea {
+                        id: sortHov
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (sortMenu.shown) sortMenu.close()
+                            else sortMenu.show(sortBtnSlot)
+                        }
+                    }
+                }
+
+                Rectangle {
+                    anchors.right: parent.right
+                    anchors.top: parent.bottom
+                    anchors.topMargin: 6
+                    width: sortTipText.implicitWidth + 20
+                    height: 26
+                    radius: 8
+                    color: Qt.rgba(theme.surface.r, theme.surface.g, theme.surface.b, 1.0)
+                    border.color: theme.outline
+                    border.width: 1
+                    opacity: sortHov.containsMouse && !sortMenu.shown ? 1 : 0
+                    visible: opacity > 0
+                    z: 9999
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                    Text {
+                        id: sortTipText
+                        anchors.centerIn: parent
+                        text: "Sort options"
+                        color: page.tipText
+                        font.pixelSize: 10
+                        font.weight: Font.Medium
+                    }
                 }
             }
         }
@@ -352,7 +357,7 @@ Item {
                     Layout.alignment: Qt.AlignHCenter
                     text: library.showOnlyLiked ? "No liked tracks" : "No library"
                     color: theme.onSurface
-                    font.pixelSize: 16
+                    font.pixelSize: 15
                     font.weight: Font.Medium
                 }
 
@@ -364,204 +369,299 @@ Item {
                             : "Nothing matches the current filters")
                         : "Press Ctrl+O to select a folder"
                     color: theme.outline
-                    font.pixelSize: 12
+                    font.pixelSize: 11
                     horizontalAlignment: Text.AlignHCenter
                 }
             }
         }
 
-        ListView {
-            id: list
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: library.trackCount > 0
             clip: true
-            spacing: 2
-            boundsBehavior: Flickable.DragOverBounds
-            boundsMovement: Flickable.StopAtBounds
-            cacheBuffer: 200
-            reuseItems: false
-            flickDeceleration: 500
-            maximumFlickVelocity: 8000
 
-            property int  dragIndex: -1
-            property int  dropIndex: -1
-            property real lastMouseY: 0
-            property real _bottomComp: 0
+            ListView {
+                id: list
+                anchors.fill: parent
+                clip: true
+                spacing: 2
+                boundsBehavior: Flickable.DragOverBounds
+                boundsMovement: Flickable.StopAtBounds
+                cacheBuffer: 2000
+                reuseItems: false
+                interactive: !library.editMode
+                flickDeceleration: 500
+                maximumFlickVelocity: 8000
 
-            model: library.tracks
+                property int  dragIndex: -1
+                property int  dropIndex: -1
+                property real lastViewportX: 0
+                property real lastViewportY: 0
+                property real _bottomComp: 0
 
-            bottomMargin: _bottomComp
+                bottomMargin: _bottomComp
 
-            NumberAnimation {
-                id: bottomCompAnim
-                target: list
-                property: "_bottomComp"
-                to: 0
-                duration: 320
-                easing.type: Easing.OutCubic
-            }
+                function computeDropFromCursor() {
+                    if (dragIndex < 0) return
+                    if (count === 0) { dropIndex = 0; return }
 
-            function removeWithSmoothScroll(removalFn) {
-                const yBefore = contentY
-                const hBefore = contentHeight
-                const stride  = 42 + spacing
-                const nearBot = (yBefore + height >= hBefore - stride - 0.5)
+                    const vy = Math.max(0, Math.min(height - 1, lastViewportY))
+                    const stride = 42 + spacing
 
-                if (!nearBot) {
-                    removalFn()
-                    return
-                }
-
-                bottomCompAnim.stop()
-                list._bottomComp = list._bottomComp + stride
-
-                removalFn()
-
-                bottomCompAnim.from = list._bottomComp
-                bottomCompAnim.to   = 0
-                bottomCompAnim.restart()
-            }
-
-            function deleteCurrentLikedTrack() {
-                const path = library.currentFilePath
-                if (path.length === 0) return
-                for (let i = 0; i < library.tracks.count; ++i) {
-                    if (library.tracks.pathAt(i) === path) {
-                        removeWithSmoothScroll(function() {
-                            library.toggleLikeByPath(path)
-                        })
+                    if (vy < 14) {
+                        const s = Math.floor((contentY - originY) / stride)
+                        dropIndex = Math.max(0, Math.min(count, s))
                         return
                     }
-                }
-            }
-
-            ScrollBar.vertical: ScrollBar {
-                id: vbar
-                policy: ScrollBar.AsNeeded
-                width: 10
-                contentItem: Rectangle {
-                    implicitWidth: 5
-                    radius: 2.5
-                    color: theme.outline
-                    opacity: vbar.pressed ? 0.8 : (vbar.hovered ? 0.55 : 0.3)
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                }
-                background: Item {}
-            }
-
-            function resetScrollAndFade() {
-                list.opacity = 0
-                Qt.callLater(function() {
-                    list.contentY = 0
-                    list.positionViewAtBeginning()
-                    list.forceLayout()
-                    listFadeIn.restart()
-                })
-            }
-
-            Connections {
-                target: library
-                function onSortChanged() { list.resetScrollAndFade() }
-                function onShowOnlyLikedChanged() { list.resetScrollAndFade() }
-                function onFilterTextChanged() { list.resetScrollAndFade() }
-                function onFilterArtistChanged() { list.resetScrollAndFade() }
-                function onFilterAlbumChanged() { list.resetScrollAndFade() }
-            }
-
-            NumberAnimation {
-                id: listFadeIn
-                target: list
-                property: "opacity"
-                to: 1
-                duration: 260
-                easing.type: Easing.OutCubic
-            }
-
-            NumberAnimation {
-                id: wheelAnim
-                target: list
-                property: "contentY"
-                duration: 260
-                easing.type: Easing.OutCubic
-            }
-
-            WheelHandler {
-                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                blocking: true
-                onWheel: (event) => {
-                    const maxY = Math.max(0, list.contentHeight - list.height)
-                    let dy = 0
-                    if (Math.abs(event.pixelDelta.y) > 0) dy = event.pixelDelta.y * 3.5
-                    else dy = (event.angleDelta.y / 120.0) * 140
-                    const currentTarget = wheelAnim.running ? wheelAnim.to : list.contentY
-                    const target = Math.max(0, Math.min(maxY, currentTarget - dy))
-                    wheelAnim.stop()
-                    wheelAnim.from = list.contentY
-                    wheelAnim.to = target
-                    wheelAnim.duration = Math.min(550, Math.max(240, Math.abs(target - list.contentY) * 1.2))
-                    wheelAnim.start()
-                    event.accepted = true
-                }
-            }
-
-            Timer {
-                id: autoScrollTimer
-                interval: 16
-                repeat: true
-                running: false
-
-                onTriggered: {
-                    const edge = 70
-                    const maxSpeed = 16
-                    let step = 0
-                    if (list.lastMouseY < edge) {
-                        step = -(maxSpeed * (1 - list.lastMouseY / edge))
-                    } else if (list.lastMouseY > list.height - edge) {
-                        step = maxSpeed * (1 - (list.height - list.lastMouseY) / edge)
+                    if (vy > height - 14) {
+                        const s = Math.ceil((contentY - originY + height) / stride)
+                        dropIndex = Math.max(0, Math.min(count, s))
+                        return
                     }
-                    if (Math.abs(step) > 0.5) {
-                        const maxY = Math.max(0, list.contentHeight - list.height)
-                        const target = Math.max(0, Math.min(maxY, list.contentY + step))
-                        list.contentY = target
-                        if (list.dragIndex >= 0) {
-                            const contentY = list.lastMouseY + list.contentY
-                            const stride = 42 + list.spacing
-                            let idx = Math.floor(contentY / stride)
-                            idx = Math.max(0, Math.min(library.tracks.count - 1, idx))
-                            if (idx !== list.dropIndex) list.dropIndex = idx
+
+                    const cpt = vy + contentY - originY
+                    const idx = Math.floor(cpt / stride)
+                    const ly = cpt - idx * stride
+                    let slot = (ly < 21) ? idx : idx + 1
+
+                    if (slot < 0) slot = 0
+                    if (slot > count) slot = count
+                    if (slot !== dropIndex) dropIndex = slot
+                }
+
+                function removeWithSmoothScroll(removalFn) {
+                    const stride = 42 + spacing
+                    const yBefore = contentY
+                    const hBefore = contentHeight
+                    const nearBot = (yBefore + height >= hBefore - stride - 0.5)
+
+                    if (!nearBot) { removalFn(); return }
+
+                    bottomCompAnim.stop()
+                    scrollCompAnim.stop()
+
+                    list._bottomComp = list._bottomComp + stride
+                    removalFn()
+
+                    const targetY = Math.max(0, hBefore - stride - height)
+
+                    if (Math.abs(list.contentY - targetY) > 0.5) {
+                        scrollCompAnim.from = list.contentY
+                        scrollCompAnim.to = targetY
+                        scrollCompAnim.start()
+                    }
+
+                    bottomCompAnim.from = list._bottomComp
+                    bottomCompAnim.to   = 0
+                    bottomCompAnim.restart()
+                }
+
+                NumberAnimation {
+                    id: bottomCompAnim
+                    target: list
+                    property: "_bottomComp"
+                    to: 0
+                    duration: 320
+                    easing.type: Easing.OutCubic
+                }
+
+                NumberAnimation {
+                    id: scrollCompAnim
+                    target: list
+                    property: "contentY"
+                    duration: 320
+                    easing.type: Easing.OutCubic
+                }
+
+                onContentYChanged: {
+                    if (dragIndex >= 0) computeDropFromCursor()
+                    if (dropOverlay && dropOverlay.active) {
+                        dropOverlay.yArmed = false
+                        Qt.callLater(function() {
+                            if (dropOverlay) {
+                                dropOverlay.lastY = dropOverlay.y
+                                dropOverlay.yArmed = true
+                            }
+                        })
+                    }
+                }
+
+                model: library.tracks
+
+                HoverHandler {
+                    enabled: library.editMode
+                    cursorShape: list.dragIndex >= 0 ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                }
+
+                ScrollBar.vertical: ScrollBar {
+                    id: vbar
+                    policy: ScrollBar.AsNeeded
+                    width: 10
+                    contentItem: Rectangle {
+                        implicitWidth: 5
+                        radius: 2.5
+                        color: theme.outline
+                        opacity: vbar.pressed ? 0.8 : (vbar.hovered ? 0.55 : 0.3)
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                    }
+                    background: Item {}
+                }
+
+                function resetScrollAndFade() {
+                    list.opacity = 0
+                    Qt.callLater(function() {
+                        list._bottomComp = 0
+                        list.contentY = 0
+                        list.positionViewAtBeginning()
+                        list.forceLayout()
+                        listFadeIn.restart()
+                    })
+                }
+
+                Connections {
+                    target: library
+                    function onSortChanged() { list.resetScrollAndFade() }
+                    function onShowOnlyLikedChanged() { list.resetScrollAndFade() }
+                    function onFilterTextChanged() { list.resetScrollAndFade() }
+                    function onFilterArtistChanged() { list.resetScrollAndFade() }
+                    function onFilterAlbumChanged() { list.resetScrollAndFade() }
+                    function onEditModeChanged() {
+                        if (!library.editMode) {
+                            list.dragIndex = -1
+                            list.dropIndex = -1
+                        }
+                    }
+                }
+
+                NumberAnimation {
+                    id: listFadeIn
+                    target: list
+                    property: "opacity"
+                    to: 1
+                    duration: 260
+                    easing.type: Easing.OutCubic
+                }
+
+                NumberAnimation {
+                    id: wheelAnim
+                    target: list
+                    property: "contentY"
+                    duration: 260
+                    easing.type: Easing.OutCubic
+                }
+
+                WheelHandler {
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    blocking: true
+                    onWheel: (event) => {
+                        let dy = 0
+                        if (Math.abs(event.pixelDelta.y) > 0) dy = event.pixelDelta.y * 3.5
+                        else dy = (event.angleDelta.y / 120.0) * 140
+
+                        const maxY = Math.max(0, list.originY + list.contentHeight - list.height)
+                        const minY = list.originY
+
+                        if (list.contentY > maxY) list.contentY = maxY
+                        if (list.contentY < minY) list.contentY = minY
+
+                        const currentTarget = wheelAnim.running ? wheelAnim.to : list.contentY
+                        let target = currentTarget - dy
+                        if (target > maxY) target = maxY
+                        if (target < minY) target = minY
+
+                        if (Math.abs(target - list.contentY) < 0.5) {
+                            event.accepted = true
+                            return
+                        }
+
+                        wheelAnim.stop()
+                        wheelAnim.from = list.contentY
+                        wheelAnim.to = target
+                        wheelAnim.duration = Math.min(550, Math.max(240, Math.abs(target - list.contentY) * 1.2))
+                        wheelAnim.start()
+                        event.accepted = true
+                    }
+                }
+
+                add: Transition {
+                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 300; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "x"; from: -60; to: 0; duration: 360; easing.type: Easing.OutCubic }
+                }
+                remove: Transition {
+                    NumberAnimation { property: "opacity"; to: 0; duration: 320; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "x"; to: -60; duration: 360; easing.type: Easing.OutCubic }
+                }
+                displaced: Transition {
+                    NumberAnimation { properties: "x,y"; duration: 320; easing.type: Easing.OutCubic }
+                }
+                move: Transition {
+                    NumberAnimation { properties: "x,y"; duration: 320; easing.type: Easing.OutCubic }
+                }
+
+                delegate: TrackRow {
+                    listView: list
+                    onActivated: {
+                        if (window.floatingSearchOpen) window.closeFloatingSearch()
+                        page.trackActivated()
+                    }
+                    onAddMenuRequested: (path, rightX, anchorContentY, btnHeight) => {
+                        page.openAddMenu(path, rightX, anchorContentY, btnHeight)
+                    }
+                    onTrackRemovalRequested: (removalFn) => {
+                        if (library.showOnlyLiked) {
+                            list.removeWithSmoothScroll(removalFn)
+                        } else {
+                            removalFn()
                         }
                     }
                 }
             }
 
-            add: Transition {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 300; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "x"; from: -60; to: 0; duration: 360; easing.type: Easing.OutCubic }
-            }
-            remove: Transition {
-                NumberAnimation { property: "opacity"; to: 0; duration: 320; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "x"; to: -60; duration: 360; easing.type: Easing.OutCubic }
-            }
-            displaced: Transition {
-                NumberAnimation { properties: "x,y"; duration: 420; easing.type: Easing.OutCubic }
-            }
-            move: Transition {
-                NumberAnimation { properties: "x,y"; duration: 320; easing.type: Easing.OutCubic }
-            }
+            Rectangle {
+                id: dropOverlay
+                z: 300
+                x: 20
+                width: list.width - 40
+                height: 2
+                radius: 1
+                color: theme.primary
 
-            delegate: TrackRow {
-                listView: list
-                autoScrollTimer: autoScrollTimer
-                onActivated: {
-                    if (window.floatingSearchOpen) window.closeFloatingSearch()
-                    page.trackActivated()
+                readonly property bool active: list.dragIndex >= 0 && list.dropIndex >= 0
+                readonly property real rawY: active
+                    ? list.dropIndex * (42 + list.spacing) - (list.contentY - list.originY) - 1
+                    : 0
+
+                property real lastY: 0
+                property bool yArmed: false
+
+                y: {
+                    if (!active) return lastY
+                    if (rawY < 0) return 0
+                    if (rawY > list.height - 2) return list.height - 2
+                    return rawY
                 }
-                onAddMenuRequested: (path, rightX, anchorContentY, btnHeight) => {
-                    page.openAddMenu(path, rightX, anchorContentY, btnHeight)
+
+                onYChanged: if (active && yArmed) lastY = y
+
+                opacity: active ? 1 : 0
+
+                onActiveChanged: {
+                    if (active) {
+                        dropOverlay.yArmed = false
+                        Qt.callLater(function() {
+                            dropOverlay.lastY = dropOverlay.y
+                            dropOverlay.yArmed = true
+                        })
+                    } else {
+                        dropOverlay.yArmed = false
+                    }
                 }
-                onTrackRemovalRequested: (removalFn) => {
-                    list.removeWithSmoothScroll(removalFn)
+
+                Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                Behavior on y {
+                    enabled: dropOverlay.yArmed
+                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
                 }
             }
         }

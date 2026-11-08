@@ -15,17 +15,10 @@ Rectangle {
 
     signal activated()
     signal trackRemovalRequested(var removalFn)
+    signal reorderFinished()
 
     readonly property bool isCurrent: library.currentFilePath === trackRow.path
     readonly property bool isDragging: listView && listView.dragIndex === trackRow.index
-    readonly property bool dropAbove: listView
-        && listView.dropIndex === trackRow.index
-        && listView.dragIndex > trackRow.index
-        && listView.dragIndex !== trackRow.index
-    readonly property bool dropBelow: listView
-        && listView.dropIndex === trackRow.index
-        && listView.dragIndex < trackRow.index
-        && listView.dragIndex !== trackRow.index
 
     readonly property bool liked: {
         library.likedRevision
@@ -52,23 +45,8 @@ Rectangle {
         HoverHandler { id: trackHover }
 
         Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-            height: 2
-            radius: 1
-            color: theme.primary
-            y: trackRow.dropAbove ? 0
-               : trackRow.dropBelow ? parent.height - 2
-               : 0
-            visible: trackRow.dropAbove || trackRow.dropBelow
-            opacity: visible ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: 120 } }
-        }
-
-        Rectangle {
             anchors.fill: parent
+            anchors.margins: 2
             radius: 10
             color: trackRow.isCurrent ? theme.primary : theme.onSurface
             opacity: trackRow.isCurrent
@@ -79,8 +57,9 @@ Rectangle {
 
         RowLayout {
             anchors.fill: parent
+            anchors.margins: 2
             anchors.leftMargin: 10
-            anchors.rightMargin: (library.editMode && !trackRow.isDragging) ? 50 : 10
+            anchors.rightMargin: (library.editMode && !trackRow.isDragging) ? 48 : 10
             spacing: 10
 
             Behavior on anchors.rightMargin {
@@ -111,7 +90,7 @@ Rectangle {
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 6
+                    radius: 7
                     color: theme.surfaceVariant
                     visible: thumbImg.status !== Image.Ready
                 }
@@ -132,7 +111,7 @@ Rectangle {
                         : ""
                     sourceSize.width: 60
                     sourceSize.height: 60
-                    fillMode: Image.PreserveAspectFit
+                    fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     cache: true
                     smooth: true
@@ -141,7 +120,7 @@ Rectangle {
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 6
+                    radius: 7
                     color: "#000"
                     opacity: trackHover.hovered && !library.editMode ? 0.5 : 0
                     Behavior on opacity { NumberAnimation { duration: 180 } }
@@ -245,6 +224,7 @@ Rectangle {
         }
 
         MouseArea {
+            id: ma
             anchors.fill: parent
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton | Qt.MiddleButton
@@ -252,6 +232,17 @@ Rectangle {
                 ? (pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
                 : Qt.PointingHandCursor
             preventStealing: library.editMode
+
+            function updateDrop(mx, my) {
+                if (!trackRow.listView) return
+                const gp = ma.mapToItem(null, mx, my)
+                const lp = trackRow.listView.mapFromItem(null, gp.x, gp.y)
+                const vx = Math.max(0, Math.min(trackRow.listView.width  - 1, lp.x))
+                const vy = Math.max(0, Math.min(trackRow.listView.height - 1, lp.y))
+                trackRow.listView.lastViewportX = vx
+                trackRow.listView.lastViewportY = vy
+                trackRow.listView.computeDropFromCursor()
+            }
 
             onClicked: (mouse) => {
                 if (library.editMode) return
@@ -279,40 +270,40 @@ Rectangle {
                 if (trackRow.pressY < 0) return
                 if (!library.editMode) return
                 if (library.filterText.length > 0) return
-                if (listView.dragIndex < 0) {
+                if (trackRow.listView.dragIndex < 0) {
                     if (Math.abs(mouse.y - trackRow.pressY) < 6) return
-                    listView.dragIndex = trackRow.pressIndex
-                    listView.dropIndex = trackRow.pressIndex
+                    trackRow.listView.dragIndex = trackRow.pressIndex
+                    trackRow.listView.dropIndex = trackRow.pressIndex
                 }
-                const pt = mapToItem(listView, mouse.x, mouse.y)
-                const stride = trackRow.height + listView.spacing
-                let idx = Math.floor((pt.y + listView.contentY) / stride)
-                idx = Math.max(0, Math.min(listView.count - 1, idx))
-                listView.dropIndex = idx
+                updateDrop(mouse.x, mouse.y)
             }
 
-            onReleased: {
+            onReleased: (mouse) => {
                 trackRow.pressY = -1
                 trackRow.pressIndex = -1
                 if (!library.editMode) return
-                if (listView.dragIndex < 0) return
-                if (listView.dragIndex >= 0 && listView.dropIndex >= 0
-                    && listView.dragIndex !== listView.dropIndex) {
-                    const savedY = listView.contentY
-                    library.moveTrackInPlaylist(library.activePlaylistId,
-                                                 listView.dragIndex,
-                                                 listView.dropIndex)
-                    Qt.callLater(function() { listView.contentY = savedY })
+                const lv = trackRow.listView
+                const from = lv.dragIndex
+                const slot = lv.dropIndex
+                let to = -1
+                if (from >= 0 && slot >= 0) {
+                    if (from < slot)      to = slot - 1
+                    else if (from > slot) to = slot
                 }
-                listView.dragIndex = -1
-                listView.dropIndex = -1
+                const moved = from >= 0 && to >= 0 && to !== from
+                lv.dragIndex = -1
+                lv.dropIndex = -1
+                if (moved) {
+                    library.moveTrackInPlaylist(library.activePlaylistId, from, to)
+                    trackRow.reorderFinished()
+                }
             }
 
             onCanceled: {
                 trackRow.pressY = -1
                 trackRow.pressIndex = -1
-                listView.dragIndex = -1
-                listView.dropIndex = -1
+                trackRow.listView.dragIndex = -1
+                trackRow.listView.dropIndex = -1
             }
         }
 
@@ -321,7 +312,8 @@ Rectangle {
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            width: (library.editMode && !trackRow.isDragging) ? 42 : 0
+            anchors.margins: 2
+            width: (library.editMode && !trackRow.isDragging) ? 40 : 0
             radius: 10
             clip: true
             color: removeHov.containsMouse
@@ -347,7 +339,7 @@ Rectangle {
                 onClicked: {
                     library.requestCloseSearch()
                     trackRow.trackRemovalRequested(function() {
-                        library.removeTrackFromPlaylist(library.activePlaylistId, trackRow.index)
+                        library.removeTrackFromPlaylist(library.activePlaylistId, trackRow.path)
                     })
                 }
             }

@@ -146,7 +146,7 @@ public:
     Q_INVOKABLE void    deletePlaylist(const QString &id);
     Q_INVOKABLE void    renamePlaylist(const QString &id, const QString &name);
     Q_INVOKABLE void    addTrackToPlaylist(const QString &playlistId, const QString &trackPath);
-    Q_INVOKABLE void    removeTrackFromPlaylist(const QString &playlistId, int index);
+    Q_INVOKABLE void    removeTrackFromPlaylist(const QString &playlistId, const QString &trackPath);
     Q_INVOKABLE void    moveTrackInPlaylist(const QString &playlistId, int from, int to);
     Q_INVOKABLE void    movePlaylist(int from, int to);
     Q_INVOKABLE void    setActivePlaylist(const QString &id);
@@ -158,6 +158,7 @@ public:
     Q_INVOKABLE void    setPlaybackContext(const QString &ctx);
 
     Q_INVOKABLE void loadFolder(const QString &path);
+    Q_INVOKABLE void refreshLibrary();
     Q_INVOKABLE void playIndex(int index);
     Q_INVOKABLE void playSearchIndex(int index);
     Q_INVOKABLE void setCurrent(int index);
@@ -174,6 +175,8 @@ public:
     Q_INVOKABLE void cycleRepeat();
     Q_INVOKABLE void toggleReorderMode();
     Q_INVOKABLE void moveTrack(int from, int to);
+    Q_INVOKABLE void forceLayout() { m_tracks.forceRelayout(); }
+    Q_INVOKABLE void forceRelayoutPlaylists() { m_playlistModel.forceRelayout(); }
     Q_INVOKABLE void savePlaylistOrder();
     Q_INVOKABLE bool saveMetadata(int index,
                                   const QString &title,
@@ -230,6 +233,8 @@ signals:
     void playlistsChanged();
     void activePlaylistChanged();
     void searchShouldClose();
+    void refreshStarted();
+    void refreshFinished();
 
 private slots:
     void flushPresence();

@@ -17,6 +17,7 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
+            Layout.preferredHeight: 30
             spacing: 6
 
             Text {
@@ -30,20 +31,20 @@ Item {
 
             Rectangle {
                 id: sortChip
-                Layout.preferredWidth: sortRow.implicitWidth + 22
+                Layout.preferredWidth: sortRow.implicitWidth + 20
                 Layout.preferredHeight: 26
-                radius: 8
+                radius: 9
                 color: sortChipHov.containsMouse
                     ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.20)
                     : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06)
                 Behavior on color { ColorAnimation { duration: 200 } }
 
-                scale: sortChipHov.pressed ? 0.93 : (sortChipHov.containsMouse ? 1.05 : 1.0)
+                scale: sortChipHov.pressed ? 0.94 : 1.0
                 Behavior on scale {
                     NumberAnimation {
-                        duration: 220
+                        duration: 200
                         easing.type: Easing.OutBack
-                        easing.overshoot: 2.8
+                        easing.overshoot: 2.4
                     }
                 }
 
@@ -185,13 +186,14 @@ Item {
                 required property int index
 
                 width: list.width
-                height: 48
-                radius: 12
+                height: 46
+                radius: 10
                 color: "transparent"
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: parent.radius
+                    anchors.margins: 2
+                    radius: 10
                     color: theme.onSurface
                     opacity: hov.containsMouse ? 0.08 : 0
                     Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
@@ -199,14 +201,14 @@ Item {
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 14
-                    spacing: 14
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    spacing: 12
 
                     Rectangle {
                         Layout.preferredWidth: 34
                         Layout.preferredHeight: 34
-                        radius: 17
+                        radius: 10
                         color: theme.primary
                         opacity: hov.containsMouse ? 0.22 : 0.14
                         Behavior on opacity { NumberAnimation { duration: 220 } }
@@ -214,7 +216,7 @@ Item {
                         MaterialIcon {
                             anchors.centerIn: parent
                             glyph: "\ue7fd"
-                            iconSize: 18
+                            iconSize: 17
                             filled: hov.containsMouse
                             iconColor: theme.primary
                         }
@@ -224,7 +226,7 @@ Item {
                         Layout.fillWidth: true
                         text: row.modelData
                         color: hov.containsMouse ? theme.primary : theme.onSurface
-                        font.pixelSize: 13
+                        font.pixelSize: 12
                         font.weight: Font.Medium
                         elide: Text.ElideRight
                         Behavior on color { ColorAnimation { duration: 220 } }
