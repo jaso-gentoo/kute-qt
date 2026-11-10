@@ -1,3 +1,6 @@
+## v1.4-rc0 — 2026-11-09
+No changelog entry for v1.4-rc0.
+
 ## v1.3-rc2 — 2026-10-08
 
 ### Fixed
