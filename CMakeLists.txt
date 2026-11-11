@@ -82,28 +82,28 @@ qt_add_qml_module(kute
     NO_PLUGIN
     QML_FILES
         qml/Main.qml
-        qml/MaterialIcon.qml
-        qml/NavRail.qml
+        qml/Icon.qml
+        qml/NavBar.qml
         qml/InfoPanel.qml
-        qml/BottomBar.qml
-        qml/ArtistsView.qml
-        qml/AlbumsView.qml
-        qml/BrowseView.qml
-        qml/SettingsModal.qml
-        qml/NowPlayingOverlay.qml
-        qml/SettingsTab.qml
-        qml/TrackTab.qml
-        qml/LyricsTab.qml
-        qml/FloatingSearch.qml
-        qml/TrackListPage.qml
-        qml/TrackRow.qml
-        qml/TrackSortMenu.qml
-        qml/AddToPlaylistMenu.qml
-        qml/PlaylistsPage.qml
-        qml/PlaylistListPage.qml
-        qml/PlaylistDetailPage.qml
-        qml/PlaylistRow.qml
-        qml/PlaylistTrackRow.qml
+        qml/PlayerBar.qml
+        qml/Artists.qml
+        qml/Albums.qml
+        qml/Browse.qml
+        qml/SettingsView.qml
+        qml/SearchView.qml
+        qml/MetadataView.qml
+        qml/LyricsView.qml
+                qml/Sidebar.qml
+        qml/ModalOverlay.qml
+        qml/TrackList.qml
+        qml/TrackItem.qml
+        qml/SortMenu.qml
+        qml/PlaylistPicker.qml
+        qml/Playlists.qml
+        qml/PlaylistList.qml
+        qml/PlaylistDetail.qml
+        qml/PlaylistItem.qml
+        qml/PlaylistTrackItem.qml
 )
 
 qt_add_resources(kute "fonts"
