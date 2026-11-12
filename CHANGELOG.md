@@ -1,4 +1,4 @@
-## v1.5-rc0 - 2026-11-12
+## v1.5-rc0 — 2026-11-12
 
 ### Added
 - InfoaPanel, NavBar position choice in settings.
