@@ -1,3 +1,20 @@
+## v1.5-rc0 - 2026-11-12
+
+### Added
+- InfoaPanel, NavBar position choice in settings.
+- Visualizer toggle switch in settings.
+- Cover shapes in NowPlaying
+
+### Changed
+- Discord RPC button was replaced with switch in settings.
+- Sort options panel was replaced with hover panel.
+- Navigation bar now contains hover button which shows additional options.
+- Some UI things...
+
+### Fixed
+- Fixed an issue where the last item in a list would get stuck underneath the list.
+- The drop indicator did not move along with the list scrolling.
+
 ## v1.4-rc0 — 2026-11-09
 No changelog entry for v1.4-rc0.
 
