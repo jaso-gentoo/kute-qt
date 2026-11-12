@@ -15,7 +15,7 @@ jobs:
   linux:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -154,7 +154,7 @@ jobs:
           ls -la kute-x86_64.AppImage
 
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: linux-appimage
           path: kute-x86_64.AppImage
@@ -165,7 +165,7 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - name: Install NSIS
         shell: pwsh
@@ -304,7 +304,7 @@ jobs:
           ls -la kute-windows-x86_64.exe
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: windows-portable
           path: kute-windows-x86_64.exe
@@ -315,9 +315,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v4
         with:
           path: downloads/
 
@@ -326,10 +326,10 @@ jobs:
         run: |
           python3 - <<'PY'
           import os, re, pathlib
-          version = os.environ["VERSION"]
-          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          version = os.environ["VERSION"].strip()
+          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8-sig")
 
-          pattern = re.compile(rf"^##\s+{re.escape(version)}\b.*?$", re.MULTILINE)
+          pattern = re.compile(rf"^##\s+{re.escape(version)}(?=\s|$).*?$", re.MULTILINE)
           m = pattern.search(text)
           if not m:
               print("::warning::No changelog section found for", version)
