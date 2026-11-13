@@ -4,29 +4,17 @@ import QtQuick.Layouts
 Item {
     id: root
 
+    signal playlistOpened(string id, string name)
     signal artistSelected(string name)
     signal albumSelected(string name)
     signal browseActivated
     signal contextChanged
 
     property int currentTab: 0
-    property alias playlistsPageViewing: playlistsPage.viewing
-
-    function closePlaylistDetail() {
-        playlistsPage.closeDetail()
-    }
+    readonly property bool showCounters: root.width > 550
 
     function closePlaylistsDialogs() {
         playlistsPage.closeDialogs()
-    }
-
-    function openPlaylist(id, name) {
-        playlistsPage.openById(id, name)
-        currentTab = 0
-    }
-
-    function scrollPlaylistToCurrent() {
-        playlistsPage.scrollDetailToCurrent()
     }
 
     onCurrentTabChanged: root.contextChanged()
@@ -39,42 +27,62 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 34
-            spacing: 6
+            Layout.preferredHeight: 42
+            spacing: 10
+
+            Rectangle {
+                Layout.preferredWidth: 36
+                Layout.preferredHeight: 36
+                Layout.alignment: Qt.AlignVCenter
+                radius: 11
+                color: Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.16)
+
+                Icon {
+                    anchors.centerIn: parent
+                    glyph: ""
+                    iconSize: 19
+                    iconColor: theme.primary
+                    filled: true
+                }
+            }
 
             Text {
-                text: "BROWSE"
-                color: theme.outline
-                font.pixelSize: 10
-                font.letterSpacing: 1.4
+                Layout.alignment: Qt.AlignVCenter
+                text: "Browse"
+                color: theme.onBackground
+                font.pixelSize: 15
+                font.weight: Font.DemiBold
             }
 
             Item { Layout.preferredWidth: 8 }
 
             Repeater {
                 model: [
-                    { label: "Playlists", icon: "\ue8ef" },
-                    { label: "Albums",    icon: "\ue02b" },
-                    { label: "Artists",   icon: "\ue7fd" }
+                    { label: "Playlists", icon: "" },
+                    { label: "Albums",    icon: "" },
+                    { label: "Artists",   icon: "" }
                 ]
                 delegate: Rectangle {
                     required property var modelData
                     required property int index
                     readonly property bool active: root.currentTab === index
+                    readonly property int cnt: index === 0 ? library.playlistsFiltered.count
+                                            : index === 1 ? library.albums.length
+                                            : library.artists.length
 
-                    property real chipW: tabRow.implicitWidth + 22
+                    property real chipW: tabRow.implicitWidth + (root.showCounters ? 20 : 16)
                     Layout.preferredWidth: chipW
                     Layout.preferredHeight: 30
                     radius: 9
                     Behavior on chipW {
-                        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                        NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
                     }
                     color: active
                         ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.18)
                         : (tabHov.containsMouse
                             ? Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.08)
                             : "transparent")
-                    Behavior on color { ColorAnimation { duration: 180 } }
+                    Behavior on color { ColorAnimation { duration: 260; easing.type: Easing.OutCubic } }
 
                     Row {
                         id: tabRow
@@ -87,7 +95,7 @@ Item {
                             iconSize: 14
                             iconColor: active ? theme.primary : theme.outline
                             filled: active
-                            Behavior on iconColor { ColorAnimation { duration: 180 } }
+                            Behavior on iconColor { ColorAnimation { duration: 260; easing.type: Easing.OutCubic } }
                         }
 
                         Text {
@@ -96,7 +104,26 @@ Item {
                             color: active ? theme.primary : theme.onBackground
                             font.pixelSize: 11
                             font.weight: active ? Font.DemiBold : Font.Medium
-                            Behavior on color { ColorAnimation { duration: 180 } }
+                            Behavior on color { ColorAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                        }
+
+                        Text {
+                            visible: root.showCounters
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "·"
+                            color: active ? theme.primary : theme.outline
+                            font.pixelSize: 11
+                            opacity: 0.5
+                        }
+
+                        Text {
+                            visible: root.showCounters
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: cnt
+                            color: active ? theme.primary : theme.outline
+                            font.pixelSize: 10
+                            font.family: "monospace"
+                            opacity: active ? 1.0 : 0.8
                         }
                     }
 
@@ -127,7 +154,7 @@ Item {
                 Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
                 Behavior on x       { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
 
-                onPlaylistActivated: root.browseActivated()
+                onPlaylistOpened: (id, name) => root.playlistOpened(id, name)
                 onContextChanged: root.contextChanged()
             }
 

@@ -6,6 +6,8 @@ Rectangle {
     id: bar
     radius: 16
     color: theme.surface
+    border.color: Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.18)
+    border.width: 1
 
     signal coverClicked
     signal likeClicked
@@ -68,15 +70,6 @@ Rectangle {
         return library.isCurrentLiked()
     }
 
-    Rectangle {
-        anchors.fill: parent
-        radius: parent.radius
-        color: "transparent"
-        border.color: theme.outline
-        border.width: 1
-        opacity: 0.18
-    }
-
     RowLayout {
         anchors.fill: parent
         anchors.leftMargin: 12
@@ -85,131 +78,143 @@ Rectangle {
         anchors.bottomMargin: 4
         spacing: 12
 
-        RowLayout {
-            Layout.preferredWidth: 200
-            Layout.minimumWidth: 200
+        Item {
+            id: trackInfoSlot
+            property real _targetW: bar.width >= 700 ? 200 : 0
+            Layout.preferredWidth: _targetW
+            Layout.minimumWidth: 0
             Layout.maximumWidth: 200
             Layout.fillWidth: false
             Layout.fillHeight: true
-            spacing: 10
+            clip: true
+            Behavior on _targetW { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
 
-            Item {
-                id: coverWrap
-                Layout.preferredWidth: 48
-                Layout.preferredHeight: 48
-                Layout.alignment: Qt.AlignVCenter
-                transformOrigin: Item.Center
-
-                transform: Translate { id: coverShift; y: 0 }
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 10
-                    color: theme.surfaceVariant
-                }
-
-                Icon {
-                    anchors.centerIn: parent
-                    glyph: "\ue405"
-                    iconSize: 20
-                    iconColor: theme.outline
-                    visible: !bar.sCover || coverImg.status !== Image.Ready
-                }
-
-                Image {
-                    id: coverImg
-                    readonly property real dpr: Screen.devicePixelRatio > 0
-                                                    ? Screen.devicePixelRatio : 1
-                    readonly property int decodeSize: Math.ceil(48 * dpr)
-                    anchors.fill: parent
-                    source: bar.sCover ? library.toFileUrl(bar.sCover) + "?v=" + library.coverVersion : ""
-                    sourceSize.width: decodeSize
-                    sourceSize.height: decodeSize
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    cache: true
-                    smooth: true
-                    visible: false
-                }
+            RowLayout {
+                id: trackInfoRow
+                width: parent.width
+                height: parent.height
+                opacity: trackInfoSlot._targetW / 200
+                spacing: 10
+                Behavior on opacity { NumberAnimation { duration: 200 } }
 
                 Item {
-                    id: coverMask
-                    anchors.fill: parent
-                    visible: false
-                    layer.enabled: true
+                    id: coverWrap
+                    Layout.preferredWidth: 48
+                    Layout.preferredHeight: 48
+                    Layout.alignment: Qt.AlignVCenter
+                    transformOrigin: Item.Center
+
+                    transform: Translate { id: coverShift; y: 0 }
+
                     Rectangle {
                         anchors.fill: parent
                         radius: 10
-                        color: "white"
+                        color: theme.surfaceVariant
                     }
-                }
-
-                MultiEffect {
-                    anchors.fill: parent
-                    source: coverImg
-                    maskEnabled: true
-                    maskSource: coverMask
-                    visible: coverImg.status === Image.Ready
-                }
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 10
-                    color: "#000"
-                    opacity: hovCover.containsMouse ? 0.45 : 0
-                    Behavior on opacity { NumberAnimation { duration: 180 } }
 
                     Icon {
                         anchors.centerIn: parent
-                        glyph: "\ue88e"
+                        glyph: ""
                         iconSize: 20
-                        iconColor: "white"
-                        scale: hovCover.containsMouse ? 1.0 : 0.7
-                        opacity: hovCover.containsMouse ? 1 : 0
+                        iconColor: theme.outline
+                        visible: !bar.sCover || coverImg.status !== Image.Ready
+                    }
+
+                    Image {
+                        id: coverImg
+                        readonly property real dpr: Screen.devicePixelRatio > 0
+                                                        ? Screen.devicePixelRatio : 1
+                        readonly property int decodeSize: Math.ceil(48 * dpr)
+                        anchors.fill: parent
+                        source: bar.sCover ? library.toFileUrl(bar.sCover) + "?v=" + library.coverVersion : ""
+                        sourceSize.width: decodeSize
+                        sourceSize.height: decodeSize
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        cache: true
+                        smooth: true
+                        visible: false
+                    }
+
+                    Item {
+                        id: coverMask
+                        anchors.fill: parent
+                        visible: false
+                        layer.enabled: true
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 10
+                            color: "white"
+                        }
+                    }
+
+                    MultiEffect {
+                        anchors.fill: parent
+                        source: coverImg
+                        maskEnabled: true
+                        maskSource: coverMask
+                        visible: coverImg.status === Image.Ready
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 10
+                        color: "#000"
+                        opacity: hovCover.containsMouse ? 0.45 : 0
                         Behavior on opacity { NumberAnimation { duration: 180 } }
-                        Behavior on scale {
-                            NumberAnimation {
-                                duration: 220
-                                easing.type: Easing.OutBack
-                                easing.overshoot: 2.5
+
+                        Icon {
+                            anchors.centerIn: parent
+                            glyph: ""
+                            iconSize: 20
+                            iconColor: "white"
+                            scale: hovCover.containsMouse ? 1.0 : 0.7
+                            opacity: hovCover.containsMouse ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: 180 } }
+                            Behavior on scale {
+                                NumberAnimation {
+                                    duration: 220
+                                    easing.type: Easing.OutBack
+                                    easing.overshoot: 2.5
+                                }
                             }
                         }
                     }
+
+                    MouseArea {
+                        id: hovCover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: bar.coverClicked()
+                    }
                 }
 
-                MouseArea {
-                    id: hovCover
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: bar.coverClicked()
-                }
-            }
-
-            ColumnLayout {
-                id: textCol
-                Layout.fillWidth: true
-                Layout.alignment: Qt.AlignVCenter
-                spacing: 1
-                clip: true
-
-                transform: Translate { id: textShift; y: 0 }
-
-                Text {
+                ColumnLayout {
+                    id: textCol
                     Layout.fillWidth: true
-                    text: bar.displayTitle
-                    color: theme.onSurface
-                    font.pixelSize: 12
-                    font.weight: Font.Medium
-                    elide: Text.ElideRight
-                }
+                    Layout.alignment: Qt.AlignVCenter
+                    spacing: 1
+                    clip: true
 
-                Text {
-                    Layout.fillWidth: true
-                    text: library.hasCurrent ? bar.sArtist : ""
-                    color: theme.outline
-                    font.pixelSize: 10
-                    elide: Text.ElideRight
+                    transform: Translate { id: textShift; y: 0 }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: bar.displayTitle
+                        color: theme.onSurface
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: library.hasCurrent ? bar.sArtist : ""
+                        color: theme.outline
+                        font.pixelSize: 10
+                        elide: Text.ElideRight
+                    }
                 }
             }
         }
@@ -481,7 +486,7 @@ Rectangle {
 
                 Icon {
                     anchors.centerIn: parent
-                    glyph: "\ue045"
+                    glyph: ""
                     iconSize: 18
                     iconColor: theme.onSurface
                 }
@@ -518,7 +523,7 @@ Rectangle {
 
                     Icon {
                         anchors.centerIn: parent
-                        glyph: "\ue037"
+                        glyph: ""
                         iconSize: 22
                         iconColor: theme.background
                         opacity: library.isPlaying ? 0 : 1
@@ -535,7 +540,7 @@ Rectangle {
 
                     Icon {
                         anchors.centerIn: parent
-                        glyph: "\ue034"
+                        glyph: ""
                         iconSize: 22
                         iconColor: theme.background
                         opacity: library.isPlaying ? 1 : 0
@@ -581,7 +586,7 @@ Rectangle {
 
                 Icon {
                     anchors.centerIn: parent
-                    glyph: "\ue044"
+                    glyph: ""
                     iconSize: 18
                     iconColor: theme.onSurface
                 }
@@ -619,7 +624,7 @@ Rectangle {
 
                 Icon {
                     anchors.centerIn: parent
-                    glyph: library.repeatMode === 2 ? "\ue041" : "\ue040"
+                    glyph: library.repeatMode === 2 ? "" : ""
                     iconSize: 17
                     iconColor: library.repeatMode > 0 ? theme.primary : theme.onSurface
                     Behavior on iconColor { ColorAnimation { duration: 220 } }
@@ -649,7 +654,7 @@ Rectangle {
 
                 Icon {
                     anchors.centerIn: parent
-                    glyph: "\ue04f"
+                    glyph: ""
                     iconSize: 18
                     iconColor: theme.outline
                     opacity: library.volume === 0 ? 1 : 0
@@ -660,7 +665,7 @@ Rectangle {
 
                 Icon {
                     anchors.centerIn: parent
-                    glyph: "\ue050"
+                    glyph: ""
                     iconSize: 18
                     iconColor: theme.outline
                     opacity: library.volume === 0 ? 0 : 1

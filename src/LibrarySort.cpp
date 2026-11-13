@@ -315,6 +315,7 @@ void Library::sortAndApply(bool animate) {
     else          m_tracks.setTracks(filtered);
 
     refreshCurrentIndexFromPath(currentPath);
+    emit trackCountChanged();
 }
 
 void Library::rebuildArtists() {
@@ -420,6 +421,12 @@ void Library::rebuildSearch() {
 
 void Library::applySort(const QString &field, bool ascending) {
     if (m_sortField == field && m_sortAscending == ascending) return;
+
+    if (m_editMode && field != "custom") {
+        m_editMode = false;
+        savePlaylistOrderNow();
+        emit editModeChanged();
+    }
 
     m_sortField = field;
     m_sortAscending = ascending;
@@ -534,10 +541,6 @@ void Library::toggleEditMode() {
         if (m_showOnlyLiked) return;
         if (!m_filterText.isEmpty()) return;
         if (!m_filterArtist.isEmpty() || !m_filterAlbum.isEmpty()) return;
-
-        if (m_sortField != "custom") {
-            applySort("custom", true);
-        }
         m_editMode = true;
     } else {
         m_editMode = false;

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 Item {
@@ -11,100 +12,13 @@ Item {
         if (visible && library.editMode) library.toggleEditMode()
     }
 
-    ColumnLayout {
+    Item {
         anchors.fill: parent
-        spacing: 8
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 30
-            spacing: 6
-
-            Text {
-                text: "ALBUMS"
-                color: theme.outline
-                font.pixelSize: 10
-                font.letterSpacing: 1.4
-            }
-
-            Item { Layout.fillWidth: true }
-
-            Rectangle {
-                id: sortChip
-                Layout.preferredWidth: sortRow.implicitWidth + 20
-                Layout.preferredHeight: 26
-                radius: 9
-                color: sortChipHov.containsMouse
-                    ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.20)
-                    : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06)
-                Behavior on color { ColorAnimation { duration: 200 } }
-
-                scale: sortChipHov.pressed ? 0.94 : 1.0
-                Behavior on scale {
-                    NumberAnimation {
-                        duration: 200
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 2.4
-                    }
-                }
-
-                SequentialAnimation {
-                    id: flipAnim
-                    NumberAnimation {
-                        target: sortChip
-                        property: "opacity"
-                        to: 0.2
-                        duration: 110
-                        easing.type: Easing.InCubic
-                    }
-                    ScriptAction {
-                        script: library.albumsAscending = !library.albumsAscending
-                    }
-                    NumberAnimation {
-                        target: sortChip
-                        property: "opacity"
-                        to: 1.0
-                        duration: 220
-                        easing.type: Easing.OutCubic
-                    }
-                }
-
-                Row {
-                    id: sortRow
-                    anchors.centerIn: parent
-                    spacing: 5
-
-                    Icon {
-                        anchors.verticalCenter: parent.verticalCenter
-                        glyph: library.albumsAscending ? "\ue5d8" : "\ue5db"
-                        iconSize: 13
-                        iconColor: theme.primary
-                    }
-
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: library.albumsAscending ? "A-Z" : "Z-A"
-                        color: theme.primary
-                        font.pixelSize: 11
-                        font.weight: Font.DemiBold
-                        font.family: "monospace"
-                    }
-                }
-
-                MouseArea {
-                    id: sortChipHov
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: flipAnim.start()
-                }
-            }
-        }
+        clip: true
 
         ListView {
             id: list
-            Layout.fillWidth: true
-            Layout.fillHeight: true
+            anchors.fill: parent
             clip: true
             spacing: 2
             boundsBehavior: Flickable.StopAtBounds
@@ -114,6 +28,20 @@ Item {
             maximumFlickVelocity: 8000
 
             model: library.albums
+
+            ScrollBar.vertical: ScrollBar {
+                id: albScrollBar
+                policy: list.contentHeight > list.height + 1 ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                width: 10
+                contentItem: Rectangle {
+                    implicitWidth: 5
+                    radius: 2.5
+                    color: theme.outline
+                    opacity: albScrollBar.pressed ? 0.8 : (albScrollBar.hovered ? 0.55 : 0.3)
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                }
+                background: Item {}
+            }
 
             Connections {
                 target: library
@@ -148,17 +76,12 @@ Item {
                     } else {
                         dy = (event.angleDelta.y / 120.0) * 140
                     }
-
                     const currentTarget = wheelAnim.running ? wheelAnim.to : list.contentY
                     const target = Math.max(0, Math.min(maxY, currentTarget - dy))
-
                     wheelAnim.stop()
                     wheelAnim.from = list.contentY
                     wheelAnim.to = target
-                    wheelAnim.duration = Math.min(
-                        550,
-                        Math.max(240, Math.abs(target - list.contentY) * 1.2)
-                    )
+                    wheelAnim.duration = Math.min(550, Math.max(240, Math.abs(target - list.contentY) * 1.2))
                     wheelAnim.start()
                     event.accepted = true
                 }
@@ -185,7 +108,7 @@ Item {
                 required property var modelData
                 required property int index
 
-                width: list.width
+                width: list.width - 12
                 height: 46
                 radius: 10
                 color: "transparent"
@@ -218,7 +141,7 @@ Item {
 
                         Icon {
                             anchors.centerIn: parent
-                            glyph: "\ue02b"
+                            glyph: ""
                             iconSize: 16
                             iconColor: theme.outline
                             opacity: 0.5
@@ -265,15 +188,6 @@ Item {
                         }
                     }
 
-                    Icon {
-                        glyph: "\ue5cc"
-                        iconSize: 16
-                        iconColor: theme.outline
-                        opacity: hov.containsMouse ? 1 : 0
-                        x: hov.containsMouse ? 0 : -10
-                        Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                        Behavior on x { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-                    }
                 }
 
                 MouseArea {
@@ -290,12 +204,78 @@ Item {
         }
 
         Text {
-            Layout.fillWidth: true
-            text: library.albums.length === 0 ? "No albums" : library.albums.length + " albums"
+            anchors.centerIn: parent
+            text: "No albums"
+            visible: library.albums.length === 0
             color: theme.outline
-            font.pixelSize: 10
-            horizontalAlignment: Text.AlignHCenter
-            visible: library.albums.length > 0
+            font.pixelSize: 12
+            opacity: 0.6
+        }
+
+        Rectangle {
+            id: sortChip
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: 12
+            anchors.rightMargin: 16
+            z: 100
+            width: sortRow.implicitWidth + 24
+            height: 34
+            radius: 14
+            color: Qt.rgba(theme.surfaceVariant.r, theme.surfaceVariant.g, theme.surfaceVariant.b, 0.96)
+            border.color: Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.10)
+            border.width: 1
+
+            SequentialAnimation {
+                id: flipAnim
+                NumberAnimation {
+                    target: sortChip
+                    property: "opacity"
+                    to: 0.2
+                    duration: 110
+                    easing.type: Easing.InCubic
+                }
+                ScriptAction {
+                    script: library.albumsAscending = !library.albumsAscending
+                }
+                NumberAnimation {
+                    target: sortChip
+                    property: "opacity"
+                    to: 1.0
+                    duration: 220
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Row {
+                id: sortRow
+                anchors.centerIn: parent
+                spacing: 5
+
+                Icon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    glyph: library.albumsAscending ? "" : ""
+                    iconSize: 13
+                    iconColor: theme.primary
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: library.albumsAscending ? "A-Z" : "Z-A"
+                    color: theme.primary
+                    font.pixelSize: 11
+                    font.weight: Font.DemiBold
+                    font.family: "monospace"
+                }
+            }
+
+            MouseArea {
+                id: sortChipHov
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: flipAnim.start()
+            }
         }
     }
 }

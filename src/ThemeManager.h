@@ -23,6 +23,8 @@ class ThemeManager : public QObject {
     Q_PROPERTY(QString coverShape READ coverShape WRITE setCoverShape NOTIFY coverShapeChanged)
     Q_PROPERTY(QString infoPanelPosition READ infoPanelPosition WRITE setInfoPanelPosition NOTIFY infoPanelPositionChanged)
     Q_PROPERTY(QString navBarPosition READ navBarPosition WRITE setNavBarPosition NOTIFY navBarPositionChanged)
+    Q_PROPERTY(bool hideHeader READ hideHeader WRITE setHideHeader NOTIFY hideHeaderChanged)
+    Q_PROPERTY(bool hideNavBar READ hideNavBar WRITE setHideNavBar NOTIFY hideNavBarChanged)
 
 public:
     explicit ThemeManager(QObject *parent = nullptr);
@@ -45,6 +47,8 @@ public:
     QString coverShape() const { return m_coverShape; }
     QString infoPanelPosition() const { return m_infoPanelPosition; }
     QString navBarPosition() const { return m_navBarPosition; }
+    bool hideHeader() const { return m_hideHeader; }
+    bool hideNavBar() const { return m_hideNavBar; }
 
     void setLightTheme(bool v);
     void setMatugenEnabled(bool v);
@@ -53,6 +57,8 @@ public:
     void setCoverShape(const QString &v);
     void setInfoPanelPosition(const QString &v);
     void setNavBarPosition(const QString &v);
+    void setHideHeader(bool v);
+    void setHideNavBar(bool v);
 
     Q_INVOKABLE void restartApplication();
 
@@ -66,6 +72,8 @@ signals:
     void coverShapeChanged();
     void infoPanelPositionChanged();
     void navBarPositionChanged();
+    void hideHeaderChanged();
+    void hideNavBarChanged();
 
 private:
     void refresh();
@@ -92,6 +100,8 @@ private:
     QString m_coverShape = "circle";
     QString m_infoPanelPosition = "top";
     QString m_navBarPosition = "top";
+    bool m_hideHeader = false;
+    bool m_hideNavBar = false;
 
 #ifdef Q_OS_WIN
     QString m_renderBackend = "d3d11";

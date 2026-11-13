@@ -6,7 +6,7 @@ FocusScope {
     id: overlay
     visible: opacity > 0
     opacity: open ? 1 : 0
-    z: 1000
+    z: 2000
     focus: open
 
     property bool open: false
@@ -118,7 +118,7 @@ FocusScope {
         anchors.leftMargin: 16
         anchors.rightMargin: 16
         anchors.topMargin: 20
-        anchors.bottomMargin: 8
+        anchors.bottomMargin: 88
 
         Sidebar {
             id: sidebar
@@ -200,5 +200,18 @@ FocusScope {
 
 
         }
+    }
+
+    PlayerBar {
+        id: modalPlayerBar
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 16
+        anchors.rightMargin: 16
+        anchors.bottomMargin: 16
+        height: 62
+        z: 50
+        onCoverClicked: library.infoPanelVisible = !library.infoPanelVisible
     }
 }

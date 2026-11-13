@@ -339,391 +339,376 @@ Item {
         }
     }
 
-    ColumnLayout {
+
+    Item {
+        id: bodyRoot
         anchors.fill: parent
-        spacing: 8
+        clip: true
 
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 30
-            spacing: 6
-
-            Text {
-                text: "PLAYLISTS"
-                color: theme.outline
-                font.pixelSize: 10
-                font.letterSpacing: 1.4
-            }
-
-            Item { Layout.fillWidth: true }
-
-            Rectangle {
-                id: editListBtn
-                Layout.preferredWidth: editListRow.implicitWidth + 20
-                Layout.preferredHeight: 26
-                Layout.rightMargin: 4
-                radius: 9
-                color: library.editMode
-                    ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.22)
-                    : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06)
-                Behavior on color { ColorAnimation { duration: 220 } }
-
-                scale: editListHov.pressed ? 0.94 : (editListHov.containsMouse ? 1.04 : 1.0)
-                Behavior on scale {
-                    NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 2.6 }
-                }
-
-                Item {
-                    id: editListRow
-                    anchors.centerIn: parent
-                    implicitWidth: Math.max(editRowEdit.implicitWidth, editRowDone.implicitWidth)
-                    implicitHeight: Math.max(editRowEdit.implicitHeight, editRowDone.implicitHeight)
-
-                    Row {
-                        id: editRowEdit
-                        anchors.centerIn: parent
-                        spacing: 5
-                        opacity: library.editMode ? 0 : 1
-                        Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                        Icon {
-                            anchors.verticalCenter: parent.verticalCenter
-                            glyph: "\ue3c9"
-                            iconSize: 13
-                            iconColor: theme.onBackground
-                        }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "Edit"
-                            color: theme.onBackground
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                        }
-                    }
-
-                    Row {
-                        id: editRowDone
-                        anchors.centerIn: parent
-                        spacing: 5
-                        opacity: library.editMode ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                        Icon {
-                            anchors.verticalCenter: parent.verticalCenter
-                            glyph: "\ue5ca"
-                            iconSize: 13
-                            iconColor: theme.primary
-                        }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "Done"
-                            color: theme.primary
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                        }
-                    }
-                }
-
-                MouseArea {
-                    id: editListHov
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: library.toggleEditMode()
-                }
-            }
-
-            Rectangle {
-                id: newPlaylistBtn
-                Layout.preferredWidth: 26
-                Layout.preferredHeight: 26
-                radius: 9
-                color: newBtnHov.containsMouse
-                    ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.22)
-                    : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06)
-                Behavior on color { ColorAnimation { duration: 200 } }
-
-                scale: newBtnHov.pressed ? 0.9 : (newBtnHov.containsMouse ? 1.08 : 1.0)
-                Behavior on scale {
-                    NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 2.8 }
-                }
-
-                Icon {
-                    anchors.centerIn: parent
-                    glyph: "\ue145"
-                    iconSize: 16
-                    iconColor: theme.primary
-                }
-
-                MouseArea {
-                    id: newBtnHov
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        library.requestCloseSearch()
-                        const p = newPlaylistBtn.mapToItem(null, 0, 0)
-                        nameDialog.x = Math.max(12,
-                            Math.min(p.x + newPlaylistBtn.width - nameDialog.width,
-                                     page.width - nameDialog.width - 12))
-                        nameDialog.y = p.y + newPlaylistBtn.height + 6
-                        nameDialog.mode = "create"
-                        nameInput.text = ""
-                        nameDialog.open()
-                        Qt.callLater(() => nameInput.forceActiveFocus())
-                    }
-                }
-            }
-        }
-
-        Item {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
+        ListView {
+            id: plList
+            anchors.fill: parent
             clip: true
+            spacing: 2
+            boundsBehavior: Flickable.DragOverBounds
+            boundsMovement: Flickable.StopAtBounds
+            cacheBuffer: 2000
+            reuseItems: false
+            interactive: !library.editMode
+            model: library.filterText.length === 0
+                ? library.playlists
+                : library.playlistsFiltered
 
-            ListView {
-                id: plList
-                anchors.fill: parent
-                clip: true
-                spacing: 2
-                boundsBehavior: Flickable.DragOverBounds
-                boundsMovement: Flickable.StopAtBounds
-                cacheBuffer: 2000
-                reuseItems: false
-                interactive: !library.editMode
-                model: library.filterText.length === 0
-                    ? library.playlists
-                    : library.playlistsFiltered
+            property int  dragIndex: -1
+            property int  dropIndex: -1
+            property real lastViewportX: 0
+            property real lastViewportY: 0
+            readonly property bool dragActive: dragIndex >= 0
+            property real _bottomComp: 0
+            bottomMargin: _bottomComp
 
-                property int  dragIndex: -1
-                property int  dropIndex: -1
-                property real lastViewportX: 0
-                property real lastViewportY: 0
-                readonly property bool dragActive: dragIndex >= 0
-
-                function computeDropFromCursor() {
-                    if (dragIndex < 0) return
-                    if (count === 0) { dropIndex = 0; return }
-
-                    const vy = Math.max(0, Math.min(height - 1, lastViewportY))
-                    const stride = 48 + spacing
-
-                    if (vy < 14) {
-                        const s = Math.floor((contentY - originY) / stride)
-                        dropIndex = Math.max(0, Math.min(count, s))
-                        return
-                    }
-                    if (vy > height - 14) {
-                        const s = Math.ceil((contentY - originY + height) / stride)
-                        dropIndex = Math.max(0, Math.min(count, s))
-                        return
-                    }
-
-                    const cpt = vy + contentY - originY
-                    const idx = Math.floor(cpt / stride)
-                    const ly = cpt - idx * stride
-                    let slot = (ly < 24) ? idx : idx + 1
-
-                    if (slot < 0) slot = 0
-                    if (slot > count) slot = count
-                    if (slot !== dropIndex) dropIndex = slot
+            function computeDropFromCursor() {
+                if (dragIndex < 0) return
+                if (count === 0) { dropIndex = 0; return }
+                const vy = Math.max(0, Math.min(height - 1, lastViewportY))
+                const stride = 48 + spacing
+                if (vy < 14) {
+                    const s = Math.floor((contentY - originY) / stride)
+                    dropIndex = Math.max(0, Math.min(count, s))
+                    return
                 }
-                property real _bottomComp: 0
-                bottomMargin: _bottomComp
-
-                NumberAnimation {
-                    id: bottomCompAnim
-                    target: plList
-                    property: "_bottomComp"
-                    to: 0
-                    duration: 320
-                    easing.type: Easing.OutCubic
+                if (vy > height - 14) {
+                    const s = Math.ceil((contentY - originY + height) / stride)
+                    dropIndex = Math.max(0, Math.min(count, s))
+                    return
                 }
-
-                NumberAnimation {
-                    id: scrollCompAnim
-                    target: plList
-                    property: "contentY"
-                    duration: 320
-                    easing.type: Easing.OutCubic
-                }
-
-                function removeWithSmoothScroll(removalFn) {
-                    const stride = 48 + spacing
-                    const yBefore = contentY
-                    const hBefore = contentHeight
-                    const nearBot = (yBefore + height >= hBefore - stride - 0.5)
-
-                    if (!nearBot) {
-                        removalFn()
-                        return
-                    }
-
-                    bottomCompAnim.stop()
-                    scrollCompAnim.stop()
-
-                    plList._bottomComp = plList._bottomComp + stride
-                    removalFn()
-
-                    const targetY = Math.max(0, hBefore - stride - height)
-
-                    if (Math.abs(plList.contentY - targetY) > 0.5) {
-                        scrollCompAnim.from = plList.contentY
-                        scrollCompAnim.to = targetY
-                        scrollCompAnim.start()
-                    }
-
-                    bottomCompAnim.from = plList._bottomComp
-                    bottomCompAnim.to   = 0
-                    bottomCompAnim.restart()
-                }
-
-                onContentYChanged: {
-                    if (dragIndex >= 0) computeDropFromCursor()
-                    if (dropOverlay && dropOverlay.active) {
-                        dropOverlay.yArmed = false
-                        Qt.callLater(function() {
-                            if (dropOverlay) {
-                                dropOverlay.lastY = dropOverlay.y
-                                dropOverlay.yArmed = true
-                            }
-                        })
-                    }
-                }
-
-                NumberAnimation {
-                    id: wheelAnim
-                    target: plList
-                    property: "contentY"
-                    duration: 260
-                    easing.type: Easing.OutCubic
-                }
-
-                WheelHandler {
-                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                    blocking: true
-                    onWheel: (event) => {
-                        let dy = 0
-                        if (Math.abs(event.pixelDelta.y) > 0) dy = event.pixelDelta.y * 3.5
-                        else dy = (event.angleDelta.y / 120.0) * 140
-
-                        const maxY = Math.max(0, plList.originY + plList.contentHeight - plList.height)
-                        const minY = plList.originY
-
-                        if (plList.contentY > maxY) plList.contentY = maxY
-                        if (plList.contentY < minY) plList.contentY = minY
-
-                        const currentTarget = wheelAnim.running ? wheelAnim.to : plList.contentY
-                        let target = currentTarget - dy
-                        if (target > maxY) target = maxY
-                        if (target < minY) target = minY
-
-                        if (Math.abs(target - plList.contentY) < 0.5) {
-                            event.accepted = true
-                            return
-                        }
-
-                        wheelAnim.stop()
-                        wheelAnim.from = plList.contentY
-                        wheelAnim.to = target
-                        wheelAnim.duration = Math.min(550, Math.max(240, Math.abs(target - plList.contentY) * 1.2))
-                        wheelAnim.start()
-                        event.accepted = true
-                    }
-                }
-
-                add: Transition {
-                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 280; easing.type: Easing.OutCubic }
-                    NumberAnimation { property: "x"; from: -60; to: 0; duration: 340; easing.type: Easing.OutCubic }
-                }
-                remove: Transition {
-                    NumberAnimation { property: "opacity"; to: 0; duration: 380; easing.type: Easing.OutCubic }
-                    NumberAnimation { property: "x"; to: -60; duration: 420; easing.type: Easing.OutCubic }
-                }
-                displaced: Transition {
-                    NumberAnimation { properties: "x,y"; duration: 320; easing.type: Easing.OutCubic }
-                }
-                move: Transition {
-                    NumberAnimation { properties: "x,y"; duration: 320; easing.type: Easing.OutCubic }
-                }
-
-                delegate: PlaylistItem {
-                    listView: plList
-                    onOpened: (id, name) => page.playlistOpened(id, name)
-                    onRenameRequested: (id, name, px, py) => {
-                        nameDialog.x = Math.max(12, Math.min(px, page.width - nameDialog.width - 12))
-                        nameDialog.y = py
-                        nameDialog.mode = "rename"
-                        nameDialog.playlistId = id
-                        nameInput.text = name
-                        nameDialog.open()
-                        Qt.callLater(() => nameInput.forceActiveFocus())
-                    }
-                    onDeleteRequested: (id, name) => {
-                        deleteDialog.targetId = id
-                        deleteDialog.targetName = name
-                        deleteDialog.open()
-                    }
-                }
+                const cpt = vy + contentY - originY
+                const idx = Math.floor(cpt / stride)
+                const ly = cpt - idx * stride
+                let slot = (ly < 24) ? idx : idx + 1
+                if (slot < 0) slot = 0
+                if (slot > count) slot = count
+                if (slot !== dropIndex) dropIndex = slot
             }
 
-            Rectangle {
-                id: dropOverlay
-                z: 300
-                x: 20
-                width: plList.width - 40
-                height: 2
-                radius: 1
-                color: theme.primary
+            NumberAnimation {
+                id: bottomCompAnim
+                target: plList
+                property: "_bottomComp"
+                to: 0
+                duration: 320
+                easing.type: Easing.OutCubic
+            }
 
-                readonly property bool active: plList.dragIndex >= 0 && plList.dropIndex >= 0
-                readonly property real rawY: active
-                    ? plList.dropIndex * (48 + plList.spacing) - (plList.contentY - plList.originY) - 1
-                    : 0
+            NumberAnimation {
+                id: scrollCompAnim
+                target: plList
+                property: "contentY"
+                duration: 320
+                easing.type: Easing.OutCubic
+            }
 
-                property real lastY: 0
-                property bool yArmed: false
-
-                y: {
-                    if (!active) return lastY
-                    if (rawY < 0) return 0
-                    if (rawY > plList.height - 2) return plList.height - 2
-                    return rawY
+            function removeWithSmoothScroll(removalFn) {
+                const stride = 48 + spacing
+                const yBefore = contentY
+                const hBefore = contentHeight
+                const nearBot = (yBefore + height >= hBefore - stride - 0.5)
+                if (!nearBot) { removalFn(); return }
+                bottomCompAnim.stop()
+                scrollCompAnim.stop()
+                plList._bottomComp = plList._bottomComp + stride
+                removalFn()
+                const targetY = Math.max(0, hBefore - stride - height)
+                if (Math.abs(plList.contentY - targetY) > 0.5) {
+                    scrollCompAnim.from = plList.contentY
+                    scrollCompAnim.to = targetY
+                    scrollCompAnim.start()
                 }
+                bottomCompAnim.from = plList._bottomComp
+                bottomCompAnim.to   = 0
+                bottomCompAnim.restart()
+            }
 
-                onYChanged: if (active && yArmed) lastY = y
-
-                opacity: active ? 1 : 0
-
-                onActiveChanged: {
-                    if (active) {
-                        dropOverlay.yArmed = false
-                        Qt.callLater(function() {
+            onContentYChanged: {
+                if (dragIndex >= 0) computeDropFromCursor()
+                if (dropOverlay && dropOverlay.active) {
+                    dropOverlay.yArmed = false
+                    Qt.callLater(function() {
+                        if (dropOverlay) {
                             dropOverlay.lastY = dropOverlay.y
                             dropOverlay.yArmed = true
-                        })
-                    } else {
-                        dropOverlay.yArmed = false
-                    }
+                        }
+                    })
                 }
+            }
 
-                Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                Behavior on y {
-                    enabled: dropOverlay.yArmed
-                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            ScrollBar.vertical: ScrollBar {
+                id: plScrollBar
+                policy: plList.contentHeight > plList.height + 1 ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                width: 10
+                contentItem: Rectangle {
+                    implicitWidth: 5
+                    radius: 2.5
+                    color: theme.outline
+                    opacity: plScrollBar.pressed ? 0.8 : (plScrollBar.hovered ? 0.55 : 0.3)
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                }
+                background: Item {}
+            }
+
+            NumberAnimation {
+                id: wheelAnim
+                target: plList
+                property: "contentY"
+                duration: 260
+                easing.type: Easing.OutCubic
+            }
+
+            WheelHandler {
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                blocking: true
+                onWheel: (event) => {
+                    let dy = 0
+                    if (Math.abs(event.pixelDelta.y) > 0) dy = event.pixelDelta.y * 3.5
+                    else dy = (event.angleDelta.y / 120.0) * 140
+                    const maxY = Math.max(0, plList.originY + plList.contentHeight - plList.height)
+                    const minY = plList.originY
+                    if (plList.contentY > maxY) plList.contentY = maxY
+                    if (plList.contentY < minY) plList.contentY = minY
+                    const currentTarget = wheelAnim.running ? wheelAnim.to : plList.contentY
+                    let target = currentTarget - dy
+                    if (target > maxY) target = maxY
+                    if (target < minY) target = minY
+                    if (Math.abs(target - plList.contentY) < 0.5) { event.accepted = true; return }
+                    wheelAnim.stop()
+                    wheelAnim.from = plList.contentY
+                    wheelAnim.to = target
+                    wheelAnim.duration = Math.min(550, Math.max(240, Math.abs(target - plList.contentY) * 1.2))
+                    wheelAnim.start()
+                    event.accepted = true
+                }
+            }
+
+            add: Transition {
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 280; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "x"; from: -60; to: 0; duration: 340; easing.type: Easing.OutCubic }
+            }
+            remove: Transition {
+                NumberAnimation { property: "opacity"; to: 0; duration: 380; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "x"; to: -60; duration: 420; easing.type: Easing.OutCubic }
+            }
+            displaced: Transition {
+                NumberAnimation { properties: "x,y"; duration: 320; easing.type: Easing.OutCubic }
+            }
+            move: Transition {
+                NumberAnimation { properties: "x,y"; duration: 320; easing.type: Easing.OutCubic }
+            }
+
+            delegate: PlaylistItem {
+                listView: plList
+                onOpened: (id, name) => page.playlistOpened(id, name)
+                onRenameRequested: (id, name, px, py) => {
+                    nameDialog.x = Math.max(12, Math.min(px, page.width - nameDialog.width - 12))
+                    nameDialog.y = py
+                    nameDialog.mode = "rename"
+                    nameDialog.playlistId = id
+                    nameInput.text = name
+                    nameDialog.open()
+                    Qt.callLater(() => nameInput.forceActiveFocus())
+                }
+                onDeleteRequested: (id, name) => {
+                    deleteDialog.targetId = id
+                    deleteDialog.targetName = name
+                    deleteDialog.open()
                 }
             }
         }
 
         Text {
-            Layout.fillWidth: true
-            text: library.playlistsFiltered.count === 0
-                ? (library.filterText.length > 0
-                    ? "No matches"
-                    : "No playlists yet — press +")
-                : library.playlistsFiltered.count
-                  + (library.playlistsFiltered.count === 1 ? " playlist" : " playlists")
+            anchors.centerIn: parent
+            text: library.filterText.length > 0
+                ? "No matches"
+                : "No playlists yet - press +"
+            visible: library.playlistsFiltered.count === 0
             color: theme.outline
-            font.pixelSize: 10
-            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 12
+            opacity: 0.6
+        }
+
+        Rectangle {
+            id: dropOverlay
+            z: 300
+            x: 20
+            width: plList.width - 40
+            height: 2
+            radius: 1
+            color: theme.primary
+
+            readonly property bool active: plList.dragIndex >= 0 && plList.dropIndex >= 0
+            readonly property real rawY: active
+                ? plList.dropIndex * (48 + plList.spacing) - (plList.contentY - plList.originY) - 1
+                : 0
+
+            property real lastY: 0
+            property bool yArmed: false
+
+            y: {
+                if (!active) return lastY
+                if (rawY < 0) return 0
+                if (rawY > plList.height - 2) return plList.height - 2
+                return rawY
+            }
+
+            onYChanged: if (active && yArmed) lastY = y
+            opacity: active ? 1 : 0
+
+            onActiveChanged: {
+                if (active) {
+                    dropOverlay.yArmed = false
+                    Qt.callLater(function() {
+                        dropOverlay.lastY = dropOverlay.y
+                        dropOverlay.yArmed = true
+                    })
+                } else {
+                    dropOverlay.yArmed = false
+                }
+            }
+
+            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            Behavior on y {
+                enabled: dropOverlay.yArmed
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
+        }
+
+        Rectangle {
+            id: listToolbar
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: 12
+            anchors.rightMargin: 24
+            z: 100
+            width: listToolbarRow.implicitWidth + 12
+            height: 34
+            radius: 14
+            color: Qt.rgba(theme.surfaceVariant.r, theme.surfaceVariant.g, theme.surfaceVariant.b, 0.96)
+            border.color: Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.10)
+            border.width: 1
+
+            Row {
+                id: listToolbarRow
+                anchors.centerIn: parent
+                spacing: 2
+
+                Rectangle {
+                    id: editListBtn
+                    width: editListRow.implicitWidth + 20
+                    height: 28
+                    radius: 10
+                    color: library.editMode
+                        ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.22)
+                        : (editListHov.containsMouse
+                            ? Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.08)
+                            : "transparent")
+                    Behavior on color { ColorAnimation { duration: 220 } }
+
+                    Item {
+                        id: editListRow
+                        anchors.centerIn: parent
+                        implicitWidth: Math.max(editRowEdit.implicitWidth, editRowDone.implicitWidth)
+                        implicitHeight: Math.max(editRowEdit.implicitHeight, editRowDone.implicitHeight)
+
+                        Row {
+                            id: editRowEdit
+                            anchors.centerIn: parent
+                            spacing: 5
+                            opacity: library.editMode ? 0 : 1
+                            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                            Icon {
+                                anchors.verticalCenter: parent.verticalCenter
+                                glyph: ""
+                                iconSize: 13
+                                iconColor: theme.onBackground
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Edit"
+                                color: theme.onBackground
+                                font.pixelSize: 11
+                                font.weight: Font.DemiBold
+                            }
+                        }
+
+                        Row {
+                            id: editRowDone
+                            anchors.centerIn: parent
+                            spacing: 5
+                            opacity: library.editMode ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                            Icon {
+                                anchors.verticalCenter: parent.verticalCenter
+                                glyph: ""
+                                iconSize: 13
+                                iconColor: theme.primary
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Done"
+                                color: theme.primary
+                                font.pixelSize: 11
+                                font.weight: Font.DemiBold
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        id: editListHov
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: library.toggleEditMode()
+                    }
+                }
+
+                Rectangle {
+                    id: newPlaylistBtn
+                    width: 28
+                    height: 28
+                    radius: 10
+                    color: newBtnHov.pressed
+                        ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.24)
+                        : (newBtnHov.containsMouse
+                            ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.18)
+                            : "transparent")
+                    Behavior on color { ColorAnimation { duration: 200 } }
+
+                    Icon {
+                        anchors.centerIn: parent
+                        glyph: ""
+                        iconSize: 16
+                        iconColor: theme.primary
+                    }
+
+                    MouseArea {
+                        id: newBtnHov
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            library.requestCloseSearch()
+                            const p = newPlaylistBtn.mapToItem(null, 0, 0)
+                            nameDialog.x = Math.max(12,
+                                Math.min(p.x + newPlaylistBtn.width - nameDialog.width,
+                                         page.width - nameDialog.width - 12))
+                            nameDialog.y = p.y + newPlaylistBtn.height + 6
+                            nameDialog.mode = "create"
+                            nameInput.text = ""
+                            nameDialog.open()
+                            Qt.callLater(() => nameInput.forceActiveFocus())
+                        }
+                    }
+                }
+            }
         }
     }
 }

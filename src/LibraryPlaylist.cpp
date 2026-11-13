@@ -197,6 +197,7 @@ void Library::deletePlaylist(const QString &id) {
 
             if (m_activePlaylistId == id) {
                 m_activePlaylistId.clear();
+                m_activePlaylistName.clear();
                 m_playlistTracks.clear();
                 emit activePlaylistChanged();
             }
@@ -214,6 +215,7 @@ void Library::renamePlaylist(const QString &id, const QString &name) {
     const QString trimmed = name.trimmed();
     if (trimmed.isEmpty() || p->name == trimmed) return;
     p->name = trimmed;
+    if (m_activePlaylistId == id) m_activePlaylistName = trimmed;
     savePlaylists();
     refreshPlaylistModel();
     emit playlistsChanged();
@@ -364,6 +366,8 @@ void Library::movePlaylist(int from, int to) {
 void Library::setActivePlaylist(const QString &id) {
     if (m_activePlaylistId == id) return;
     m_activePlaylistId = id;
+    const Playlist *ap = findPlaylist(id);
+    m_activePlaylistName = ap ? ap->name : QString();
     if (id.isEmpty()) {
         m_playbackPlaylistId.clear();
     }

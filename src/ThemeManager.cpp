@@ -38,6 +38,8 @@ ThemeManager::ThemeManager(QObject *parent) : QObject(parent) {
     m_navBarPosition = s.value("ui/navBarPosition", "top").toString();
     if (m_navBarPosition != "top" && m_navBarPosition != "center" && m_navBarPosition != "bottom")
         m_navBarPosition = "top";
+    m_hideHeader = s.value("ui/hideHeader", false).toBool();
+    m_hideNavBar = s.value("ui/hideNavBar", false).toBool();
 #ifdef Q_OS_WIN
     m_renderBackend = s.value("ui/renderBackend", "d3d11").toString();
 #else
@@ -131,6 +133,20 @@ void ThemeManager::setNavBarPosition(const QString &v) {
     m_navBarPosition = v;
     QSettings().setValue("ui/navBarPosition", v);
     emit navBarPositionChanged();
+}
+
+void ThemeManager::setHideHeader(bool v) {
+    if (m_hideHeader == v) return;
+    m_hideHeader = v;
+    QSettings().setValue("ui/hideHeader", v);
+    emit hideHeaderChanged();
+}
+
+void ThemeManager::setHideNavBar(bool v) {
+    if (m_hideNavBar == v) return;
+    m_hideNavBar = v;
+    QSettings().setValue("ui/hideNavBar", v);
+    emit hideNavBarChanged();
 }
 
 void ThemeManager::setRenderBackend(const QString &v) {

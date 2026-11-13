@@ -10,6 +10,20 @@ Item {
 
     readonly property color tipText: theme.onBackground
     readonly property bool filtered: library.filterArtist.length > 0 || library.filterAlbum.length > 0
+    readonly property bool playlistMode: library.activePlaylistId !== ""
+    readonly property bool backAvailable: playlistMode || filtered
+    readonly property int visibleTrackCount: playlistMode ? library.activePlaylistTrackCount : library.trackCount
+    readonly property int effectiveCurrentIndex: {
+        if (playlistMode) {
+            const curPath = library.currentFilePath
+            if (curPath === "") return -1
+            for (let i = 0; i < library.playlistTracks.count; ++i) {
+                if (library.playlistTracks.pathAt(i) === curPath) return i
+            }
+            return -1
+        }
+        return library.currentIndex
+    }
 
     function openAddMenu(path, rightX, anchorContentY, btnHeight) {
         addMenu.open(path, rightX, anchorContentY, btnHeight, list)
@@ -18,7 +32,7 @@ Item {
     function closeSort()    { sortMenu.close() }
 
     function scrollToCurrent() {
-        if (library.currentIndex < 0) return
+        if (page.effectiveCurrentIndex < 0) return
         scrollTimer.restart()
     }
 
@@ -27,7 +41,7 @@ Item {
         interval: 380
         property int retries: 0
         onTriggered: {
-            if (library.currentIndex < 0) return
+            if (page.effectiveCurrentIndex < 0) return
             if (list.contentHeight <= 0 || list.height <= 0) {
                 if (retries < 4) { retries++; restart(); return }
                 retries = 0
@@ -36,7 +50,7 @@ Item {
             retries = 0
             const stride = 44
             const itemH = 42
-            const itemY = library.currentIndex * stride
+            const itemY = page.effectiveCurrentIndex * stride
             const centerOffset = Math.max(0, (list.height - itemH) / 2)
             const targetY = itemY - centerOffset
             const maxY = Math.max(0, list.contentHeight - list.height)
@@ -86,14 +100,18 @@ Item {
             z: 100
 
             Rectangle {
-                Layout.preferredWidth: 36
-                Layout.preferredHeight: 36
+                Layout.preferredWidth: page.backAvailable ? 30 : 36
+                Layout.preferredHeight: page.backAvailable ? 30 : 36
                 Layout.alignment: Qt.AlignVCenter
-                radius: 11
-                color: Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.16)
+                radius: page.backAvailable ? 9 : 11
+                color: page.backAvailable
+                    ? (headerHov.containsMouse
+                        ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.20)
+                        : Qt.rgba(theme.onBackground.r, theme.onBackground.g, theme.onBackground.b, 0.06))
+                    : Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.16)
                 Behavior on color { ColorAnimation { duration: 180 } }
 
-                scale: headerHov.pressed && page.filtered ? 0.92 : 1.0
+                scale: headerHov.pressed && page.backAvailable ? 0.92 : 1.0
                 Behavior on scale {
                     NumberAnimation {
                         duration: 150
@@ -104,20 +122,21 @@ Item {
 
                 Icon {
                     anchors.centerIn: parent
-                    glyph: page.filtered ? "\ue5c4" : "\ue8f7"
-                    iconSize: 19
+                    glyph: page.backAvailable ? "\ue314" : "\ue88a"
+                    iconSize: page.backAvailable ? 16 : 19
                     iconColor: theme.primary
-                    filled: !page.filtered
+                    filled: !page.backAvailable
                 }
 
                 MouseArea {
                     id: headerHov
                     anchors.fill: parent
                     hoverEnabled: true
-                    enabled: page.filtered
-                    cursorShape: page.filtered ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    enabled: page.backAvailable
+                    cursorShape: page.backAvailable ? Qt.PointingHandCursor : Qt.ArrowCursor
                     onClicked: {
-                        library.clearFilter()
+                        if (page.playlistMode) library.setActivePlaylist("")
+                        else library.clearFilter()
                         page.backRequested()
                     }
                 }
@@ -128,18 +147,20 @@ Item {
                 spacing: 0
 
                 Text {
-                    text: page.filtered
-                        ? (library.filterAlbum.length > 0 ? "Album" : "Artist")
-                        : "Library"
+                    text: page.playlistMode ? "Playlist"
+                        : (page.filtered ? (library.filterAlbum.length > 0 ? "Album" : "Artist") : "Library")
                     color: theme.onBackground
                     font.pixelSize: 15
                     font.weight: Font.DemiBold
                 }
 
                 Text {
-                    text: page.filtered
-                        ? (library.filterAlbum.length > 0 ? library.filterAlbum : library.filterArtist)
-                        : (library.trackCount + (library.trackCount === 1 ? " track" : " tracks"))
+                    text: page.playlistMode
+                        ? (library.activePlaylistName + " · " + library.activePlaylistTrackCount
+                           + (library.activePlaylistTrackCount === 1 ? " track" : " tracks"))
+                        : (page.filtered
+                            ? (library.filterAlbum.length > 0 ? library.filterAlbum : library.filterArtist)
+                            : (library.trackCount + (library.trackCount === 1 ? " track" : " tracks")))
                     color: theme.outline
                     font.pixelSize: 10
                     elide: Text.ElideRight
@@ -151,7 +172,7 @@ Item {
 
             RowLayout {
                 Layout.alignment: Qt.AlignVCenter
-                visible: !page.filtered && (library.trackCount > 0 || library.likedCount > 0 || library.showOnlyLiked)
+                visible: !page.filtered && !page.playlistMode && (library.trackCount > 0 || library.likedCount > 0 || library.showOnlyLiked)
                 spacing: 6
 
                 Rectangle {
@@ -245,12 +266,14 @@ Item {
 
             Item {
                 id: reorderBtnSlot
-                readonly property bool reorderAvailable: library.trackCount > 0
-                    && library.sortField === "custom"
-                    && !library.showOnlyLiked
-                    && library.filterText === ""
-                    && library.filterArtist === ""
-                    && library.filterAlbum === ""
+                readonly property bool reorderAvailable: page.playlistMode
+                    ? (library.activePlaylistTrackCount > 0 && !library.showOnlyLiked && library.filterText === "")
+                    : (library.trackCount > 0
+                        && library.sortField === "custom"
+                        && !library.showOnlyLiked
+                        && library.filterText === ""
+                        && library.filterArtist === ""
+                        && library.filterAlbum === "")
 
                 Layout.preferredWidth: reorderAvailable ? 32 : 0
                 Layout.preferredHeight: 32
@@ -315,7 +338,7 @@ Item {
 
             Item {
                 id: sortBtnSlot
-                readonly property bool shown: library.filterArtist === "" && library.filterAlbum === "" && library.trackCount > 0
+                readonly property bool shown: !page.playlistMode && library.filterArtist === "" && library.filterAlbum === "" && library.trackCount > 0
                 Layout.preferredWidth: shown ? 32 : 0
                 Layout.preferredHeight: 32
                 Layout.alignment: Qt.AlignVCenter
@@ -390,7 +413,7 @@ Item {
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: library.trackCount === 0
+            visible: page.visibleTrackCount === 0
 
             ColumnLayout {
                 anchors.centerIn: parent
@@ -407,7 +430,8 @@ Item {
 
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: library.showOnlyLiked ? "No liked tracks" : "No library"
+                    text: page.playlistMode ? "Empty playlist"
+                        : (library.showOnlyLiked ? "No liked tracks" : "No library")
                     color: theme.onSurface
                     font.pixelSize: 15
                     font.weight: Font.Medium
@@ -415,11 +439,13 @@ Item {
 
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: library.showOnlyLiked
-                        ? (library.likedCount === 0
-                            ? "Press Ctrl+W or middle-click on a track to add it here"
-                            : "Nothing matches the current filters")
-                        : "Press Ctrl+O to select a folder"
+                    text: page.playlistMode
+                        ? "Add tracks from library via + button on a track"
+                        : (library.showOnlyLiked
+                            ? (library.likedCount === 0
+                                ? "Press Ctrl+W or middle-click on a track to add it here"
+                                : "Nothing matches the current filters")
+                            : "Press Ctrl+O to select a folder")
                     color: theme.outline
                     font.pixelSize: 11
                     horizontalAlignment: Text.AlignHCenter
@@ -430,7 +456,7 @@ Item {
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: library.trackCount > 0
+            visible: page.visibleTrackCount > 0
             clip: true
 
             ListView {
@@ -557,7 +583,7 @@ Item {
 
                 ScrollBar.vertical: ScrollBar {
                     id: vbar
-                    policy: ScrollBar.AsNeeded
+                    policy: list.contentHeight > list.height + 1 ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
                     width: 10
                     contentItem: Rectangle {
                         implicitWidth: 5

@@ -29,7 +29,7 @@ Rectangle {
     property real pressY: -1
     property int  pressIndex: -1
 
-    width: listView ? listView.width : 0
+    width: listView ? (listView.width - 12) : 0
     height: 42
     radius: 10
     color: "transparent"
@@ -131,6 +131,7 @@ Rectangle {
                         glyph: trackRow.isCurrent && library.isPlaying ? "\ue034" : "\ue037"
                         iconSize: 14
                         iconColor: "white"
+                        filled: true
                     }
                 }
 

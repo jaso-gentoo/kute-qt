@@ -66,6 +66,7 @@ class Library : public QObject {
     Q_PROPERTY(PlaylistModel* playlists          READ playlists          CONSTANT)
     Q_PROPERTY(PlaylistFilterModel* playlistsFiltered READ playlistsFiltered CONSTANT)
     Q_PROPERTY(QString      activePlaylistId   READ activePlaylistId   NOTIFY activePlaylistChanged)
+    Q_PROPERTY(QString      activePlaylistName READ activePlaylistName NOTIFY activePlaylistChanged)
     Q_PROPERTY(int          activePlaylistTrackCount READ activePlaylistTrackCount NOTIFY activePlaylistChanged)
     Q_PROPERTY(TrackModel*  playlistTracks     READ playlistTracks     CONSTANT)
     Q_PROPERTY(AudioVisualizer* visualizer READ visualizer CONSTANT)
@@ -140,6 +141,7 @@ public:
     PlaylistModel* playlists() { return &m_playlistModel; }
     PlaylistFilterModel* playlistsFiltered() { return m_playlistsProxy; }
     QString      activePlaylistId() const { return m_activePlaylistId; }
+    QString      activePlaylistName() const { return m_activePlaylistName; }
     int          activePlaylistTrackCount() const;
     TrackModel*  playlistTracks()   { return &m_playlistTracks; }
 
@@ -371,5 +373,6 @@ private:
 
     QList<Playlist> m_playlists;
     QString         m_activePlaylistId;
+    QString         m_activePlaylistName;
     QString         m_playbackPlaylistId;
 };

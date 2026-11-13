@@ -257,12 +257,13 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 30
+            Layout.preferredHeight: 42
             spacing: 10
 
             Rectangle {
                 Layout.preferredWidth: 30
                 Layout.preferredHeight: 30
+                Layout.alignment: Qt.AlignVCenter
                 radius: 9
                 color: backHov.containsMouse
                     ? Qt.rgba(theme.primary.r, theme.primary.g, theme.primary.b, 0.20)
@@ -276,9 +277,9 @@ Item {
 
                 Icon {
                     anchors.centerIn: parent
-                    glyph: "\ue5c4"
+                    glyph: "\ue314"
                     iconSize: 16
-                    iconColor: theme.onBackground
+                    iconColor: theme.primary
                     x: backHov.containsMouse ? -1 : 0
                     Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                 }
@@ -293,10 +294,10 @@ Item {
             }
 
             Text {
-                text: "PLAYLIST"
-                color: theme.outline
-                font.pixelSize: 10
-                font.letterSpacing: 1.4
+                text: "Playlist"
+                color: theme.onBackground
+                font.pixelSize: 15
+                font.weight: Font.DemiBold
             }
 
             Item { Layout.fillWidth: true }
@@ -446,6 +447,20 @@ Item {
                 cacheBuffer: 2000
                 reuseItems: false
                 model: library.playlistTracks
+
+                ScrollBar.vertical: ScrollBar {
+                    id: detailScrollBar
+                    policy: trackList.contentHeight > trackList.height + 1 ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                    width: 10
+                    contentItem: Rectangle {
+                        implicitWidth: 5
+                        radius: 2.5
+                        color: theme.outline
+                        opacity: detailScrollBar.pressed ? 0.8 : (detailScrollBar.hovered ? 0.55 : 0.3)
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                    }
+                    background: Item {}
+                }
 
                 property int  dragIndex: -1
                 property int  dropIndex: -1

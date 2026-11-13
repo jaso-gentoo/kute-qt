@@ -8,6 +8,10 @@ Rectangle {
     radius: 16
     border.color: Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.18)
     border.width: 1
+    clip: true
+
+    signal requestHide
+
 
     readonly property int coverSize: 165
     readonly property real dpr: Screen.devicePixelRatio > 0
@@ -19,7 +23,7 @@ Rectangle {
     readonly property int waveLineWidth: 3
     readonly property int ringPad: Math.ceil(waveAmp + waveLineWidth / 2 + 1)
     readonly property int ringCanvasSize: ringRectSize + ringPad * 2
-    implicitHeight: 34 + 220 + 6 + infoWrap.height + 6
+    implicitHeight: 254 + infoWrap.height
 
     readonly property int currentRingRadius: ringRectSize / 2
     readonly property string coverShape: theme.coverShape
@@ -246,6 +250,7 @@ Rectangle {
                 glyph: library.isPlaying ? "" : ""
                 iconSize: 11
                 iconColor: theme.primary
+                filled: true
             }
 
             Text {
@@ -260,12 +265,34 @@ Rectangle {
     }
 
     Item {
-        id: coverArea
-        anchors.top: parent.top
-        anchors.topMargin: 34
+        id: contentStack
         anchors.horizontalCenter: parent.horizontalCenter
-        width: 220
-        height: 220
+        width: parent.width
+        height: coverArea.height + infoWrap.height - 4
+
+        property real _targetY: {
+            const topMin = 44
+            const avail = panel.height - contentStack.height
+            if (avail <= topMin) return topMin
+            switch (theme.infoPanelPosition) {
+                case "center": return Math.max(topMin, avail / 2)
+                case "bottom": return Math.max(topMin, avail - 8)
+                default:       return topMin
+            }
+        }
+
+        y: _targetY
+
+        Behavior on y {
+            NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+        }
+
+        Item {
+            id: coverArea
+            y: 0
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: panel.ringCanvasSize
+            height: panel.ringCanvasSize
 
         Canvas {
             id: ringCanvas
@@ -511,8 +538,8 @@ Rectangle {
             Image {
                 id: prevImg
                 anchors.centerIn: parent
-                width: 220
-                height: 220
+                width: panel.coverSize + 20
+                height: panel.coverSize + 20
                 source: coverBox.prevSource
                 sourceSize.width: panel.coverDecodeSize
                 sourceSize.height: panel.coverDecodeSize
@@ -527,8 +554,8 @@ Rectangle {
             Image {
                 id: liveImg
                 anchors.centerIn: parent
-                width: 220
-                height: 220
+                width: panel.coverSize + 20
+                height: panel.coverSize + 20
                 source: coverBox.liveSource
                 sourceSize.width: panel.coverDecodeSize
                 sourceSize.height: panel.coverDecodeSize
@@ -543,8 +570,8 @@ Rectangle {
             Canvas {
                 id: renderCanvas
                 anchors.centerIn: parent
-                width: 220
-                height: 220
+                width: panel.coverSize + 20
+                height: panel.coverSize + 20
                 onPaint: {
                     var ctx = getContext("2d")
                     ctx.reset()
@@ -641,59 +668,59 @@ Rectangle {
             }
             onReleased: (mouse) => { panel.seeking = false }
         }
-
     }
 
     Item {
         id: infoWrap
         anchors.top: coverArea.bottom
-        anchors.topMargin: 6
+        anchors.topMargin: -4
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: 16
         anchors.rightMargin: 16
         height: infoCol.implicitHeight
 
-        transform: Translate { id: infoShift; y: 0 }
+            transform: Translate { id: infoShift; y: 0 }
 
-        ColumnLayout {
-            id: infoCol
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            spacing: 4
+            ColumnLayout {
+                id: infoCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                spacing: 4
 
-            Text {
-                Layout.fillWidth: true
-                text: panel.dHasCurrent ? panel.dTitle : "Nothing playing"
-                color: theme.onBackground
-                font.pixelSize: 18
-                font.weight: Font.DemiBold
-                elide: Text.ElideRight
-                horizontalAlignment: Text.AlignHCenter
-                maximumLineCount: 2
-                wrapMode: Text.Wrap
-            }
+                Text {
+                    Layout.fillWidth: true
+                    text: panel.dHasCurrent ? panel.dTitle : "Nothing playing"
+                    color: theme.onBackground
+                    font.pixelSize: 18
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignHCenter
+                    maximumLineCount: 2
+                    wrapMode: Text.Wrap
+                }
 
-            Text {
-                Layout.fillWidth: true
-                text: panel.dHasCurrent ? panel.dArtist : "—"
-                color: theme.outline
-                font.pixelSize: 13
-                elide: Text.ElideRight
-                horizontalAlignment: Text.AlignHCenter
-            }
+                Text {
+                    Layout.fillWidth: true
+                    text: panel.dHasCurrent ? panel.dArtist : "—"
+                    color: theme.outline
+                    font.pixelSize: 13
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignHCenter
+                }
 
-            Text {
-                Layout.fillWidth: true
-                text: (panel.dHasCurrent && panel.dAlbum !== "Unknown Album") ? panel.dAlbum : ""
-                color: theme.outline
-                font.pixelSize: 11
-                opacity: 0.7
-                elide: Text.ElideRight
-                horizontalAlignment: Text.AlignHCenter
-                visible: text.length > 0
+                Text {
+                    Layout.fillWidth: true
+                    text: (panel.dHasCurrent && panel.dAlbum !== "Unknown Album") ? panel.dAlbum : ""
+                    color: theme.outline
+                    font.pixelSize: 11
+                    opacity: 0.7
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: text.length > 0
+                }
             }
         }
-    }
+        }
 }

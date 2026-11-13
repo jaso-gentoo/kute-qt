@@ -19,7 +19,7 @@ Item {
     signal deleteRequested(string id, string name)
     signal reorderFinished()
 
-    width: listView ? listView.width : 0
+    width: listView ? (listView.width - 12) : 0
     height: 48
     clip: true
 
@@ -194,37 +194,45 @@ Item {
                 }
             }
 
-            Text {
-                id: plNameText
+            RowLayout {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 40
                 Layout.alignment: Qt.AlignVCenter
-                text: plRowWrap.playlistName
-                color: plHov.hovered ? theme.primary : theme.onSurface
-                font.pixelSize: 12
-                font.weight: Font.Medium
-                elide: Text.ElideRight
-                Behavior on color { ColorAnimation { duration: 220 } }
+                spacing: 6
 
-                TapHandler {
-                    enabled: library.editMode
-                    gesturePolicy: TapHandler.DragThreshold
-                    onTapped: {
-                        const p = plNameText.mapToItem(null, 0, 0)
-                        plRowWrap.renameRequested(plRowWrap.playlistId,
-                                                  plRowWrap.playlistName,
-                                                  p.x,
-                                                  p.y + plNameText.height + 4)
+                Text {
+                    id: plNameText
+                    Layout.preferredWidth: Math.min(implicitWidth, plRowWrap.width - 200)
+                    text: plRowWrap.playlistName
+                    color: plHov.hovered ? theme.primary : theme.onSurface
+                    font.pixelSize: 12
+                    font.weight: Font.Medium
+                    elide: Text.ElideRight
+                    Behavior on color { ColorAnimation { duration: 220 } }
+
+                    TapHandler {
+                        enabled: library.editMode
+                        gesturePolicy: TapHandler.DragThreshold
+                        onTapped: {
+                            const p = plNameText.mapToItem(null, 0, 0)
+                            plRowWrap.renameRequested(plRowWrap.playlistId,
+                                                      plRowWrap.playlistName,
+                                                      p.x,
+                                                      p.y + plNameText.height + 4)
+                        }
                     }
                 }
-            }
 
-            Text {
-                Layout.alignment: Qt.AlignVCenter
-                text: plRowWrap.playlistTrackCount
-                      + (plRowWrap.playlistTrackCount === 1 ? " track" : " tracks")
-                color: theme.outline
-                font.pixelSize: 10
+                Text {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: "· " + plRowWrap.playlistTrackCount
+                          + (plRowWrap.playlistTrackCount === 1 ? " track" : " tracks")
+                    color: theme.outline
+                    font.pixelSize: 10
+                    opacity: 0.85
+                }
+
+                Item { Layout.fillWidth: true }
             }
         }
 

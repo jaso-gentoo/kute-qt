@@ -22,11 +22,11 @@ Rectangle {
 
     readonly property string rowPath: path
 
+    readonly property bool playlistMode: library.activePlaylistId !== ""
     readonly property bool canDrag: library.editMode
-        && library.filterArtist === ""
-        && library.filterAlbum === ""
-        && library.filterText === ""
         && !library.showOnlyLiked
+        && library.filterText === ""
+        && (playlistMode || (library.filterArtist === "" && library.filterAlbum === ""))
 
     readonly property bool isCurrent: library.currentFilePath === rowPath
     readonly property bool isDragging: listView && listView.dragIndex === row.index
@@ -127,7 +127,8 @@ Rectangle {
                 dragging = false
 
                 if (from >= 0 && to >= 0 && to !== from) {
-                    library.moveTrack(from, to)
+                    if (row.playlistMode) library.moveTrackInPlaylist(library.activePlaylistId, from, to)
+                    else library.moveTrack(from, to)
                     row.reorderFinished()
                 }
                 return
@@ -137,7 +138,8 @@ Rectangle {
             if (mouse.button !== Qt.LeftButton) return
 
             if (row.isCurrent) library.togglePlayPause()
-            else               library.playIndex(row.index)
+            else if (row.playlistMode) library.playPlaylistIndex(row.index)
+            else library.playIndex(row.index)
             row.activated()
         }
 
@@ -244,6 +246,7 @@ Rectangle {
                     glyph: row.isCurrent && library.isPlaying ? "\ue034" : "\ue037"
                     iconSize: 14
                     iconColor: "white"
+                    filled: true
                     opacity: rowHover.hovered ? 1 : 0
                     scale: rowHover.hovered ? 1.0 : 0.7
                     Behavior on opacity { NumberAnimation { duration: 150 } }

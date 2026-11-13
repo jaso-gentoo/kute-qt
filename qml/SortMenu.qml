@@ -53,8 +53,16 @@ Item {
             return p.y + 6
         }
 
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+            hoverEnabled: false
+            onPressed: (m) => m.accepted = true
+        }
+
         HoverHandler {
             id: menuHover
+            blocking: true
         }
 
         ColumnLayout {

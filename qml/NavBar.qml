@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 
 Rectangle {
     id: rail
@@ -17,16 +18,10 @@ Rectangle {
     property int currentIndex: 0
 
     implicitHeight: contentCol.implicitHeight + 20
-    radius: 18
+    radius: 16
     color: theme.surface
-
-    Rectangle {
-        anchors.fill: parent
-        radius: parent.radius
-        color: "transparent"
-        border.color: Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.18)
-        border.width: 1
-    }
+    border.color: Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.18)
+    border.width: 1
 
     component RailBtn: Item {
         id: rb
@@ -77,16 +72,15 @@ Rectangle {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: {
-                rbIcon.spin()
-                rb.clicked()
-            }
+            onClicked: rb.clicked()
         }
 
         Rectangle {
-            anchors.left: parent.right
-            anchors.leftMargin: 12
-            anchors.verticalCenter: parent.verticalCenter
+            id: rbTipRect
+            parent: Overlay.overlay ? Overlay.overlay : rb
+            readonly property point absPos: rb.mapToItem(parent, rb.width + 12, rb.height / 2)
+            x: absPos.x
+            y: absPos.y - height / 2
             width: rbTip.implicitWidth + 20
             height: 26
             radius: 9
@@ -95,8 +89,14 @@ Rectangle {
             border.width: 1
             opacity: rbHov.containsMouse ? 1 : 0
             visible: opacity > 0
-            z: 100
+            z: 999999
             Behavior on opacity { NumberAnimation { duration: 150 } }
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.AllButtons
+                onPressed: (m) => m.accepted = true
+            }
 
             Text {
                 id: rbTip
@@ -179,13 +179,27 @@ Rectangle {
 
     ColumnLayout {
         id: contentCol
-        anchors.top: parent.top
-        anchors.topMargin: 10
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: 4
 
+        property real _targetY: {
+            const h = contentCol.implicitHeight
+            const margin = 10
+            switch (theme.navBarPosition) {
+                case "center": return Math.max(margin, (rail.height - h) / 2)
+                case "bottom": return Math.max(margin, rail.height - h - margin)
+                default:       return margin
+            }
+        }
+
+        y: _targetY
+
+        Behavior on y {
+            NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+        }
+
         RailBtn {
-            glyph: "\ue88a"
+            glyph: ""
             tip: "Home (Ctrl+1)"
             active: rail.currentIndex === 0
             onClicked: {
@@ -195,7 +209,7 @@ Rectangle {
         }
 
         RailBtn {
-            glyph: "\ue8ef"
+            glyph: ""
             tip: "Browse (Ctrl+2)"
             active: rail.currentIndex === 1
             onClicked: {
@@ -207,7 +221,7 @@ Rectangle {
         RailDivider {}
 
         RailBtn {
-            glyph: "\ue88e"
+            glyph: ""
             tip: "Now playing (Ctrl+Q)"
             active: library.infoPanelVisible
             onClicked: rail.infoToggled()
@@ -237,7 +251,7 @@ Rectangle {
             Icon {
                 id: panelIcon
                 anchors.centerIn: parent
-                glyph: "\ue5d2"
+                glyph: ""
                 iconSize: 20
                 filled: rail.panelActive
                 iconColor: rail.panelActive ? theme.primary : theme.onBackground
@@ -279,26 +293,22 @@ Rectangle {
 
     Item {
         id: panelMenu
+        parent: Overlay.overlay ? Overlay.overlay : rail
         property bool menuOpen: false
         property bool hovered: menuHov.hovered
 
-        readonly property real btnX: contentCol.x + panelBtn.x
-        readonly property real btnY: contentCol.y + panelBtn.y
         readonly property real btnW: panelBtn.width
         readonly property real btnH: panelBtn.height
-
-        readonly property real btnCX: btnX + btnW / 2
-        readonly property real btnCY: btnY + btnH / 2
+        readonly property point absBtn: rail.mapToItem(parent, contentCol.x + panelBtn.x, contentCol.y + panelBtn.y)
         readonly property real targetW: 200
         readonly property real targetH: menuContent.implicitHeight + 16
 
-        x: btnX + btnW + 6
+        x: absBtn.x + btnW + 6
         y: {
-            const natural = Math.min(btnY, btnCY - targetH / 2)
-            if (!rail.parent) return natural
-            const safeBottom = rail.parent.height - 82
-            const maxY = safeBottom - targetH - rail.y
-            return Math.max(0, Math.min(natural, maxY))
+            const natural = Math.min(absBtn.y, absBtn.y + btnH / 2 - targetH / 2)
+            if (!parent) return natural
+            const safeBottom = parent.height - 82
+            return Math.max(8, Math.min(natural, safeBottom - targetH))
         }
         width: targetW
         height: targetH
@@ -306,7 +316,7 @@ Rectangle {
         scale: menuOpen ? 1.0 : 0.9
         transformOrigin: Item.Left
         visible: opacity > 0.01
-        z: 50
+        z: 1000000
 
         Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
         Behavior on scale   { NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
@@ -317,6 +327,13 @@ Rectangle {
             color: theme.surface
             border.color: Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.22)
             border.width: 1
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.AllButtons
+                hoverEnabled: false
+                onPressed: (m) => m.accepted = true
+            }
         }
 
         Item {
@@ -331,10 +348,10 @@ Rectangle {
                 width: parent.width
                 spacing: 4
 
-                MenuItemBtn { icon: "\ue8b8"; label: "Settings"; onClicked: rail.settingsRequested() }
-                MenuItemBtn { icon: "\ue8b6"; label: "Search";   onClicked: rail.searchRequested() }
-                MenuItemBtn { icon: "\ue3c9"; label: "Metadata"; onClicked: rail.metadataRequested() }
-                MenuItemBtn { icon: "\ue405"; label: "Lyrics";   onClicked: rail.lyricsRequested() }
+                MenuItemBtn { icon: ""; label: "Settings"; onClicked: rail.settingsRequested() }
+                MenuItemBtn { icon: ""; label: "Search";   onClicked: rail.searchRequested() }
+                MenuItemBtn { icon: ""; label: "Metadata"; onClicked: rail.metadataRequested() }
+                MenuItemBtn { icon: ""; label: "Lyrics";   onClicked: rail.lyricsRequested() }
             }
         }
 
@@ -349,13 +366,14 @@ Rectangle {
 
     Item {
         id: hoverBridge
-        readonly property real bridgeX: panelMenu.x - 8
+        parent: panelMenu.parent
         readonly property real bridgeW: 10
-        x: bridgeX
+        x: panelMenu.x - 8
         y: panelMenu.y
         width: bridgeW
         height: panelMenu.height
         visible: panelMenu.menuOpen && panelMenu.opacity > 0.01
+        z: 999999
         HoverHandler {
             id: bridgeHov
             onHoveredChanged: {

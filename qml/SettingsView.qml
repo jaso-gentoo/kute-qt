@@ -889,6 +889,23 @@ FocusScope {
                         onToggled: library.visualizerEnabled = !library.visualizerEnabled
                     }
 
+                    SettingRow {
+                        icon: ""
+                        label: "Hide header"
+                        description: "Slide the top bar off-screen"
+                        rowChecked: theme.hideHeader
+                        onToggled: theme.hideHeader = !theme.hideHeader
+                    }
+
+                    SettingRow {
+                        icon: ""
+                        label: "Hide navigation bar"
+                        description: "Slide the navigation rail off-screen"
+                        rowChecked: theme.hideNavBar
+                        onToggled: theme.hideNavBar = !theme.hideNavBar
+                    }
+
+
                     PanelPositionRow {}
                     NavBarPositionRow {}
 

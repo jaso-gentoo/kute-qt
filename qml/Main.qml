@@ -27,12 +27,15 @@ ApplicationWindow {
     readonly property bool anyModalOpen: window.settingsOpen
 
     readonly property bool editAvailable: {
-        if (currentPage === 0)
+        if (currentPage === 0) {
+            if (library.showOnlyLiked) return false
+            if (library.sortField !== "custom") return false
             return library.filterArtist === ""
                 && library.filterAlbum === ""
-                && !library.showOnlyLiked
-        if (currentPage === 2 && browseView.currentTab === 0)
-            return true
+                && library.filterText === ""
+        }
+        if (currentPage === 3) return library.filterText === ""
+        if (currentPage === 2 && browseView.currentTab === 0) return true
         return false
     }
 
@@ -123,24 +126,26 @@ ApplicationWindow {
 
     function toggleEdit() {
         if (currentPage === 2 && browseView.currentTab !== 0) return
-        if (currentPage !== 0 && currentPage !== 2) return
         if (currentPage === 0) {
+            if (library.showOnlyLiked) return
             if (library.filterArtist !== "" || library.filterAlbum !== "") return
             if (library.filterText !== "") return
-            if (library.showOnlyLiked) return
+            if (library.sortField !== "custom") {
+                library.applySort("custom", true)
+            }
+        } else if (currentPage === 3) {
+            if (library.filterText !== "") return
+        } else if (currentPage !== 2) {
+            return
         }
         library.toggleEditMode()
     }
 
     function syncPlaybackContext() {
-        if (currentPage === 0) {
+        if (library.activePlaylistId !== "") {
+            library.setPlaybackContext("playlist")
+        } else {
             library.setPlaybackContext("library")
-        } else if (currentPage === 2) {
-            if (browseView.currentTab === 0 && browseView.playlistsPageViewing !== "") {
-                library.setPlaybackContext("playlist")
-            } else {
-                library.setPlaybackContext("library")
-            }
         }
         if (library.editMode && !window.editAvailable) {
             library.toggleEditMode()
@@ -149,12 +154,15 @@ ApplicationWindow {
 
     function goToHome() {
         library.clearFilter()
+        library.setActivePlaylist("")
         closeFloatingSearch()
         if (trackListPage) {
             trackListPage.closeSort()
             trackListPage.closeAddMenu()
         }
-        if (browseView) browseView.closePlaylistsDialogs()
+        if (browseView) {
+            browseView.closePlaylistsDialogs()
+        }
         library.setPlaybackContext("library")
         window.currentPage = 0
         navRail.currentIndex = 0
@@ -163,13 +171,16 @@ ApplicationWindow {
 
     function goToArtists() {
         library.clearFilter()
+        library.setActivePlaylist("")
         library.showOnlyLiked = false
         closeFloatingSearch()
         if (trackListPage) {
             trackListPage.closeSort()
             trackListPage.closeAddMenu()
         }
-        if (browseView) browseView.closePlaylistsDialogs()
+        if (browseView) {
+            browseView.closePlaylistsDialogs()
+        }
         library.setPlaybackContext("library")
         window.currentPage = 2
         navRail.currentIndex = 1
@@ -196,17 +207,25 @@ ApplicationWindow {
         window.settingsOpen = false
         window.lastSearchClose = Date.now()
         library.clearFilter()
-        window.currentPage = 2
+        library.setActivePlaylist(id)
+        if (trackListPage) {
+            trackListPage.closeSort()
+            trackListPage.closeAddMenu()
+        }
+        if (browseView) browseView.closePlaylistsDialogs()
+        window.currentPage = 3
         navRail.currentIndex = 1
-        browseView.currentTab = 0
-        browseView.openPlaylist(id, name)
-        if (shouldScroll) Qt.callLater(browseView.scrollPlaylistToCurrent)
+        if (shouldScroll) Qt.callLater(function() {
+            if (playlistDetailPage) playlistDetailPage.scrollToCurrent()
+        })
+        Qt.callLater(window.syncPlaybackContext)
     }
 
     function navigateToArtist(name, shouldScroll) {
         window.settingsOpen = false
         window.lastSearchClose = Date.now()
         library.clearFilter()
+        library.setActivePlaylist("")
         library.setFilterArtist(name)
         window.currentPage = 0
         navRail.currentIndex = 1
@@ -217,6 +236,7 @@ ApplicationWindow {
         window.settingsOpen = false
         window.lastSearchClose = Date.now()
         library.clearFilter()
+        library.setActivePlaylist("")
         library.setFilterAlbum(name)
         window.currentPage = 0
         navRail.currentIndex = 1
@@ -227,6 +247,7 @@ ApplicationWindow {
         window.settingsOpen = false
         window.lastSearchClose = Date.now()
         library.clearFilter()
+        library.setActivePlaylist("")
         window.currentPage = 0
         navRail.currentIndex = 0
         if (shouldScroll) Qt.callLater(window.scrollToCurrentTrack)
@@ -288,61 +309,116 @@ ApplicationWindow {
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 92
+            anchors.leftMargin: theme.hideNavBar ? 16 : 86
             anchors.rightMargin: 16
-            anchors.topMargin: 76
-            anchors.bottomMargin: 82
-            spacing: 20
+            anchors.topMargin: theme.hideHeader ? 16 : 70
+            anchors.bottomMargin: 88
+            spacing: library.infoPanelVisible ? 10 : 0
+            Behavior on spacing {
+                NumberAnimation { duration: 400; easing.type: Easing.OutCubic }
+            }
+            Behavior on anchors.leftMargin {
+                NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+            }
+            Behavior on anchors.topMargin {
+                NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+            }
 
-            Item {
+            Rectangle {
+                id: mainContentPanel
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                radius: 16
+                color: theme.surface
+                border.color: Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.18)
+                border.width: 1
                 clip: true
 
-                TrackList {
-                    id: trackListPage
+                Item {
                     anchors.fill: parent
-                    visible: window.currentPage === 0
-                    opacity: visible ? 1 : 0
-                    x: visible ? 0 : -20
-                    Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-                    Behavior on x       { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                    anchors.margins: 6
+                    clip: true
 
-                    onBackRequested: {
-                        window.currentPage = 2
-                        navRail.currentIndex = 1
-                        window.closeFloatingSearch()
-                    }
-                    onTrackActivated: window.closeFloatingSearch()
-                }
+                    TrackList {
+                        id: trackListPage
+                        anchors.fill: parent
+                        visible: window.currentPage === 0
+                        opacity: visible ? 1 : 0
+                        x: visible ? 0 : -20
+                        Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                        Behavior on x       { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
 
-                Browse {
-                    id: browseView
-                    anchors.fill: parent
-                    visible: window.currentPage === 2
-                    opacity: visible ? 1 : 0
-                    x: visible ? 0 : -20
-                    Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-                    Behavior on x       { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                        onBackRequested: {
+                            window.currentPage = 2
+                            navRail.currentIndex = 1
+                            window.closeFloatingSearch()
+                        }
+                        onTrackActivated: window.closeFloatingSearch()
+                    }
 
-                    onArtistSelected: (name) => {
-                        window.closeFloatingSearch()
-                        library.clearFilter()
-                        library.setFilterArtist(name)
-                        window.currentPage = 0
-                        navRail.currentIndex = 1
-                        Qt.callLater(window.scrollToCurrentTrack)
+                    Browse {
+                        id: browseView
+                        anchors.fill: parent
+                        visible: window.currentPage === 2
+                        opacity: visible ? 1 : 0
+                        x: visible ? 0 : -20
+                        Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                        Behavior on x       { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+
+                        onArtistSelected: (name) => {
+                            window.closeFloatingSearch()
+                            library.clearFilter()
+                            library.setActivePlaylist("")
+                            library.setFilterArtist(name)
+                            window.currentPage = 0
+                            navRail.currentIndex = 1
+                            Qt.callLater(window.scrollToCurrentTrack)
+                        }
+                        onAlbumSelected: (name) => {
+                            window.closeFloatingSearch()
+                            library.clearFilter()
+                            library.setActivePlaylist("")
+                            library.setFilterAlbum(name)
+                            window.currentPage = 0
+                            navRail.currentIndex = 1
+                            Qt.callLater(window.scrollToCurrentTrack)
+                        }
+                        onPlaylistOpened: (id, name) => {
+                            library.clearFilter()
+                            library.setActivePlaylist(id)
+                            window.closeFloatingSearch()
+                            if (trackListPage) {
+                                trackListPage.closeSort()
+                                trackListPage.closeAddMenu()
+                            }
+                            window.currentPage = 3
+                            navRail.currentIndex = 1
+                            Qt.callLater(window.syncPlaybackContext)
+                        }
+                        onBrowseActivated: window.closeFloatingSearch()
+                        onContextChanged: Qt.callLater(window.syncPlaybackContext)
                     }
-                    onAlbumSelected: (name) => {
-                        window.closeFloatingSearch()
-                        library.clearFilter()
-                        library.setFilterAlbum(name)
-                        window.currentPage = 0
-                        navRail.currentIndex = 1
-                        Qt.callLater(window.scrollToCurrentTrack)
+
+                    PlaylistDetail {
+                        id: playlistDetailPage
+                        anchors.fill: parent
+                        visible: window.currentPage === 3
+                        opacity: visible ? 1 : 0
+                        x: visible ? 0 : -20
+                        Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                        Behavior on x       { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+
+                        playlistId: library.activePlaylistId
+                        playlistName: library.activePlaylistName
+
+                        onBackRequested: {
+                            library.setActivePlaylist("")
+                            window.currentPage = 2
+                            navRail.currentIndex = 1
+                            Qt.callLater(window.syncPlaybackContext)
+                        }
+                        onPlaylistActivated: window.closeFloatingSearch()
                     }
-                    onBrowseActivated: window.closeFloatingSearch()
-                    onContextChanged: Qt.callLater(window.syncPlaybackContext)
                 }
             }
 
@@ -356,66 +432,9 @@ ApplicationWindow {
 
                 InfoPanel {
                     id: infoPanel
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    property real displayHeight: 200
-                    height: displayHeight
+                    anchors.fill: parent
                     opacity: library.infoPanelVisible ? 1 : 0
                     Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-
-                    property real _y: 0
-                    y: _y
-
-                    function _recomputeY() {
-                        if (infoSlot.height <= 0 || height <= 0) return 0
-                        const avail = infoSlot.height - height
-                        if (avail <= 0) return 0
-                        switch (theme.infoPanelPosition) {
-                            case "center": return avail / 2
-                            case "bottom": return Math.max(0, avail - 12)
-                            default: return 0
-                        }
-                    }
-                    function _applyY() { infoPanel._y = infoPanel._recomputeY() }
-
-                    onHeightChanged: _applyY()
-
-                    Connections {
-                        target: infoSlot
-                        function onHeightChanged() { if (infoPanel) infoPanel._applyY() }
-                    }
-
-                    NumberAnimation {
-                        id: yMoveAnim
-                        target: infoPanel
-                        property: "_y"
-                        duration: 340
-                        easing.type: Easing.OutCubic
-                    }
-                    Connections {
-                        target: theme
-                        function onInfoPanelPositionChanged() {
-                            yMoveAnim.stop()
-                            yMoveAnim.from = infoPanel._y
-                            yMoveAnim.to = infoPanel._recomputeY()
-                            yMoveAnim.start()
-                        }
-                    }
-                    Behavior on displayHeight {
-                        id: heightBehavior
-                        NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
-                    }
-                    onImplicitHeightChanged: { if (library.infoPanelVisible) displayHeight = implicitHeight }
-                    Component.onCompleted: {
-                        heightBehavior.enabled = false
-                        displayHeight = implicitHeight
-                        _applyY()
-                        Qt.callLater(function() { heightBehavior.enabled = true })
-                    }
-                    Connections {
-                        target: library
-                        function onInfoPanelVisibleChanged() { if (library.infoPanelVisible) displayHeight = implicitHeight }
-                    }
                 }
             }
         }
@@ -424,25 +443,19 @@ ApplicationWindow {
             id: header
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: parent.top
             anchors.leftMargin: 16
             anchors.rightMargin: 16
-            anchors.topMargin: 16
+            y: theme.hideHeader ? -44 : 16
+            Behavior on y { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
             height: 44
             radius: 16
             color: theme.surface
-
-            Rectangle {
-                anchors.fill: parent
-                radius: parent.radius
-                color: "transparent"
-                border.color: theme.outline
-                border.width: 1
-                opacity: 0.18
-            }
+            border.color: Qt.rgba(theme.outline.r, theme.outline.g, theme.outline.b, 0.18)
+            border.width: 1
 
             MouseArea {
                 anchors.fill: parent
+                enabled: !theme.hideHeader
                 onPressed: window.startSystemMove()
             }
 
@@ -451,6 +464,7 @@ ApplicationWindow {
                 anchors.leftMargin: 18
                 anchors.rightMargin: 8
                 spacing: 6
+                enabled: !theme.hideHeader
 
                 Text {
                     text: "kute"
@@ -506,9 +520,9 @@ ApplicationWindow {
 
                 Repeater {
                     model: [
-                        { ic: "\ue15b", hover: "#2a2a2e", act: "min" },
-                        { ic: "\ue3c6", hover: "#2a2a2e", act: "max" },
-                        { ic: "\ue5cd", hover: "#4a2a2e", act: "close" }
+                        { ic: "", hover: "#2a2a2e", act: "min" },
+                        { ic: "", hover: "#2a2a2e", act: "max" },
+                        { ic: "", hover: "#4a2a2e", act: "close" }
                     ]
                     delegate: Rectangle {
                         required property var modelData
@@ -544,49 +558,18 @@ ApplicationWindow {
 
         NavBar {
             id: navRail
-            anchors.left: parent.left
-            anchors.leftMargin: 14
+            x: theme.hideNavBar ? -60 : 16
+            Behavior on x { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+            anchors.top: parent.top
+            anchors.topMargin: theme.hideHeader ? 16 : 70
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 88
             width: 60
-            property real _y: 0
-            y: _y
-
-            function _recomputeY() {
-                const topLimit = 76
-                const p = navRail.parent
-                const parentH = p ? p.height : 0
-                const maxY = Math.max(topLimit, parentH - 94 - implicitHeight)
-                switch (theme.navBarPosition) {
-                    case "center": return Math.max(topLimit, (parentH - implicitHeight) / 2)
-                    case "bottom": return maxY
-                    default: return topLimit
-                }
-            }
-            function _applyY() { navRail._y = navRail._recomputeY() }
-
-            Component.onCompleted: _applyY()
-            onImplicitHeightChanged: _applyY()
-
-            Connections {
-                target: navRail.parent
-                function onHeightChanged() { if (navRail) navRail._applyY() }
+            enabled: !theme.hideNavBar
+            Behavior on anchors.topMargin {
+                NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
             }
 
-            NumberAnimation {
-                id: navYMoveAnim
-                target: navRail
-                property: "_y"
-                duration: 340
-                easing.type: Easing.OutCubic
-            }
-            Connections {
-                target: theme
-                function onNavBarPositionChanged() {
-                    navYMoveAnim.stop()
-                    navYMoveAnim.from = navRail._y
-                    navYMoveAnim.to = navRail._recomputeY()
-                    navYMoveAnim.start()
-                }
-            }
             settingsOpen: window.settingsOpen
             searchOpen: window.floatingSearchOpen
             onInfoToggled: window.toggleInfoPanel()
@@ -596,13 +579,16 @@ ApplicationWindow {
             onLyricsRequested: window.toggleLyrics()
             onPageChanged: (page) => {
                 library.clearFilter()
+                library.setActivePlaylist("")
                 if (page === 2) library.showOnlyLiked = false
                 window.closeFloatingSearch()
                 if (trackListPage) {
                     trackListPage.closeSort()
                     trackListPage.closeAddMenu()
                 }
-                if (browseView) browseView.closePlaylistsDialogs()
+                if (browseView) {
+                    browseView.closePlaylistsDialogs()
+                }
                 window.currentPage = page
                 Qt.callLater(window.syncPlaybackContext)
             }
@@ -618,7 +604,10 @@ ApplicationWindow {
         anchors.rightMargin: 16
         anchors.bottomMargin: 16
         height: 62
-        z: 1500
+        z: 500
+        visible: !window.settingsOpen
+        opacity: window.settingsOpen ? 0 : 1
+        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         onCoverClicked: library.infoPanelVisible = !library.infoPanelVisible
         onLikeClicked: window.toggleCurrentLike()
     }
@@ -635,16 +624,17 @@ ApplicationWindow {
         enabled: !window.anyModalOpen
               && (library.filterArtist.length > 0
                   || library.filterAlbum.length > 0
-                  || (window.currentPage === 2
-                      && browseView.currentTab === 0
-                      && browseView.playlistsPageViewing !== ""))
+                  || library.activePlaylistId !== "")
         onActivated: {
-            if (library.filterArtist.length > 0 || library.filterAlbum.length > 0) {
+            if (library.activePlaylistId !== "") {
+                library.setActivePlaylist("")
+                window.currentPage = 2
+                navRail.currentIndex = 1
+                Qt.callLater(window.syncPlaybackContext)
+            } else if (library.filterArtist.length > 0 || library.filterAlbum.length > 0) {
                 library.clearFilter()
                 window.currentPage = 2
                 navRail.currentIndex = 1
-            } else {
-                browseView.closePlaylistDetail()
             }
         }
     }
@@ -654,7 +644,6 @@ ApplicationWindow {
     ModalOverlay {
         id: nowPlayingOverlay
         anchors.fill: parent
-        anchors.bottomMargin: 78
         open: window.settingsOpen
         onCloseRequested: window.settingsOpen = false
         onSaved: window.settingsOpen = false
