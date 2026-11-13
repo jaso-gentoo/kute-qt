@@ -6,9 +6,9 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 
 <table>
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/12495107-bec8-4249-952a-5ae32b46f8e4" width="260"/></td>
-    <td><img src="https://github.com/user-attachments/assets/02ebb28d-c7cb-4ec9-bec2-8ef548cf1455" width="260"/></td>
-    <td><img src="https://github.com/user-attachments/assets/37e5f3c8-f580-40f8-a7f0-dcc7f9932abf" width="260"/></td>
+    <td><img src="https://github.com/user-attachments/assets/12495107-bec8-4249-952a-5ae32b46f8e4" width="280"/></td>
+    <td><img src="https://github.com/user-attachments/assets/02ebb28d-c7cb-4ec9-bec2-8ef548cf1455" width="280"/></td>
+    <td><img src="https://github.com/user-attachments/assets/37e5f3c8-f580-40f8-a7f0-dcc7f9932abf" width="280"/></td>
   </tr>
 </table>
 
@@ -63,6 +63,7 @@ Music player for Linux and Windows, written in C++/Qt6/QML.
 ### Settings
 
 - QSettings file — `~/.config/kute/kute.conf`
+- **Window opacity** — adjustable slider at **Settings** → **Appearance** → **Window opacity** (30%–100%), stored as `ui/windowOpacity`
 
 ### Global
 
@@ -94,24 +95,9 @@ Keys: `background`, `surface`, `onBackground`, `onSurface`, `primary`, `secondar
   "primary": "{{colors.primary.default.hex}}",
   "secondary": "{{colors.tertiary.default.hex}}",
   "background": "{{colors.background.default.hex}}",
-  "surface": "{{colors.surface_container.default.hex}}",
-  "surfaceVariant": "{{colors.surface_container_high.default.hex}}",
+  "surface": "{{colors.surface.default.hex}}",
+  "surfaceVariant": "{{colors.surface_variant.default.hex}}",
   "outline": "{{colors.outline.default.hex}}",
   "onBackground": "{{colors.on_background.default.hex}}",
   "onSurface": "{{colors.on_surface_variant.default.hex}}"
 }
-```
-
-### Building from source
-- Requires `Qt 6.5+`, `TagLib`, `CMake 3.20+`, `C++17 compiler`.
-
-- Build
-```bash
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-```
-
-- Start
-```bash
-./build/kute
-```
