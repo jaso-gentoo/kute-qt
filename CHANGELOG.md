@@ -1,3 +1,17 @@
+## v1.5-rc1 — 2026-11-13
+
+### Added
+- Hide header toggle in Settings → Appearance.
+- Hide navigation bar toggle in Settings → Appearance.
+
+### Changed
+- Play/pause overlay icons on track hover in library and playlist views are now filled.
+- Play/pause icon in the "NOW PLAYING" chip is now filled.
+
+### Fixed
+- Sort menu popup allowed clicks to pass through to the track list.
+- Edit mode could be enabled from Browse while the sort field was not custom, and stayed enabled after returning to Home.
+
 ## v1.5-rc0 — 2026-11-12
 
 ### Added
